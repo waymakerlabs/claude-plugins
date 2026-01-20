@@ -66,6 +66,18 @@ Minimal single-line statusline with Nord Aurora theme.
 
 Then restart Claude Code.
 
+#### Update
+
+Updates are applied automatically when plugin version changes:
+
+1. Update the plugin:
+```bash
+/plugin marketplace update waymakerlabs-claude-plugins
+/plugin update minimal-statusline@waymakerlabs-claude-plugins
+```
+
+2. Restart Claude Code - the new version is automatically applied via SessionStart hook.
+
 #### Manual Installation
 
 If you prefer not to use the plugin system:
