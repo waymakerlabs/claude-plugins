@@ -2,11 +2,10 @@
 # ============================================================================
 # Minimal Statusline by WaymakerLabs
 # ============================================================================
-# Line 1: Model | Style | path (branch)
-# Line 2: Context % | 5H % (time) | 7D % (day)
+# Single line: Model | path (branch) | Context % | 5H % (time) | 7D % (day)
 # No progress bars - just clean gradient-colored percentages
 # ============================================================================
-# v1.1.0 - Nord Aurora theme
+# v1.2.0 - Nord Aurora theme, single line layout
 # ============================================================================
 
 input=$(cat)
@@ -193,7 +192,6 @@ else
 fi
 
 # ============================================================================
-# Output
+# Output (single line)
 # ============================================================================
-printf "%b%b\n" "$LINE1" "$CLR"
-printf "%b%b\n" "$LINE2" "$CLR"
+printf "%b | %b%b\n" "$LINE1" "$LINE2" "$CLR"
