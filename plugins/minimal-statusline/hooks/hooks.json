@@ -1,5 +1,5 @@
 {
-  "description": "Statusline 미설정 시 세션 시작 때 설정 안내",
+  "description": "Prompt setup guide on session start if statusline is not configured",
   "hooks": {
     "SessionStart": [
       {

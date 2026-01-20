@@ -23,7 +23,7 @@ A collection of useful Claude Code plugins by WaymakerLabs.
 
 ### minimal-statusline
 
-Nord Aurora 테마의 미니멀 스테이터스라인 - 한 줄 레이아웃.
+Minimal single-line statusline with Nord Aurora theme.
 
 **Preview:**
 ```
@@ -31,13 +31,13 @@ Opus 4.5 | ~/Dev (main)✓ | Context 4% | 5H 7% (3h18m) | 7D 14% (Fri)
 ```
 
 **Features:**
-| 기능 | 설명 |
-|------|------|
-| Single Line | 한 줄에 모든 정보 표시 |
-| Nord Aurora Theme | 통일된 Nord 팔레트 |
-| No Progress Bars | 바 없이 숫자만 깔끔하게 |
-| Smart Gradient | 사용량에 따라 Green → Yellow → Orange → Red |
-| Git Status | 브랜치명 + 상태 (✓ clean, +staged, !modified, ?untracked) |
+| Feature | Description |
+|---------|-------------|
+| Single Line | All info displayed in one line |
+| Nord Aurora Theme | Unified Nord color palette |
+| No Progress Bars | Clean percentage numbers only |
+| Smart Gradient | Green → Yellow → Orange → Red based on usage |
+| Git Status | Branch name + status (✓ clean, +staged, !modified, ?untracked) |
 
 **Install:**
 ```bash
@@ -69,13 +69,13 @@ chmod +x ~/.claude/minimal-statusline.sh
 
 ## Troubleshooting
 
-### Usage가 N/A로 표시되는 경우
+### Usage shows N/A
 
-API 사용량 조회에는 Claude Pro/Max 구독과 OAuth 인증이 필요합니다.
+API usage requires Claude Pro/Max subscription with OAuth authentication.
 
-### 색상이 이상하게 보이는 경우
+### Colors look wrong
 
-터미널이 True Color (24-bit)를 지원해야 합니다. iTerm2, Warp, Alacritty 등 모던 터미널 사용을 권장합니다.
+Your terminal must support True Color (24-bit). We recommend modern terminals like iTerm2, Warp, or Alacritty.
 
 ---
 
