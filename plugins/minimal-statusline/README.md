@@ -4,14 +4,7 @@ Minimal single-line statusline with Nord Aurora theme.
 
 ## Preview
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ Opus 4.5 | ~/Dev (main)✓ | Full | 5H 8% (2h58m) | 7D 15% (Fri)              │
-│ ────────   ──────────────   ────   ───────────   ────────────               │
-│ Teal       Snow    Green   Green  Blue          Yellow                      │
-│ #8FBCBB    #D8DEE9 #A3BE8C        #81A1C1       #EBCB8B                     │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+![Minimal Statusline Preview](assets/preview.svg)
 
 ## Color Scheme (Nord Aurora)
 

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="50" viewBox="0 0 680 50">
+  <rect width="680" height="50" rx="6" fill="#2E3440"/>
+  <text font-family="Menlo, Monaco, Consolas, monospace" font-size="14" y="30">
+    <tspan x="20" fill="#8FBCBB" font-weight="bold">Opus 4.5</tspan>
+    <tspan fill="#4C566A"> | </tspan>
+    <tspan fill="#D8DEE9">~/Dev </tspan>
+    <tspan fill="#A3BE8C">(main)</tspan>
+    <tspan fill="#A3BE8C">✓</tspan>
+    <tspan fill="#4C566A"> | </tspan>
+    <tspan fill="#A3BE8C" font-weight="bold">Full</tspan>
+    <tspan fill="#4C566A"> | </tspan>
+    <tspan fill="#81A1C1">5H </tspan>
+    <tspan fill="#A3BE8C" font-weight="bold">8%</tspan>
+    <tspan fill="#D8DEE9"> (2h58m)</tspan>
+    <tspan fill="#4C566A"> | </tspan>
+    <tspan fill="#EBCB8B">7D </tspan>
+    <tspan fill="#A3BE8C" font-weight="bold">15%</tspan>
+    <tspan fill="#D8DEE9"> (Fri)</tspan>
+  </text>
+</svg>
