@@ -4,9 +4,7 @@ Minimal single-line statusline with Nord Aurora theme.
 
 ## Preview
 
-```
-Opus 4.5 | ~/Dev (main)✓ | Context 4% | 5H 7% (3h18m) | 7D 14% (Fri)
-```
+![Minimal Statusline Preview](assets/preview.png)
 
 ## Color Scheme (Nord Aurora)
 
