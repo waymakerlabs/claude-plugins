@@ -43,15 +43,17 @@ Model | Directory (branch)status | Context % | 5H % (time) | 7D % (day)
 
 ## Installation
 
+**1. Install plugin**
 ```bash
-# 1. Install plugin
 /plugin install minimal-statusline@waymakerlabs-claude-plugins
-
-# 2. Setup statusline
-/minimal-statusline-start
-
-# 3. Restart Claude Code
 ```
+
+**2. Setup statusline**
+```bash
+/minimal-statusline-start
+```
+
+**3. Restart Claude Code**
 
 > 💡 If statusline is not configured after installation, a setup prompt will appear on session start.
 

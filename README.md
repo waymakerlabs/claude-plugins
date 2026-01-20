@@ -4,18 +4,22 @@ A collection of useful Claude Code plugins by WaymakerLabs.
 
 ## Quick Start
 
+**1. Add marketplace**
 ```bash
-# 1. Add marketplace
 /plugin marketplace add waymakerlabs/claude-plugins
-
-# 2. Install plugin
-/plugin install minimal-statusline@waymakerlabs-claude-plugins
-
-# 3. Setup statusline
-/minimal-statusline-start
-
-# 4. Restart Claude Code
 ```
+
+**2. Install plugin**
+```bash
+/plugin install minimal-statusline@waymakerlabs-claude-plugins
+```
+
+**3. Setup statusline**
+```bash
+/minimal-statusline-start
+```
+
+**4. Restart Claude Code**
 
 ---
 
