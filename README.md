@@ -51,11 +51,6 @@ Minimal single-line statusline with Nord Aurora theme.
 | `Compact` | 5-15% | Run `/compact` soon |
 | `Compact!` | < 5% | Run `/compact` now |
 
-**Install:**
-```bash
-/plugin install minimal-statusline@waymakerlabs-claude-plugins
-```
-
 ---
 
 ## Manual Installation
