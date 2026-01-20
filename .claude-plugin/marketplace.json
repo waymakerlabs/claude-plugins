@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "minimal-statusline",
-      "version": "1.2.0",
+      "version": "1.4.0",
       "description": "Minimal single-line statusline with Nord Aurora theme",
       "author": {
         "name": "waymakerlabs",
@@ -17,7 +17,7 @@
       },
       "source": "./plugins/minimal-statusline",
       "category": "tools",
-      "keywords": ["statusline", "minimal", "clean", "catppuccin"],
+      "keywords": ["statusline", "minimal", "clean", "nord"],
       "homepage": "https://github.com/waymakerlabs/claude-plugins"
     }
   ]

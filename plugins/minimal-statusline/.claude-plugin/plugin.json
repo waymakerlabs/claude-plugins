@@ -1,10 +1,10 @@
 {
   "name": "minimal-statusline",
-  "version": "1.2.0",
+  "version": "1.4.0",
   "description": "Minimal single-line statusline with Nord Aurora theme",
   "author": {
     "name": "waymakerlabs",
     "github": "waymakerlabs"
   },
-  "keywords": ["statusline", "minimal", "clean", "catppuccin"]
+  "keywords": ["statusline", "minimal", "clean", "nord"]
 }

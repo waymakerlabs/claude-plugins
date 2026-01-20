@@ -5,7 +5,7 @@
 # Single line: Model | path (branch) | Context left % | 5H % (time) | 7D % (day)
 # No progress bars - just clean gradient-colored percentages
 # ============================================================================
-# v1.3.0 - Context left (remaining until auto-compact), reversed gradient
+# v1.4.0 - Context status with text labels (Full/Half/Low/Compact)
 # ============================================================================
 
 input=$(cat)
@@ -72,37 +72,28 @@ get_nord_gradient_color() {
     echo "$r;$g;$b"
 }
 
-# For remaining metrics (Context left): high=green, low=red (reversed)
-get_nord_gradient_remaining() {
+# For context status: returns "label|r;g;b"
+get_context_status() {
     local pct=$1
-    local r g b
+    local label r g b
 
     if [[ $pct -gt 50 ]]; then
-        # Green (#A3BE8C)
-        r=163; g=190; b=140
+        label="Full"
+        r=163; g=190; b=140  # Green (#A3BE8C)
     elif [[ $pct -gt 30 ]]; then
-        # Green (#A3BE8C) → Yellow (#EBCB8B)
-        local t=$(((50 - pct) * 100 / 20))
-        r=$((163 + (235 - 163) * t / 100))
-        g=$((190 + (203 - 190) * t / 100))
-        b=$((140 + (139 - 140) * t / 100))
+        label="Half"
+        r=235; g=203; b=139  # Yellow (#EBCB8B)
     elif [[ $pct -gt 15 ]]; then
-        # Yellow (#EBCB8B) → Orange (#D08770)
-        local t=$(((30 - pct) * 100 / 15))
-        r=$((235 + (208 - 235) * t / 100))
-        g=$((203 + (135 - 203) * t / 100))
-        b=$((139 + (112 - 139) * t / 100))
+        label="Low"
+        r=208; g=135; b=112  # Orange (#D08770)
     elif [[ $pct -gt 5 ]]; then
-        # Orange (#D08770) → Red (#BF616A)
-        local t=$(((15 - pct) * 100 / 10))
-        r=$((208 + (191 - 208) * t / 100))
-        g=$((135 + (97 - 135) * t / 100))
-        b=$((112 + (106 - 112) * t / 100))
+        label="Compact"
+        r=191; g=97; b=106   # Red (#BF616A)
     else
-        # Red (#BF616A)
-        r=191; g=97; b=106
+        label="Compact!"
+        r=191; g=97; b=106   # Red (#BF616A)
     fi
-    echo "$r;$g;$b"
+    echo "${label}|${r};${g};${b}"
 }
 
 # ============================================================================
@@ -154,8 +145,16 @@ fi
 CONTEXT_LEFT=$((80 - CONTEXT_USED))
 [[ $CONTEXT_LEFT -lt 0 ]] && CONTEXT_LEFT=0
 
-CTX_COLOR=$(get_nord_gradient_remaining "$CONTEXT_LEFT")
-CTX_DISPLAY="${C_AURORA_ORANGE}Context left${RESET} ${BOLD}\033[38;2;${CTX_COLOR}m${CONTEXT_LEFT}%${RESET}"
+CTX_STATUS=$(get_context_status "$CONTEXT_LEFT")
+CTX_LABEL=$(echo "$CTX_STATUS" | cut -d'|' -f1)
+CTX_COLOR=$(echo "$CTX_STATUS" | cut -d'|' -f2)
+
+# Bold for Compact! (urgent)
+if [[ "$CTX_LABEL" == "Compact!" ]]; then
+    CTX_DISPLAY="${BOLD}\033[38;2;${CTX_COLOR}m${CTX_LABEL}${RESET}"
+else
+    CTX_DISPLAY="\033[38;2;${CTX_COLOR}m${CTX_LABEL}${RESET}"
+fi
 
 # Usage data
 get_usage_data() {
