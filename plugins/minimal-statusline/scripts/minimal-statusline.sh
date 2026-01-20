@@ -16,7 +16,6 @@ MODEL=$(echo "$input" | jq -r '.model.display_name // "Unknown"')
 CURRENT_DIR=$(echo "$input" | jq -r '.workspace.current_dir // "."')
 CONTEXT_SIZE=$(echo "$input" | jq -r '.context_window.context_window_size // 200000')
 CURRENT_USAGE=$(echo "$input" | jq -r '.context_window.current_usage // null')
-OUTPUT_STYLE=$(echo "$input" | jq -r '.output_style.name // ""')
 
 # ============================================================================
 # Colors (Nord theme)
@@ -31,7 +30,7 @@ C_FROST_BLUE="\033[38;2;129;161;193m"    # #81A1C1 - 5H label
 
 # Nord Aurora (accent colors)
 C_AURORA_RED="\033[38;2;191;97;106m"     # #BF616A - Critical
-C_AURORA_ORANGE="\033[38;2;208;135;112m" # #D08770 - Style, warnings
+C_AURORA_ORANGE="\033[38;2;208;135;112m" # #D08770 - Warnings
 C_AURORA_YELLOW="\033[38;2;235;203;139m" # #EBCB8B - 7D label
 C_AURORA_GREEN="\033[38;2;163;190;140m"  # #A3BE8C - Git clean
 C_AURORA_PURPLE="\033[38;2;180;142;173m" # #B48EAD - Context label
@@ -78,9 +77,6 @@ get_nord_gradient_color() {
 
 MODEL_DISPLAY="${BOLD}${C_FROST_TEAL}${MODEL}${RESET}"
 
-STYLE_DISPLAY=""
-[[ -n "$OUTPUT_STYLE" ]] && STYLE_DISPLAY=" | ${C_AURORA_ORANGE}${OUTPUT_STYLE}${RESET}"
-
 DIR_DISPLAY="${C_SNOW}${CURRENT_DIR/$HOME/~}${RESET}"
 
 GIT_DISPLAY=""
@@ -104,7 +100,7 @@ if git rev-parse --git-dir > /dev/null 2>&1; then
     fi
 fi
 
-LINE1="${MODEL_DISPLAY}${STYLE_DISPLAY} | ${DIR_DISPLAY} ${GIT_DISPLAY}"
+LINE1="${MODEL_DISPLAY} | ${DIR_DISPLAY} ${GIT_DISPLAY}"
 
 # ============================================================================
 # Line 2: Context + 5H + 7D (no bars, just percentages)
