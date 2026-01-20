@@ -46,8 +46,16 @@ Model | Directory (branch)status | Context % | 5H % (time) | 7D % (day)
 ## Installation
 
 ```bash
+# 1. Install plugin
+/plugin install minimal-statusline@waymakerlabs-claude-plugins
+
+# 2. Setup statusline
 /minimal-statusline-start
+
+# 3. Restart Claude Code
 ```
+
+> 💡 플러그인 설치 후 statusline이 설정되지 않았으면, 세션 시작 시 자동으로 안내 메시지가 표시됩니다.
 
 ## Credits
 

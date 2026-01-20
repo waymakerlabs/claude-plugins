@@ -11,7 +11,10 @@ A collection of useful Claude Code plugins by WaymakerLabs.
 # 2. Install plugin
 /plugin install minimal-statusline@waymakerlabs-claude-plugins
 
-# 3. Restart Claude Code
+# 3. Setup statusline
+/minimal-statusline-start
+
+# 4. Restart Claude Code
 ```
 
 ---
