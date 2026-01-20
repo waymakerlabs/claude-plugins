@@ -22,15 +22,25 @@ Minimal single-line statusline with Nord Aurora theme.
 
 ![Minimal Statusline Preview](plugins/minimal-statusline/assets/preview.svg)
 
-**Features:**
+**Layout:**
 
-| Feature | Description |
-|---------|-------------|
-| Single Line | All info displayed in one line |
-| Nord Aurora Theme | Unified Nord color palette |
-| Context Labels | `Full` → `Half` → `Low` → `Compact` → `Compact!` |
-| Smart Gradient | Green → Yellow → Orange → Red based on usage |
-| Git Status | Branch name + status (✓ clean, +staged, !modified, ?untracked) |
+| Position | Element | Description |
+|----------|---------|-------------|
+| 1 | Model | Current Claude model (e.g., `Opus 4.5`) |
+| 2 | Directory | Working directory path (e.g., `~/Dev`) |
+| 3 | Git | Branch name + status (e.g., `(main)✓`) |
+| 4 | Context | Remaining context until auto-compact |
+| 5 | 5H | 5-hour API usage % + reset time (e.g., `8% (2h58m)`) |
+| 6 | 7D | 7-day API usage % + reset day (e.g., `15% (Fri)`) |
+
+**Git Status Symbols:**
+
+| Symbol | Meaning |
+|--------|---------|
+| ✓ | Clean (no changes) |
+| + | Staged changes |
+| ! | Unstaged changes |
+| ? | Untracked files |
 
 **Context Status:**
 
