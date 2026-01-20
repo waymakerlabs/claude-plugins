@@ -30,17 +30,32 @@ A collection of useful Claude Code plugins by WaymakerLabs.
 Minimal single-line statusline with Nord Aurora theme.
 
 **Preview:**
-
-![Minimal Statusline Preview](plugins/minimal-statusline/assets/preview.png)
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Opus 4.5 | ~/Dev (main)✓ | Full | 5H 8% (2h58m) | 7D 15% (Fri)              │
+│ ────────   ──────────────   ────   ───────────   ────────────               │
+│ Teal       Snow    Green   Green  Blue          Yellow                      │
+│ #8FBCBB    #D8DEE9 #A3BE8C        #81A1C1       #EBCB8B                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 **Features:**
 | Feature | Description |
 |---------|-------------|
 | Single Line | All info displayed in one line |
 | Nord Aurora Theme | Unified Nord color palette |
-| No Progress Bars | Clean percentage numbers only |
+| Context Labels | `Full` → `Half` → `Low` → `Compact` → `Compact!` |
 | Smart Gradient | Green → Yellow → Orange → Red based on usage |
 | Git Status | Branch name + status (✓ clean, +staged, !modified, ?untracked) |
+
+**Context Status:**
+| Label | Remaining | Action |
+|-------|-----------|--------|
+| `Full` | > 50% | Plenty of context |
+| `Half` | 30-50% | Midway point |
+| `Low` | 15-30% | Consider wrapping up |
+| `Compact` | 5-15% | Run `/compact` soon |
+| `Compact!` | < 5% | Run `/compact` now |
 
 **Install:**
 ```bash
