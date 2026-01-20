@@ -2,10 +2,10 @@
 # ============================================================================
 # Minimal Statusline by WaymakerLabs
 # ============================================================================
-# Single line: Model | path (branch) | Context % | 5H % (time) | 7D % (day)
+# Single line: Model | path (branch) | Context left % | 5H % (time) | 7D % (day)
 # No progress bars - just clean gradient-colored percentages
 # ============================================================================
-# v1.2.0 - Nord Aurora theme, single line layout
+# v1.3.0 - Context left (remaining until auto-compact), reversed gradient
 # ============================================================================
 
 input=$(cat)
@@ -39,8 +39,10 @@ C_SNOW="\033[38;2;216;222;233m"          # #D8DEE9 - Subtext
 C_POLAR="\033[38;2;76;86;106m"           # #4C566A - Overlay/dimmed
 
 # ============================================================================
-# Gradient Functions (Nord Aurora: Green → Yellow → Orange → Red)
+# Gradient Functions (Nord Aurora)
 # ============================================================================
+
+# For usage metrics (5H, 7D): low=green, high=red
 get_nord_gradient_color() {
     local pct=$1
     local r g b
@@ -60,6 +62,39 @@ get_nord_gradient_color() {
     elif [[ $pct -lt 85 ]]; then
         # Orange (#D08770) → Red (#BF616A)
         local t=$(((pct - 60) * 100 / 25))
+        r=$((208 + (191 - 208) * t / 100))
+        g=$((135 + (97 - 135) * t / 100))
+        b=$((112 + (106 - 112) * t / 100))
+    else
+        # Red (#BF616A)
+        r=191; g=97; b=106
+    fi
+    echo "$r;$g;$b"
+}
+
+# For remaining metrics (Context left): high=green, low=red (reversed)
+get_nord_gradient_remaining() {
+    local pct=$1
+    local r g b
+
+    if [[ $pct -gt 50 ]]; then
+        # Green (#A3BE8C)
+        r=163; g=190; b=140
+    elif [[ $pct -gt 30 ]]; then
+        # Green (#A3BE8C) → Yellow (#EBCB8B)
+        local t=$(((50 - pct) * 100 / 20))
+        r=$((163 + (235 - 163) * t / 100))
+        g=$((190 + (203 - 190) * t / 100))
+        b=$((140 + (139 - 140) * t / 100))
+    elif [[ $pct -gt 15 ]]; then
+        # Yellow (#EBCB8B) → Orange (#D08770)
+        local t=$(((30 - pct) * 100 / 15))
+        r=$((235 + (208 - 235) * t / 100))
+        g=$((203 + (135 - 203) * t / 100))
+        b=$((139 + (112 - 139) * t / 100))
+    elif [[ $pct -gt 5 ]]; then
+        # Orange (#D08770) → Red (#BF616A)
+        local t=$(((15 - pct) * 100 / 10))
         r=$((208 + (191 - 208) * t / 100))
         g=$((135 + (97 - 135) * t / 100))
         b=$((112 + (106 - 112) * t / 100))
@@ -105,17 +140,22 @@ LINE1="${MODEL_DISPLAY} | ${DIR_DISPLAY} ${GIT_DISPLAY}"
 # Line 2: Context + 5H + 7D (no bars, just percentages)
 # ============================================================================
 
-CONTEXT_PERCENT=0
+# Calculate context remaining until auto-compact (80% threshold)
+CONTEXT_USED=0
 if [[ "$CURRENT_USAGE" != "null" && -n "$CURRENT_USAGE" ]]; then
     INPUT_TOKENS=$(echo "$CURRENT_USAGE" | jq -r '.input_tokens // 0')
     CACHE_CREATE=$(echo "$CURRENT_USAGE" | jq -r '.cache_creation_input_tokens // 0')
     CACHE_READ=$(echo "$CURRENT_USAGE" | jq -r '.cache_read_input_tokens // 0')
     CURRENT_TOKENS=$((INPUT_TOKENS + CACHE_CREATE + CACHE_READ))
-    [[ "$CONTEXT_SIZE" -gt 0 ]] && CONTEXT_PERCENT=$((CURRENT_TOKENS * 100 / CONTEXT_SIZE))
+    [[ "$CONTEXT_SIZE" -gt 0 ]] && CONTEXT_USED=$((CURRENT_TOKENS * 100 / CONTEXT_SIZE))
 fi
 
-CTX_COLOR=$(get_nord_gradient_color "$CONTEXT_PERCENT")
-CTX_DISPLAY="${C_AURORA_ORANGE}Context${RESET} ${BOLD}\033[38;2;${CTX_COLOR}m${CONTEXT_PERCENT}%${RESET}"
+# Context left = 80% (auto-compact threshold) - used%
+CONTEXT_LEFT=$((80 - CONTEXT_USED))
+[[ $CONTEXT_LEFT -lt 0 ]] && CONTEXT_LEFT=0
+
+CTX_COLOR=$(get_nord_gradient_remaining "$CONTEXT_LEFT")
+CTX_DISPLAY="${C_AURORA_ORANGE}Context left${RESET} ${BOLD}\033[38;2;${CTX_COLOR}m${CONTEXT_LEFT}%${RESET}"
 
 # Usage data
 get_usage_data() {
