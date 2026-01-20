@@ -116,7 +116,7 @@ if [[ "$CURRENT_USAGE" != "null" && -n "$CURRENT_USAGE" ]]; then
 fi
 
 CTX_COLOR=$(get_nord_gradient_color "$CONTEXT_PERCENT")
-CTX_DISPLAY="${C_AURORA_PURPLE}Context${RESET} ${BOLD}\033[38;2;${CTX_COLOR}m${CONTEXT_PERCENT}%${RESET}"
+CTX_DISPLAY="${C_AURORA_ORANGE}Context${RESET} ${BOLD}\033[38;2;${CTX_COLOR}m${CONTEXT_PERCENT}%${RESET}"
 
 # Usage data
 get_usage_data() {
