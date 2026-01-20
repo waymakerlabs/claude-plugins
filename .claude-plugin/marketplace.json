@@ -1,0 +1,24 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "waymakerlabs-claude-plugins",
+  "description": "A collection of useful Claude Code plugins by WaymakerLabs",
+  "owner": {
+    "name": "waymakerlabs",
+    "email": "peter@waymakerlabs.com"
+  },
+  "plugins": [
+    {
+      "name": "minimal-statusline",
+      "version": "1.0.0",
+      "description": "Clean minimal statusline - no progress bars, just numbers with gradient colors",
+      "author": {
+        "name": "waymakerlabs",
+        "email": "your-email@example.com"
+      },
+      "source": "./plugins/minimal-statusline",
+      "category": "tools",
+      "keywords": ["statusline", "minimal", "clean", "catppuccin"],
+      "homepage": "https://github.com/waymakerlabs/claude-plugins"
+    }
+  ]
+}

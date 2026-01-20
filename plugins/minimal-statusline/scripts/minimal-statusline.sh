@@ -1,0 +1,223 @@
+#!/bin/bash
+# ============================================================================
+# Minimal Statusline by WaymakerLabs
+# ============================================================================
+# Line 1: Model | Style | path (branch)
+# Line 2: Context % | 5H % (time) | 7D % (day)
+# No progress bars - just clean gradient-colored percentages
+# ============================================================================
+# v1.0.0 - Based on Awesome Statusline, bars removed for minimal look
+# ============================================================================
+
+input=$(cat)
+
+# Parse JSON input
+MODEL=$(echo "$input" | jq -r '.model.display_name // "Unknown"')
+CURRENT_DIR=$(echo "$input" | jq -r '.workspace.current_dir // "."')
+CONTEXT_SIZE=$(echo "$input" | jq -r '.context_window.context_window_size // 200000')
+CURRENT_USAGE=$(echo "$input" | jq -r '.context_window.current_usage // null')
+OUTPUT_STYLE=$(echo "$input" | jq -r '.output_style.name // ""')
+
+# ============================================================================
+# Colors (Catppuccin theme)
+# ============================================================================
+RESET="\033[0m"
+BOLD="\033[1m"
+CLR="\033[K"
+
+C_TEAL="\033[38;2;148;226;213m"
+C_PINK="\033[38;2;245;194;231m"
+C_PEACH="\033[38;2;250;179;135m"
+C_GREEN="\033[38;2;166;227;161m"
+C_SUBTEXT="\033[38;2;166;173;200m"
+C_LAVENDER="\033[38;2;180;190;254m"
+C_YELLOW="\033[38;2;249;226;175m"
+C_OVERLAY="\033[38;2;108;112;134m"
+C_LATTE_GREEN="\033[38;2;64;160;43m"
+C_LATTE_YELLOW="\033[38;2;223;142;29m"
+
+# ============================================================================
+# Gradient Functions (for percentage colors)
+# ============================================================================
+get_context_gradient_color() {
+    local pct=$1
+    local r g b
+    if [[ $pct -lt 30 ]]; then
+        local t=$((pct * 100 / 30))
+        r=$((245 + (230 - 245) * t / 100))
+        g=$((194 + (69 - 194) * t / 100))
+        b=$((231 + (83 - 231) * t / 100))
+    elif [[ $pct -lt 70 ]]; then
+        local t=$(((pct - 30) * 100 / 40))
+        r=$((230 + (210 - 230) * t / 100))
+        g=$((69 + (15 - 69) * t / 100))
+        b=$((83 + (57 - 83) * t / 100))
+    else
+        r=210; g=15; b=57
+    fi
+    echo "$r;$g;$b"
+}
+
+get_usage_gradient_color() {
+    local pct=$1
+    local r g b
+    if [[ $pct -lt 50 ]]; then
+        local t=$((pct * 2))
+        r=$((180 + (30 - 180) * t / 100))
+        g=$((190 + (102 - 190) * t / 100))
+        b=$((254 + (245 - 254) * t / 100))
+    else
+        local t=$(((pct - 50) * 2))
+        r=$((30 + (210 - 30) * t / 100))
+        g=$((102 + (15 - 102) * t / 100))
+        b=$((245 + (57 - 245) * t / 100))
+    fi
+    echo "$r;$g;$b"
+}
+
+get_usage_7d_gradient_color() {
+    local pct=$1
+    local r g b
+    if [[ $pct -lt 50 ]]; then
+        local t=$((pct * 2))
+        r=$((249 + (254 - 249) * t / 100))
+        g=$((226 + (100 - 226) * t / 100))
+        b=$((175 + (11 - 175) * t / 100))
+    else
+        local t=$(((pct - 50) * 2))
+        r=$((254 + (210 - 254) * t / 100))
+        g=$((100 + (15 - 100) * t / 100))
+        b=$((11 + (57 - 11) * t / 100))
+    fi
+    echo "$r;$g;$b"
+}
+
+# ============================================================================
+# Line 1: Model | Style | Directory + Git
+# ============================================================================
+
+MODEL_DISPLAY="${BOLD}${C_TEAL}${MODEL}${RESET}"
+
+STYLE_DISPLAY=""
+[[ -n "$OUTPUT_STYLE" ]] && STYLE_DISPLAY=" | ${C_PEACH}${OUTPUT_STYLE}${RESET}"
+
+DIR_DISPLAY="${C_SUBTEXT}${CURRENT_DIR/$HOME/~}${RESET}"
+
+GIT_DISPLAY=""
+cd "$CURRENT_DIR" 2>/dev/null
+if git rev-parse --git-dir > /dev/null 2>&1; then
+    BRANCH=$(git branch --show-current 2>/dev/null)
+    [[ -n "$BRANCH" ]] && GIT_DISPLAY="${C_LATTE_GREEN}(${BRANCH})${RESET}"
+
+    STAGED=$(git diff --cached --name-only 2>/dev/null | wc -l | tr -d ' ')
+    UNSTAGED=$(git diff --name-only 2>/dev/null | wc -l | tr -d ' ')
+    UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null | wc -l | tr -d ' ')
+
+    if [[ "$STAGED" -eq 0 && "$UNSTAGED" -eq 0 && "$UNTRACKED" -eq 0 ]]; then
+        GIT_DISPLAY="${GIT_DISPLAY}${C_GREEN}✓${RESET}"
+    else
+        STATUS=""
+        [[ "$STAGED" -gt 0 ]] && STATUS="${STATUS}+"
+        [[ "$UNSTAGED" -gt 0 ]] && STATUS="${STATUS}!"
+        [[ "$UNTRACKED" -gt 0 ]] && STATUS="${STATUS}?"
+        GIT_DISPLAY="${GIT_DISPLAY}${C_LATTE_YELLOW}${STATUS}${RESET}"
+    fi
+fi
+
+LINE1="${MODEL_DISPLAY}${STYLE_DISPLAY} | ${DIR_DISPLAY} ${GIT_DISPLAY}"
+
+# ============================================================================
+# Line 2: Context + 5H + 7D (no bars, just percentages)
+# ============================================================================
+
+CONTEXT_PERCENT=0
+if [[ "$CURRENT_USAGE" != "null" && -n "$CURRENT_USAGE" ]]; then
+    INPUT_TOKENS=$(echo "$CURRENT_USAGE" | jq -r '.input_tokens // 0')
+    CACHE_CREATE=$(echo "$CURRENT_USAGE" | jq -r '.cache_creation_input_tokens // 0')
+    CACHE_READ=$(echo "$CURRENT_USAGE" | jq -r '.cache_read_input_tokens // 0')
+    CURRENT_TOKENS=$((INPUT_TOKENS + CACHE_CREATE + CACHE_READ))
+    [[ "$CONTEXT_SIZE" -gt 0 ]] && CONTEXT_PERCENT=$((CURRENT_TOKENS * 100 / CONTEXT_SIZE))
+fi
+
+CTX_END_COLOR=$(get_context_gradient_color "$CONTEXT_PERCENT")
+CTX_DISPLAY="${C_PINK}Context${RESET} ${BOLD}\033[38;2;${CTX_END_COLOR}m${CONTEXT_PERCENT}%${RESET}"
+
+# Usage data
+get_usage_data() {
+    local token
+    token=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
+    [[ -z "$token" ]] && return 1
+
+    local cache_file="/tmp/.claude_usage_cache"
+    if [[ -f "$cache_file" ]]; then
+        local file_age=$(($(date +%s) - $(stat -f %m "$cache_file" 2>/dev/null || echo 0)))
+        [[ "$file_age" -lt 300 ]] && cat "$cache_file" && return 0
+    fi
+
+    local response
+    response=$(curl -s --max-time 3 \
+        -H "Authorization: Bearer $token" \
+        -H "Content-Type: application/json" \
+        -H "anthropic-beta: oauth-2025-04-20" \
+        "https://api.anthropic.com/api/oauth/usage" 2>/dev/null)
+
+    if [[ -n "$response" ]] && echo "$response" | jq -e '.five_hour' &>/dev/null; then
+        echo "$response" > "$cache_file"
+        echo "$response"
+        return 0
+    fi
+    return 1
+}
+
+format_time_remaining() {
+    local iso_ts="$1"
+    [[ -z "$iso_ts" || "$iso_ts" == "null" ]] && return
+    local normalized=$(echo "$iso_ts" | sed 's/\.[0-9]*//')
+    local mac_ts=$(echo "$normalized" | sed 's/+00:00/+0000/; s/Z$/+0000/; s/+\([0-9][0-9]\):\([0-9][0-9]\)/+\1\2/')
+    local reset_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S%z" "$mac_ts" "+%s" 2>/dev/null)
+    [[ -z "$reset_epoch" ]] && return
+    local now_epoch=$(date +%s)
+    local remaining=$((reset_epoch - now_epoch))
+    [[ $remaining -lt 0 ]] && remaining=0
+    local hours=$((remaining / 3600))
+    local minutes=$(((remaining % 3600) / 60))
+    echo "${hours}h${minutes}m"
+}
+
+format_reset_day() {
+    local iso_ts="$1"
+    [[ -z "$iso_ts" || "$iso_ts" == "null" ]] && return
+    local normalized=$(echo "$iso_ts" | sed 's/\.[0-9]*//')
+    local mac_ts=$(echo "$normalized" | sed 's/+00:00/+0000/; s/Z$/+0000/; s/+\([0-9][0-9]\):\([0-9][0-9]\)/+\1\2/')
+    local reset_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S%z" "$mac_ts" "+%s" 2>/dev/null)
+    [[ -z "$reset_epoch" ]] && return
+    date -j -f "%s" "$reset_epoch" "+%a" 2>/dev/null
+}
+
+USAGE_DATA=$(get_usage_data)
+
+if [[ -n "$USAGE_DATA" ]]; then
+    FIVE_HOUR=$(echo "$USAGE_DATA" | jq -r '.five_hour.utilization // 0' | xargs printf "%.0f")
+    FIVE_RESET=$(echo "$USAGE_DATA" | jq -r '.five_hour.resets_at // empty')
+    SEVEN_DAY=$(echo "$USAGE_DATA" | jq -r '.seven_day.utilization // 0' | xargs printf "%.0f")
+    SEVEN_RESET=$(echo "$USAGE_DATA" | jq -r '.seven_day.resets_at // empty')
+
+    FIVE_RESET_FMT=$(format_time_remaining "$FIVE_RESET")
+    SEVEN_RESET_FMT=$(format_reset_day "$SEVEN_RESET")
+
+    FIVE_END_COLOR=$(get_usage_gradient_color "$FIVE_HOUR")
+    SEVEN_END_COLOR=$(get_usage_7d_gradient_color "$SEVEN_DAY")
+
+    FIVE_DISPLAY="${C_LAVENDER}5H${RESET} ${BOLD}\033[38;2;${FIVE_END_COLOR}m${FIVE_HOUR}%${RESET} (${FIVE_RESET_FMT})"
+    SEVEN_DISPLAY="${C_YELLOW}7D${RESET} ${BOLD}\033[38;2;${SEVEN_END_COLOR}m${SEVEN_DAY}%${RESET} (${SEVEN_RESET_FMT})"
+
+    LINE2="${CTX_DISPLAY} | ${FIVE_DISPLAY} | ${SEVEN_DISPLAY}"
+else
+    LINE2="${CTX_DISPLAY} | ${C_OVERLAY}Usage: N/A${RESET}"
+fi
+
+# ============================================================================
+# Output
+# ============================================================================
+printf "%b%b\n" "$LINE1" "$CLR"
+printf "%b%b\n" "$LINE2" "$CLR"

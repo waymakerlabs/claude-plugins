@@ -1,0 +1,10 @@
+{
+  "name": "minimal-statusline",
+  "version": "1.0.0",
+  "description": "Clean minimal statusline without progress bars - just gradient-colored percentages",
+  "author": {
+    "name": "waymakerlabs",
+    "github": "waymakerlabs"
+  },
+  "keywords": ["statusline", "minimal", "clean", "catppuccin"]
+}
