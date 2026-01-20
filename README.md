@@ -2,24 +2,13 @@
 
 A collection of useful Claude Code plugins by WaymakerLabs.
 
-## Quick Start
+## Add Marketplace
 
-**1. Add marketplace**
+First, add the WaymakerLabs marketplace to Claude Code:
+
 ```bash
 /plugin marketplace add waymakerlabs/claude-plugins
 ```
-
-**2. Install plugin**
-```bash
-/plugin install minimal-statusline@waymakerlabs-claude-plugins
-```
-
-**3. Setup statusline**
-```bash
-/minimal-statusline-start
-```
-
-**4. Restart Claude Code**
 
 ---
 
@@ -34,6 +23,7 @@ Minimal single-line statusline with Nord Aurora theme.
 ![Minimal Statusline Preview](plugins/minimal-statusline/assets/preview.svg)
 
 **Features:**
+
 | Feature | Description |
 |---------|-------------|
 | Single Line | All info displayed in one line |
@@ -43,6 +33,7 @@ Minimal single-line statusline with Nord Aurora theme.
 | Git Status | Branch name + status (✓ clean, +staged, !modified, ?untracked) |
 
 **Context Status:**
+
 | Label | Remaining | Action |
 |-------|-----------|--------|
 | `Full` | > 50% | Plenty of context |
@@ -51,19 +42,39 @@ Minimal single-line statusline with Nord Aurora theme.
 | `Compact` | 5-15% | Run `/compact` soon |
 | `Compact!` | < 5% | Run `/compact` now |
 
----
-
-## Manual Installation
+#### Install
 
 ```bash
-# 1. Download script
+/plugin install minimal-statusline@waymakerlabs-claude-plugins
+```
+
+#### Setup
+
+```bash
+/minimal-statusline-start
+```
+
+Then restart Claude Code.
+
+#### Manual Installation
+
+If you prefer not to use the plugin system:
+
+**1. Download script**
+```bash
 curl -o ~/.claude/minimal-statusline.sh \
   https://raw.githubusercontent.com/waymakerlabs/claude-plugins/main/plugins/minimal-statusline/scripts/minimal-statusline.sh
+```
 
-# 2. Make executable
+**2. Make executable**
+```bash
 chmod +x ~/.claude/minimal-statusline.sh
+```
 
-# 3. Add to settings.json (~/.claude/settings.json)
+**3. Add to settings.json**
+
+Add to `~/.claude/settings.json`:
+```json
 {
   "statusLine": {
     "type": "command",
@@ -71,6 +82,10 @@ chmod +x ~/.claude/minimal-statusline.sh
   }
 }
 ```
+
+#### Credits
+
+Based on [Awesome Statusline](https://github.com/awesomejun/awesome-claude-plugins) by awesomejun
 
 ---
 
@@ -83,12 +98,6 @@ API usage requires Claude Pro/Max subscription with OAuth authentication.
 ### Colors look wrong
 
 Your terminal must support True Color (24-bit). We recommend modern terminals like iTerm2, Warp, or Alacritty.
-
----
-
-## Credits
-
-- **minimal-statusline**: Based on [Awesome Statusline](https://github.com/awesomejun/awesome-claude-plugins) by awesomejun
 
 ## License
 
