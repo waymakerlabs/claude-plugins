@@ -4,21 +4,15 @@ A collection of useful Claude Code plugins by WaymakerLabs.
 
 ## Quick Start
 
-### 1. Add Marketplace
-
 ```bash
+# 1. Add marketplace
 /plugin marketplace add waymakerlabs/claude-plugins
-```
 
-### 2. Install Plugin
-
-```bash
+# 2. Install plugin
 /plugin install minimal-statusline@waymakerlabs-claude-plugins
+
+# 3. Restart Claude Code
 ```
-
-### 3. Restart Claude Code
-
-설치 후 Claude Code를 재시작하면 새 statusline이 적용됩니다.
 
 ---
 
@@ -26,49 +20,40 @@ A collection of useful Claude Code plugins by WaymakerLabs.
 
 ### minimal-statusline
 
-Nord Aurora 테마의 미니멀 스테이터스라인 - 프로그레스 바 없이 깔끔한 퍼센트만 표시.
+Nord Aurora 테마의 미니멀 스테이터스라인 - 한 줄 레이아웃.
 
 **Preview:**
 ```
-Opus 4.5 | Explanatory | ~/Dev (main)✓
-Context 4% | 5H 0% (3h43m) | 7D 14% (Fri)
+Opus 4.5 | ~/Dev (main)✓ | Context 4% | 5H 7% (3h18m) | 7D 14% (Fri)
 ```
 
 **Features:**
 | 기능 | 설명 |
 |------|------|
-| Nord Aurora Theme | 통일된 Nord 팔레트 (Frost, Aurora, Snow Storm) |
-| No Progress Bars | 바 없이 숫자만 깔끔하게 표시 |
+| Single Line | 한 줄에 모든 정보 표시 |
+| Nord Aurora Theme | 통일된 Nord 팔레트 |
+| No Progress Bars | 바 없이 숫자만 깔끔하게 |
 | Smart Gradient | 사용량에 따라 Green → Yellow → Orange → Red |
-| Git Status | 브랜치명 + 상태 표시 (✓ clean, +staged, !modified, ?untracked) |
-| API Usage | 5시간/7일 사용량 및 리셋 시간 표시 |
+| Git Status | 브랜치명 + 상태 (✓ clean, +staged, !modified, ?untracked) |
 
-**Line 1 구성:**
-- 모델명 (Opus 4.5, Sonnet 등)
-- Output Style (있는 경우)
-- 현재 디렉토리 경로
-- Git 브랜치 및 상태
-
-**Line 2 구성:**
-- `Context`: 현재 대화의 컨텍스트 윈도우 사용률
-- `5H`: 5시간 API 사용량 + 리셋까지 남은 시간
-- `7D`: 7일 API 사용량 + 리셋 요일
+**Install:**
+```bash
+/plugin install minimal-statusline@waymakerlabs-claude-plugins
+```
 
 ---
 
 ## Manual Installation
 
-플러그인 마켓플레이스 없이 수동으로 설치하려면:
-
 ```bash
-# 1. 스크립트 다운로드
+# 1. Download script
 curl -o ~/.claude/minimal-statusline.sh \
   https://raw.githubusercontent.com/waymakerlabs/claude-plugins/main/plugins/minimal-statusline/scripts/minimal-statusline.sh
 
-# 2. 실행 권한 부여
+# 2. Make executable
 chmod +x ~/.claude/minimal-statusline.sh
 
-# 3. settings.json에 추가 (~/.claude/settings.json)
+# 3. Add to settings.json (~/.claude/settings.json)
 {
   "statusLine": {
     "type": "command",
