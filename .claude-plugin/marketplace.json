@@ -9,8 +9,8 @@
   "plugins": [
     {
       "name": "minimal-statusline",
-      "version": "1.0.0",
-      "description": "Clean minimal statusline - no progress bars, just numbers with gradient colors",
+      "version": "1.1.0",
+      "description": "Clean minimal statusline with Nord Aurora theme - no progress bars, just gradient-colored percentages",
       "author": {
         "name": "waymakerlabs",
         "email": "your-email@example.com"

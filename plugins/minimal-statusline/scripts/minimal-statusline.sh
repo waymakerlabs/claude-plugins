@@ -6,7 +6,7 @@
 # Line 2: Context % | 5H % (time) | 7D % (day)
 # No progress bars - just clean gradient-colored percentages
 # ============================================================================
-# v1.0.0 - Based on Awesome Statusline, bars removed for minimal look
+# v1.1.0 - Nord Aurora theme
 # ============================================================================
 
 input=$(cat)
@@ -19,75 +19,55 @@ CURRENT_USAGE=$(echo "$input" | jq -r '.context_window.current_usage // null')
 OUTPUT_STYLE=$(echo "$input" | jq -r '.output_style.name // ""')
 
 # ============================================================================
-# Colors (Catppuccin theme)
+# Colors (Nord theme)
 # ============================================================================
 RESET="\033[0m"
 BOLD="\033[1m"
 CLR="\033[K"
 
-C_TEAL="\033[38;2;148;226;213m"
-C_PINK="\033[38;2;245;194;231m"
-C_PEACH="\033[38;2;250;179;135m"
-C_GREEN="\033[38;2;166;227;161m"
-C_SUBTEXT="\033[38;2;166;173;200m"
-C_LAVENDER="\033[38;2;180;190;254m"
-C_YELLOW="\033[38;2;249;226;175m"
-C_OVERLAY="\033[38;2;108;112;134m"
-C_LATTE_GREEN="\033[38;2;64;160;43m"
-C_LATTE_YELLOW="\033[38;2;223;142;29m"
+# Nord Frost (cool blues)
+C_FROST_TEAL="\033[38;2;143;188;187m"    # #8FBCBB - Model name
+C_FROST_BLUE="\033[38;2;129;161;193m"    # #81A1C1 - 5H label
+
+# Nord Aurora (accent colors)
+C_AURORA_RED="\033[38;2;191;97;106m"     # #BF616A - Critical
+C_AURORA_ORANGE="\033[38;2;208;135;112m" # #D08770 - Style, warnings
+C_AURORA_YELLOW="\033[38;2;235;203;139m" # #EBCB8B - 7D label
+C_AURORA_GREEN="\033[38;2;163;190;140m"  # #A3BE8C - Git clean
+C_AURORA_PURPLE="\033[38;2;180;142;173m" # #B48EAD - Context label
+
+# Nord Snow Storm & Polar Night
+C_SNOW="\033[38;2;216;222;233m"          # #D8DEE9 - Subtext
+C_POLAR="\033[38;2;76;86;106m"           # #4C566A - Overlay/dimmed
 
 # ============================================================================
-# Gradient Functions (for percentage colors)
+# Gradient Functions (Nord Aurora: Green → Yellow → Orange → Red)
 # ============================================================================
-get_context_gradient_color() {
+get_nord_gradient_color() {
     local pct=$1
     local r g b
+
     if [[ $pct -lt 30 ]]; then
+        # Green (#A3BE8C) → Yellow (#EBCB8B)
         local t=$((pct * 100 / 30))
-        r=$((245 + (230 - 245) * t / 100))
-        g=$((194 + (69 - 194) * t / 100))
-        b=$((231 + (83 - 231) * t / 100))
-    elif [[ $pct -lt 70 ]]; then
-        local t=$(((pct - 30) * 100 / 40))
-        r=$((230 + (210 - 230) * t / 100))
-        g=$((69 + (15 - 69) * t / 100))
-        b=$((83 + (57 - 83) * t / 100))
+        r=$((163 + (235 - 163) * t / 100))
+        g=$((190 + (203 - 190) * t / 100))
+        b=$((140 + (139 - 140) * t / 100))
+    elif [[ $pct -lt 60 ]]; then
+        # Yellow (#EBCB8B) → Orange (#D08770)
+        local t=$(((pct - 30) * 100 / 30))
+        r=$((235 + (208 - 235) * t / 100))
+        g=$((203 + (135 - 203) * t / 100))
+        b=$((139 + (112 - 139) * t / 100))
+    elif [[ $pct -lt 85 ]]; then
+        # Orange (#D08770) → Red (#BF616A)
+        local t=$(((pct - 60) * 100 / 25))
+        r=$((208 + (191 - 208) * t / 100))
+        g=$((135 + (97 - 135) * t / 100))
+        b=$((112 + (106 - 112) * t / 100))
     else
-        r=210; g=15; b=57
-    fi
-    echo "$r;$g;$b"
-}
-
-get_usage_gradient_color() {
-    local pct=$1
-    local r g b
-    if [[ $pct -lt 50 ]]; then
-        local t=$((pct * 2))
-        r=$((180 + (30 - 180) * t / 100))
-        g=$((190 + (102 - 190) * t / 100))
-        b=$((254 + (245 - 254) * t / 100))
-    else
-        local t=$(((pct - 50) * 2))
-        r=$((30 + (210 - 30) * t / 100))
-        g=$((102 + (15 - 102) * t / 100))
-        b=$((245 + (57 - 245) * t / 100))
-    fi
-    echo "$r;$g;$b"
-}
-
-get_usage_7d_gradient_color() {
-    local pct=$1
-    local r g b
-    if [[ $pct -lt 50 ]]; then
-        local t=$((pct * 2))
-        r=$((249 + (254 - 249) * t / 100))
-        g=$((226 + (100 - 226) * t / 100))
-        b=$((175 + (11 - 175) * t / 100))
-    else
-        local t=$(((pct - 50) * 2))
-        r=$((254 + (210 - 254) * t / 100))
-        g=$((100 + (15 - 100) * t / 100))
-        b=$((11 + (57 - 11) * t / 100))
+        # Red (#BF616A)
+        r=191; g=97; b=106
     fi
     echo "$r;$g;$b"
 }
@@ -96,31 +76,31 @@ get_usage_7d_gradient_color() {
 # Line 1: Model | Style | Directory + Git
 # ============================================================================
 
-MODEL_DISPLAY="${BOLD}${C_TEAL}${MODEL}${RESET}"
+MODEL_DISPLAY="${BOLD}${C_FROST_TEAL}${MODEL}${RESET}"
 
 STYLE_DISPLAY=""
-[[ -n "$OUTPUT_STYLE" ]] && STYLE_DISPLAY=" | ${C_PEACH}${OUTPUT_STYLE}${RESET}"
+[[ -n "$OUTPUT_STYLE" ]] && STYLE_DISPLAY=" | ${C_AURORA_ORANGE}${OUTPUT_STYLE}${RESET}"
 
-DIR_DISPLAY="${C_SUBTEXT}${CURRENT_DIR/$HOME/~}${RESET}"
+DIR_DISPLAY="${C_SNOW}${CURRENT_DIR/$HOME/~}${RESET}"
 
 GIT_DISPLAY=""
 cd "$CURRENT_DIR" 2>/dev/null
 if git rev-parse --git-dir > /dev/null 2>&1; then
     BRANCH=$(git branch --show-current 2>/dev/null)
-    [[ -n "$BRANCH" ]] && GIT_DISPLAY="${C_LATTE_GREEN}(${BRANCH})${RESET}"
+    [[ -n "$BRANCH" ]] && GIT_DISPLAY="${C_AURORA_GREEN}(${BRANCH})${RESET}"
 
     STAGED=$(git diff --cached --name-only 2>/dev/null | wc -l | tr -d ' ')
     UNSTAGED=$(git diff --name-only 2>/dev/null | wc -l | tr -d ' ')
     UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null | wc -l | tr -d ' ')
 
     if [[ "$STAGED" -eq 0 && "$UNSTAGED" -eq 0 && "$UNTRACKED" -eq 0 ]]; then
-        GIT_DISPLAY="${GIT_DISPLAY}${C_GREEN}✓${RESET}"
+        GIT_DISPLAY="${GIT_DISPLAY}${C_AURORA_GREEN}✓${RESET}"
     else
         STATUS=""
         [[ "$STAGED" -gt 0 ]] && STATUS="${STATUS}+"
         [[ "$UNSTAGED" -gt 0 ]] && STATUS="${STATUS}!"
         [[ "$UNTRACKED" -gt 0 ]] && STATUS="${STATUS}?"
-        GIT_DISPLAY="${GIT_DISPLAY}${C_LATTE_YELLOW}${STATUS}${RESET}"
+        GIT_DISPLAY="${GIT_DISPLAY}${C_AURORA_YELLOW}${STATUS}${RESET}"
     fi
 fi
 
@@ -139,8 +119,8 @@ if [[ "$CURRENT_USAGE" != "null" && -n "$CURRENT_USAGE" ]]; then
     [[ "$CONTEXT_SIZE" -gt 0 ]] && CONTEXT_PERCENT=$((CURRENT_TOKENS * 100 / CONTEXT_SIZE))
 fi
 
-CTX_END_COLOR=$(get_context_gradient_color "$CONTEXT_PERCENT")
-CTX_DISPLAY="${C_PINK}Context${RESET} ${BOLD}\033[38;2;${CTX_END_COLOR}m${CONTEXT_PERCENT}%${RESET}"
+CTX_COLOR=$(get_nord_gradient_color "$CONTEXT_PERCENT")
+CTX_DISPLAY="${C_AURORA_PURPLE}Context${RESET} ${BOLD}\033[38;2;${CTX_COLOR}m${CONTEXT_PERCENT}%${RESET}"
 
 # Usage data
 get_usage_data() {
@@ -205,15 +185,15 @@ if [[ -n "$USAGE_DATA" ]]; then
     FIVE_RESET_FMT=$(format_time_remaining "$FIVE_RESET")
     SEVEN_RESET_FMT=$(format_reset_day "$SEVEN_RESET")
 
-    FIVE_END_COLOR=$(get_usage_gradient_color "$FIVE_HOUR")
-    SEVEN_END_COLOR=$(get_usage_7d_gradient_color "$SEVEN_DAY")
+    FIVE_COLOR=$(get_nord_gradient_color "$FIVE_HOUR")
+    SEVEN_COLOR=$(get_nord_gradient_color "$SEVEN_DAY")
 
-    FIVE_DISPLAY="${C_LAVENDER}5H${RESET} ${BOLD}\033[38;2;${FIVE_END_COLOR}m${FIVE_HOUR}%${RESET} (${FIVE_RESET_FMT})"
-    SEVEN_DISPLAY="${C_YELLOW}7D${RESET} ${BOLD}\033[38;2;${SEVEN_END_COLOR}m${SEVEN_DAY}%${RESET} (${SEVEN_RESET_FMT})"
+    FIVE_DISPLAY="${C_FROST_BLUE}5H${RESET} ${BOLD}\033[38;2;${FIVE_COLOR}m${FIVE_HOUR}%${RESET} (${FIVE_RESET_FMT})"
+    SEVEN_DISPLAY="${C_AURORA_YELLOW}7D${RESET} ${BOLD}\033[38;2;${SEVEN_COLOR}m${SEVEN_DAY}%${RESET} (${SEVEN_RESET_FMT})"
 
     LINE2="${CTX_DISPLAY} | ${FIVE_DISPLAY} | ${SEVEN_DISPLAY}"
 else
-    LINE2="${CTX_DISPLAY} | ${C_OVERLAY}Usage: N/A${RESET}"
+    LINE2="${CTX_DISPLAY} | ${C_POLAR}Usage: N/A${RESET}"
 fi
 
 # ============================================================================

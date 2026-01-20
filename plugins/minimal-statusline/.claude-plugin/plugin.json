@@ -1,7 +1,7 @@
 {
   "name": "minimal-statusline",
-  "version": "1.0.0",
-  "description": "Clean minimal statusline without progress bars - just gradient-colored percentages",
+  "version": "1.1.0",
+  "description": "Clean minimal statusline with Nord Aurora theme - no progress bars, just gradient-colored percentages",
   "author": {
     "name": "waymakerlabs",
     "github": "waymakerlabs"

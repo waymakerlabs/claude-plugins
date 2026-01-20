@@ -26,7 +26,7 @@ A collection of useful Claude Code plugins by WaymakerLabs.
 
 ### minimal-statusline
 
-프로그레스 바 없이 깔끔한 퍼센트만 표시하는 미니멀 스테이터스라인.
+Nord Aurora 테마의 미니멀 스테이터스라인 - 프로그레스 바 없이 깔끔한 퍼센트만 표시.
 
 **Preview:**
 ```
@@ -37,8 +37,9 @@ Context 4% | 5H 0% (3h43m) | 7D 14% (Fri)
 **Features:**
 | 기능 | 설명 |
 |------|------|
+| Nord Aurora Theme | 통일된 Nord 팔레트 (Frost, Aurora, Snow Storm) |
 | No Progress Bars | 바 없이 숫자만 깔끔하게 표시 |
-| Gradient Colors | 사용량에 따라 색상 변화 (낮음: 핑크/라벤더 → 높음: 레드) |
+| Smart Gradient | 사용량에 따라 Green → Yellow → Orange → Red |
 | Git Status | 브랜치명 + 상태 표시 (✓ clean, +staged, !modified, ?untracked) |
 | API Usage | 5시간/7일 사용량 및 리셋 시간 표시 |
 
