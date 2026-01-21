@@ -111,6 +111,63 @@ Based on [Awesome Statusline](https://github.com/awesomejun/awesome-claude-plugi
 
 ---
 
+### wrap-up
+
+작업 마무리 스킬 - Obsidian 문서화 + Git 커밋을 한 번에.
+
+**기능:**
+
+| 기능 | 설명 |
+|------|------|
+| Daily Log | 오늘 작업 내용을 daily log에 기록 |
+| Handoff | 다음 세션을 위한 handoff 문서 생성 |
+| 문서 업데이트 | 프로젝트 소개 등 관련 문서 자동 업데이트 |
+| Git Commit/Push | 코드 변경사항 커밋 및 푸시 |
+
+**실행 흐름:**
+
+```
+/wrap-up 실행
+    │
+    ├─ 설정 확인 (없으면 Obsidian vault 경로 물어봄)
+    ├─ 프로젝트 폴더 확인 (없으면 생성 여부 물어봄)
+    ├─ Daily log 생성/업데이트
+    ├─ Handoff 문서 생성
+    ├─ 관련 문서 업데이트
+    ├─ Git commit & push
+    └─ 다음 세션 시작 프롬프트 출력
+```
+
+#### Install
+
+```bash
+/plugin install wrap-up@waymakerlabs-claude-plugins
+```
+
+#### Usage
+
+```bash
+/wrap-up              # 일반 실행
+/wrap-up --reconfigure  # Obsidian vault 경로 재설정
+```
+
+#### Output Example
+
+```
+✅ Wrap-up 완료!
+
+📝 Daily log: Logos App/daily-logs/2026-01-21.md
+📋 Handoff: Logos App/handoffs/HANDOFF-2026-01-21-1730.md
+📦 Commit: abc1234 - feat: add vocabulary validation
+
+---
+🚀 다음 세션 시작 프롬프트:
+
+.../Logos App/handoffs/HANDOFF-2026-01-21-1730.md를 읽고 이어서 작업해줘.
+```
+
+---
+
 ## Troubleshooting
 
 ### Usage shows N/A
