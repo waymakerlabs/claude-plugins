@@ -18,7 +18,7 @@ First, add the WaymakerLabs marketplace to Claude Code:
 
 ---
 
-## minimal-statusline
+## ▶ minimal-statusline
 
 > Minimal single-line statusline with Nord Aurora theme.
 
@@ -115,7 +115,7 @@ Based on [Awesome Statusline](https://github.com/awesomejun/awesome-claude-plugi
 
 ---
 
-## wrap-up
+## ▶ wrap-up
 
 > Session wrap-up skill - Obsidian documentation + Git commit in one go.
 
