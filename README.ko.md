@@ -16,9 +16,11 @@ WaymakerLabs에서 만든 유용한 Claude Code 플러그인 모음입니다.
 
 ## 사용 가능한 플러그인
 
-### minimal-statusline
+---
 
-Nord Aurora 테마의 미니멀한 한 줄 상태표시줄.
+## minimal-statusline
+
+> Nord Aurora 테마의 미니멀한 한 줄 상태표시줄.
 
 **미리보기:**
 
@@ -113,9 +115,9 @@ awesomejun의 [Awesome Statusline](https://github.com/awesomejun/awesome-claude-
 
 ---
 
-### wrap-up
+## wrap-up
 
-작업 마무리 스킬 - Obsidian 문서화 + Git 커밋을 한 번에.
+> 작업 마무리 스킬 - Obsidian 문서화 + Git 커밋을 한 번에.
 
 **기능:**
 
