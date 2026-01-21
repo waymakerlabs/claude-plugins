@@ -1,6 +1,6 @@
 ---
 name: wrap-up
-description: 작업 마무리 - Obsidian 문서화 (daily log, handoff) + Git commit/push
+description: Session wrap-up - Obsidian documentation (daily log, handoff) + Git commit/push
 allowed-tools:
   - Read
   - Write
