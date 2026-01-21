@@ -23,7 +23,7 @@
     {
       "name": "wrap-up",
       "version": "1.0.0",
-      "description": "작업 마무리 스킬 - Obsidian 문서화 + Git 커밋을 한 번에",
+      "description": "Session wrap-up skill - Obsidian documentation + Git commit in one go",
       "author": {
         "name": "waymakerlabs",
         "email": "peter@waymakerlabs.com"

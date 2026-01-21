@@ -1,7 +1,7 @@
 {
   "name": "wrap-up",
   "version": "1.0.0",
-  "description": "Obsidian 문서화 + Git 커밋을 한 번에. Daily log, handoff 문서 자동 생성",
+  "description": "Session wrap-up skill - Obsidian documentation + Git commit in one go. Auto-generate daily log and handoff docs",
   "author": {
     "name": "waymakerlabs",
     "github": "waymakerlabs"
