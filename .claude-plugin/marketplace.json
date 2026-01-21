@@ -9,15 +9,28 @@
   "plugins": [
     {
       "name": "minimal-statusline",
-      "version": "1.4.0",
+      "version": "1.4.3",
       "description": "Minimal single-line statusline with Nord Aurora theme",
       "author": {
         "name": "waymakerlabs",
-        "email": "your-email@example.com"
+        "email": "peter@waymakerlabs.com"
       },
       "source": "./plugins/minimal-statusline",
       "category": "tools",
       "keywords": ["statusline", "minimal", "clean", "nord"],
+      "homepage": "https://github.com/waymakerlabs/claude-plugins"
+    },
+    {
+      "name": "wrap-up",
+      "version": "1.0.0",
+      "description": "작업 마무리 스킬 - Obsidian 문서화 + Git 커밋을 한 번에",
+      "author": {
+        "name": "waymakerlabs",
+        "email": "peter@waymakerlabs.com"
+      },
+      "source": "./plugins/wrap-up",
+      "category": "workflow",
+      "keywords": ["obsidian", "documentation", "daily-log", "handoff", "git", "workflow"],
       "homepage": "https://github.com/waymakerlabs/claude-plugins"
     }
   ]
