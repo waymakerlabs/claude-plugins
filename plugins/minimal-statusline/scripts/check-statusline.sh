@@ -31,7 +31,7 @@ if [[ ! -f "$TARGET_SCRIPT" ]]; then
 fi
 
 # Check installed version (from script header comment)
-INSTALLED_VERSION=$(grep "^# v" "$TARGET_SCRIPT" 2>/dev/null | head -1 | sed 's/^# v//')
+INSTALLED_VERSION=$(grep "^# v" "$TARGET_SCRIPT" 2>/dev/null | head -1 | sed 's/^# v//' | cut -d' ' -f1)
 
 # If versions differ, update
 if [[ "$INSTALLED_VERSION" != "$PLUGIN_VERSION" ]]; then

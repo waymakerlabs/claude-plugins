@@ -5,7 +5,7 @@
 # Single line: Model | path (branch) | Context left % | 5H % (time) | 7D % (day)
 # No progress bars - just clean gradient-colored percentages
 # ============================================================================
-# v1.4.2 - Auto-update via SessionStart hook
+# v1.4.3 - Fix version comparison bug
 # ============================================================================
 
 input=$(cat)
