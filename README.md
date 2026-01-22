@@ -124,9 +124,11 @@ Based on [Awesome Statusline](https://github.com/awesomejun/awesome-claude-plugi
 | Feature | Description |
 |---------|-------------|
 | Daily Log | Record today's work in daily log |
-| Handoff | Generate handoff document for next session |
+| Handoff | Generate handoff document (single file, overwrites previous) |
 | Doc Update | Auto-update related docs (project overview, etc.) |
 | Git Commit/Push | Commit and push code changes |
+
+> **Note**: Handoff maintains only one file. Previous handoff is deleted and a new timestamped file is created, so you can see when the last session ended.
 
 **Execution Flow:**
 

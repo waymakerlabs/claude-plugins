@@ -124,9 +124,11 @@ awesomejun의 [Awesome Statusline](https://github.com/awesomejun/awesome-claude-
 | 기능 | 설명 |
 |------|------|
 | Daily Log | 오늘 작업 내용을 daily log에 기록 |
-| Handoff | 다음 세션을 위한 handoff 문서 생성 |
+| Handoff | 다음 세션을 위한 handoff 문서 생성 (단일 파일 유지) |
 | 문서 업데이트 | 프로젝트 소개 등 관련 문서 자동 업데이트 |
 | Git Commit/Push | 코드 변경사항 커밋 및 푸시 |
+
+> **참고**: Handoff는 항상 하나의 파일만 유지합니다. 이전 handoff는 삭제되고 타임스탬프가 포함된 새 파일이 생성되어, 마지막 세션 종료 시점을 확인할 수 있습니다.
 
 **실행 흐름:**
 
