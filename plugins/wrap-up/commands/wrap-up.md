@@ -138,9 +138,14 @@ Obsidian에 프로젝트 폴더가 없습니다. 생성할까요?
 - "커밋 로그" 섹션 업데이트
 - "다음 작업" 섹션 업데이트
 
-### Step 5: Handoff 문서 생성
+### Step 5: Handoff 문서 생성 (단일 파일 유지)
 
-파일 경로: `{프로젝트폴더}/handoffs/HANDOFF-YYYY-MM-DD-HHMM.md`
+**기존 handoff 삭제 후 새로 생성:**
+
+1. handoffs 폴더에서 기존 `HANDOFF-*.md` 파일 삭제
+2. 새 파일 생성: `{프로젝트폴더}/handoffs/HANDOFF-YYYY-MM-DD-HHMM.md`
+
+> 💡 항상 하나의 handoff 파일만 유지합니다. 타임스탬프로 마지막 작업 시점을 알 수 있습니다.
 
 ```markdown
 # HANDOFF - YYYY-MM-DD HH:MM
@@ -322,5 +327,5 @@ git push
 1. **Obsidian vault 경로**는 사용자마다 다르므로 반드시 설정 파일에서 읽어옵니다.
 2. **프로젝트 폴더 매칭**은 유연하게 처리합니다 (대소문자, 하이픈/언더스코어/공백 무시).
 3. **Daily log는 누적**됩니다. 같은 날 여러 번 실행하면 기존 내용에 추가합니다.
-4. **Handoff는 매번 새로 생성**됩니다. 타임스탬프로 구분합니다.
+4. **Handoff는 단일 파일만 유지**됩니다. 새로 생성 시 기존 파일을 삭제하고, 타임스탬프로 마지막 작업 시점을 표시합니다.
 5. **Git 작업**은 코드 저장소에서만 수행합니다 (Obsidian vault가 아님).
