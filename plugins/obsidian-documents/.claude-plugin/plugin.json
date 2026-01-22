@@ -4,9 +4,7 @@
   "description": "Obsidian에 문서 저장 - '옵시디언에 저장해줘'라고 요청하면 자동으로 마크다운 문서로 저장",
   "author": {
     "name": "waymakerlabs",
-    "email": "peter@waymakerlabs.com"
+    "github": "waymakerlabs"
   },
-  "commands": ["commands/obsidian-documents.md"],
-  "dependencies": [],
-  "repository": "https://github.com/waymakerlabs/claude-plugins"
+  "keywords": ["obsidian", "옵시디언", "note", "markdown", "문서화"]
 }
