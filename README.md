@@ -174,6 +174,58 @@ Based on [Awesome Statusline](https://github.com/awesomejun/awesome-claude-plugi
 
 ---
 
+## ▶ obsidian-documents
+
+> Obsidian documentation - Say "옵시디언에 저장해줘" and it saves to Obsidian as markdown.
+
+**Features:**
+
+| Feature | Description |
+|---------|-------------|
+| Natural Language | Triggers on "옵시디언에 저장해줘", "옵시디안에 정리해줘", "obsidian에 넣어줘", etc. |
+| Slash Command | Also available as `/obsidian-documents` |
+| Smart Location | Saves to project `documents/` folder or vault root |
+| Shared Config | Uses same config as wrap-up |
+
+**Save Location:**
+
+| Context | Save Location |
+|---------|---------------|
+| Inside Git project | `{project}/documents/{filename}.md` |
+| Outside project | Obsidian vault root |
+
+#### Install
+
+```bash
+/plugin install obsidian-documents@waymakerlabs-claude-plugins
+```
+
+#### Usage
+
+Natural language:
+```
+이 내용 옵시디언에 저장해줘
+방금 논의한 API 설계 정리해서 옵시디언에 넣어줘
+```
+
+Slash command:
+```bash
+/obsidian-documents [content or topic]
+```
+
+#### Config
+
+Uses `~/.claude/wrap-up-config.json` (shared with wrap-up):
+
+```json
+{
+  "obsidianVault": "/path/to/obsidian/vault",
+  "projectsPath": "001. 프로젝트/진행중"
+}
+```
+
+---
+
 ## Troubleshooting
 
 ### Usage shows N/A

@@ -174,6 +174,58 @@ awesomejun의 [Awesome Statusline](https://github.com/awesomejun/awesome-claude-
 
 ---
 
+## ▶ obsidian-documents
+
+> Obsidian 문서 저장 - "옵시디언에 저장해줘"라고 말하면 Obsidian에 마크다운으로 저장.
+
+**기능:**
+
+| 기능 | 설명 |
+|------|------|
+| 자연어 발동 | "옵시디언에 저장해줘", "옵시디안에 정리해줘", "obsidian에 넣어줘" 등으로 자동 발동 |
+| 슬래시 명령어 | `/obsidian-documents`로도 사용 가능 |
+| 스마트 저장 | 프로젝트 `documents/` 폴더 또는 vault root에 저장 |
+| 설정 공유 | wrap-up과 동일한 설정 사용 |
+
+**저장 위치:**
+
+| 상황 | 저장 위치 |
+|------|----------|
+| Git 프로젝트 내에서 실행 | `{프로젝트}/documents/{파일명}.md` |
+| 프로젝트 외부에서 실행 | Obsidian vault root |
+
+#### 설치
+
+```bash
+/plugin install obsidian-documents@waymakerlabs-claude-plugins
+```
+
+#### 사용법
+
+자연어로:
+```
+이 내용 옵시디언에 저장해줘
+방금 논의한 API 설계 정리해서 옵시디언에 넣어줘
+```
+
+슬래시 명령어:
+```bash
+/obsidian-documents [내용 또는 주제]
+```
+
+#### 설정
+
+`~/.claude/wrap-up-config.json` 사용 (wrap-up과 공유):
+
+```json
+{
+  "obsidianVault": "/path/to/obsidian/vault",
+  "projectsPath": "001. 프로젝트/진행중"
+}
+```
+
+---
+
 ## 문제 해결
 
 ### Usage가 N/A로 표시됨
