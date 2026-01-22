@@ -1,0 +1,9 @@
+{
+  "name": "claude-organizer",
+  "version": "1.0.0",
+  "description": "Organize CLAUDE.md into a modular, skill-based project structure with Progressive Disclosure",
+  "author": {
+    "name": "waymakerlabs",
+    "email": "peter@waymakerlabs.com"
+  }
+}

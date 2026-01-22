@@ -45,6 +45,19 @@
       "category": "workflow",
       "keywords": ["obsidian", "옵시디언", "옵시디안", "note", "markdown", "documentation", "문서화"],
       "homepage": "https://github.com/waymakerlabs/claude-plugins"
+    },
+    {
+      "name": "claude-organizer",
+      "version": "1.0.0",
+      "description": "Organize CLAUDE.md into a modular, skill-based project structure with Progressive Disclosure",
+      "author": {
+        "name": "waymakerlabs",
+        "email": "peter@waymakerlabs.com"
+      },
+      "source": "./plugins/claude-organizer",
+      "category": "workflow",
+      "keywords": ["claude", "claude.md", "skills", "organize", "modular", "progressive-disclosure", "context"],
+      "homepage": "https://github.com/waymakerlabs/claude-plugins"
     }
   ]
 }
