@@ -217,6 +217,26 @@ version: 0.6.2+120
 - 여러 앱이 있으면 AskUserQuestion으로 어떤 앱의 버전을 올릴지 물어봅니다
 - 메인 앱만 버전 업데이트 (예: `apps/logos_one/pubspec.yaml`)
 
+#### 6-3. Node.js 프로젝트
+
+**조건**: `package.json`이 있는 경우 (단, plugin.json이 없는 경우에만)
+
+`package.json`의 `version` 필드를 업데이트합니다:
+- 형식: `X.Y.Z` (SemVer)
+- 패치 버전(Z)만 1 증가
+
+```json
+// 변경 전
+"version": "1.2.3"
+
+// 변경 후
+"version": "1.2.4"
+```
+
+**주의사항**:
+- Claude 플러그인 프로젝트는 6-1로 처리 (plugin.json 우선)
+- 모노레포의 경우 루트 package.json만 업데이트
+
 > 💡 wrap-up 실행 시 항상 패치 버전이 1 증가합니다.
 
 ### Step 7: 관련 문서 업데이트
@@ -367,4 +387,5 @@ git push
 6. **프로젝트 버전**은 wrap-up 실행 시 패치 버전이 1 증가합니다:
    - Claude 플러그인: plugin.json + marketplace.json 동기화
    - Flutter 앱: pubspec.yaml의 version 필드 (패치 + 빌드 번호 증가)
+   - Node.js: package.json의 version 필드 (패치 버전 증가)
 7. **문서 업데이트**는 버전이 명시된 곳을 기준으로 찾아서 업데이트합니다.
