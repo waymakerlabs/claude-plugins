@@ -185,18 +185,37 @@ Obsidian에 프로젝트 폴더가 없습니다. 생성할까요?
 \`\`\`
 ```
 
-### Step 6: 플러그인 버전 업데이트
+### Step 6: 프로젝트 버전 업데이트
 
-**현재 프로젝트가 플러그인 프로젝트인 경우** (plugin.json 또는 marketplace.json이 있는 경우):
+프로젝트 타입에 따라 패치 버전을 1 올립니다:
+
+#### 6-1. Claude 플러그인 프로젝트
+
+**조건**: `plugin.json` 또는 `marketplace.json`이 있는 경우
 
 1. `plugin.json`의 패치 버전을 1 올립니다 (예: 1.0.2 → 1.0.3)
 2. `marketplace.json`의 해당 플러그인 버전도 동기화합니다
 
-```bash
-# 버전 확인 예시
-# 1.0.2 → 1.0.3
-# 1.2.9 → 1.2.10
+#### 6-2. Flutter 앱 프로젝트
+
+**조건**: `pubspec.yaml`이 있는 경우
+
+`pubspec.yaml`의 `version` 필드를 업데이트합니다:
+- 형식: `X.Y.Z+BUILD` (예: 0.6.1+119)
+- 패치 버전(Z)과 빌드 번호(BUILD) 둘 다 1씩 증가
+
+```yaml
+# 변경 전
+version: 0.6.1+119
+
+# 변경 후
+version: 0.6.2+120
 ```
+
+**주의사항**:
+- 프로젝트 루트 또는 `apps/` 하위의 Flutter 앱을 찾습니다
+- 여러 앱이 있으면 AskUserQuestion으로 어떤 앱의 버전을 올릴지 물어봅니다
+- 메인 앱만 버전 업데이트 (예: `apps/logos_one/pubspec.yaml`)
 
 > 💡 wrap-up 실행 시 항상 패치 버전이 1 증가합니다.
 
@@ -345,5 +364,7 @@ git push
 3. **Daily log는 누적**됩니다. 같은 날 여러 번 실행하면 기존 내용에 추가합니다.
 4. **Handoff는 단일 파일만 유지**됩니다. 새로 생성 시 기존 파일을 삭제하고, 타임스탬프로 마지막 작업 시점을 표시합니다.
 5. **Git 작업**은 코드 저장소에서만 수행합니다 (Obsidian vault가 아님).
-6. **플러그인 버전**은 wrap-up 실행 시 패치 버전이 1 증가합니다 (plugin.json + marketplace.json 동기화).
+6. **프로젝트 버전**은 wrap-up 실행 시 패치 버전이 1 증가합니다:
+   - Claude 플러그인: plugin.json + marketplace.json 동기화
+   - Flutter 앱: pubspec.yaml의 version 필드 (패치 + 빌드 번호 증가)
 7. **문서 업데이트**는 버전이 명시된 곳을 기준으로 찾아서 업데이트합니다.
