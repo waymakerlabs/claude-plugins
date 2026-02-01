@@ -14,7 +14,7 @@ argument-hint: "[--reconfigure]"
 
 # Wrap-up: 작업 마무리 스킬
 
-현재 세션의 작업 내용을 Obsidian에 문서화하고 Git에 커밋합니다.
+현재 세션의 작업 내용을 Obsidian에 문서화하고, Git 프로젝트의 경우 커밋합니다.
 
 ## 실행 흐름
 
@@ -25,7 +25,8 @@ argument-hint: "[--reconfigure]"
 ```json
 {
   "obsidianVault": "/path/to/obsidian/vault",
-  "projectsPath": "001. 프로젝트/진행중"
+  "projectsPath": "001. 프로젝트/진행중",
+  "areasPath": "002. 관리 영역"
 }
 ```
 
@@ -40,19 +41,21 @@ Obsidian vault 경로를 입력해주세요.
 
 입력받은 경로를 `~/.claude/wrap-up-config.json`에 저장합니다.
 
-### Step 2: 현재 프로젝트 확인
+### Step 2: 작업 유형 확인 및 폴더 찾기
 
-1. 현재 작업 디렉토리에서 git root 찾기:
+1. 현재 작업 디렉토리에서 git root 찾기 시도:
 ```bash
-git rev-parse --show-toplevel
+git rev-parse --show-toplevel 2>/dev/null
 ```
 
-2. 프로젝트 이름 추출 (git root의 폴더명)
+2. **결과에 따라 분기:**
 
-3. Obsidian vault에서 해당 프로젝트 폴더 찾기:
-   - 경로: `{obsidianVault}/{projectsPath}/`
-   - 프로젝트 폴더명은 대소문자 무시, 하이픈/언더스코어 무시하고 매칭
-   - 예: `logos-app` → `Logos App` 매칭
+#### Case A: Git 프로젝트인 경우 (git root 있음)
+
+- 프로젝트 이름 추출 (git root의 폴더명)
+- `{obsidianVault}/{projectsPath}/`에서 해당 프로젝트 폴더 찾기
+- 프로젝트 폴더명은 대소문자 무시, 하이픈/언더스코어/공백 무시하고 매칭
+- 예: `logos-app` → `Logos App` 매칭
 
 **프로젝트 폴더가 없는 경우:**
 
@@ -76,6 +79,21 @@ Obsidian에 프로젝트 폴더가 없습니다. 생성할까요?
 └── handoffs/
 ```
 
+#### Case B: Git 프로젝트가 아닌 경우 (git root 없음)
+
+- 현재 폴더명 추출 (cwd의 basename)
+- `{obsidianVault}/{areasPath}/`에서 해당 폴더 찾기
+- 폴더명은 대소문자 무시, 하이픈/언더스코어/공백 무시하고 매칭
+- 예: 현재 폴더가 `GSRetail`이면 → `002. 관리 영역/GSRetail` 매칭
+
+**폴더가 없는 경우:**
+
+자동으로 `{obsidianVault}/{areasPath}/{폴더명}/` 생성
+
+**폴더 내 daily-logs 폴더가 없는 경우:**
+
+자동으로 `daily-logs/` 폴더 생성
+
 ### Step 3: 현재 세션 작업 내용 파악
 
 현재 대화에서 수행한 작업을 분석합니다:
@@ -86,7 +104,9 @@ Obsidian에 프로젝트 폴더가 없습니다. 생성할까요?
 
 ### Step 4: Daily Log 생성/업데이트
 
-파일 경로: `{프로젝트폴더}/daily-logs/YYYY-MM-DD.md`
+파일 경로: `{대상폴더}/daily-logs/YYYY-MM-DD.md`
+
+#### Git 프로젝트용 Daily Log 템플릿
 
 **파일이 없으면 새로 생성:**
 
@@ -133,12 +153,40 @@ Obsidian에 프로젝트 폴더가 없습니다. 생성할까요?
 - [ ] 작업 3
 ```
 
+#### 관리 영역용 Daily Log 템플릿 (Git 아닌 경우)
+
+**파일이 없으면 새로 생성:**
+
+```markdown
+# 업무일지 - YYYY-MM-DD
+
+## 오늘 작업 내용
+
+### 1. {작업 제목}
+- 상세 내용
+
+---
+
+## 메모 및 참고사항
+
+(해당 사항 있으면 작성)
+
+---
+
+## 다음 작업
+
+- [ ] 작업 1
+- [ ] 작업 2
+```
+
 **파일이 있으면 업데이트:**
 - "오늘 작업 내용" 섹션에 새 작업 추가
-- "커밋 로그" 섹션 업데이트
 - "다음 작업" 섹션 업데이트
+- (Git 프로젝트인 경우) "커밋 로그" 섹션 업데이트
 
-### Step 5: Handoff 문서 생성 (단일 파일 유지)
+### Step 5: Handoff 문서 생성 (Git 프로젝트만)
+
+> ⚠️ **Git 프로젝트가 아닌 경우 이 단계를 건너뜁니다.**
 
 **기존 handoff 삭제 후 새로 생성:**
 
@@ -185,7 +233,9 @@ Obsidian에 프로젝트 폴더가 없습니다. 생성할까요?
 \`\`\`
 ```
 
-### Step 6: 프로젝트 버전 업데이트
+### Step 6: 프로젝트 버전 업데이트 (Git 프로젝트만)
+
+> ⚠️ **Git 프로젝트가 아닌 경우 이 단계를 건너뜁니다.**
 
 프로젝트 타입에 따라 패치 버전을 1 올립니다:
 
@@ -239,7 +289,9 @@ version: 0.6.2+120
 
 > 💡 wrap-up 실행 시 항상 패치 버전이 1 증가합니다.
 
-### Step 7: 관련 문서 업데이트
+### Step 7: 관련 문서 업데이트 (Git 프로젝트만)
+
+> ⚠️ **Git 프로젝트가 아닌 경우 이 단계를 건너뜁니다.**
 
 **버전이 명시된 모든 문서를 찾아 업데이트합니다:**
 
@@ -254,7 +306,9 @@ version: 0.6.2+120
 
 > 💡 "버전이 명시된 곳"을 기준으로 검색하면 업데이트가 필요한 문서를 쉽게 찾을 수 있습니다.
 
-### Step 8: Git Commit & Push
+### Step 8: Git Commit & Push (Git 프로젝트만)
+
+> ⚠️ **Git 프로젝트가 아닌 경우 이 단계를 건너뜁니다.**
 
 1. 코드 저장소에서:
 ```bash
@@ -279,6 +333,8 @@ git push
 
 ### Step 9: 완료 메시지 출력
 
+#### Git 프로젝트인 경우:
+
 ```
 ✅ Wrap-up 완료!
 
@@ -290,6 +346,14 @@ git push
 🚀 다음 세션 시작 프롬프트:
 
 {obsidianVault}/{projectsPath}/{프로젝트}/handoffs/HANDOFF-YYYY-MM-DD-HHMM.md를 읽고 이어서 작업해줘.
+```
+
+#### Git 프로젝트가 아닌 경우:
+
+```
+✅ Wrap-up 완료!
+
+📝 Daily log: {영역폴더}/daily-logs/YYYY-MM-DD.md
 ```
 
 ## 상태 아이콘
@@ -310,7 +374,7 @@ git push
 
 ## 프로젝트 소개.md 템플릿
 
-새 프로젝트 폴더 생성 시 사용:
+새 프로젝트 폴더 생성 시 사용 (Git 프로젝트만):
 
 ```markdown
 # {프로젝트명}
@@ -380,12 +444,13 @@ git push
 ## 중요 사항
 
 1. **Obsidian vault 경로**는 사용자마다 다르므로 반드시 설정 파일에서 읽어옵니다.
-2. **프로젝트 폴더 매칭**은 유연하게 처리합니다 (대소문자, 하이픈/언더스코어/공백 무시).
+2. **폴더 매칭**은 유연하게 처리합니다 (대소문자, 하이픈/언더스코어/공백 무시).
 3. **Daily log는 누적**됩니다. 같은 날 여러 번 실행하면 기존 내용에 추가합니다.
-4. **Handoff는 단일 파일만 유지**됩니다. 새로 생성 시 기존 파일을 삭제하고, 타임스탬프로 마지막 작업 시점을 표시합니다.
-5. **Git 작업**은 코드 저장소에서만 수행합니다 (Obsidian vault가 아님).
-6. **프로젝트 버전**은 wrap-up 실행 시 패치 버전이 1 증가합니다:
+4. **Git 프로젝트**: Handoff 생성, 버전 업데이트, Git commit/push 수행
+5. **Git 아닌 경우**: Daily log만 생성 (관리 영역에 저장)
+6. **Git 작업**은 코드 저장소에서만 수행합니다 (Obsidian vault가 아님).
+7. **프로젝트 버전**은 wrap-up 실행 시 패치 버전이 1 증가합니다:
    - Claude 플러그인: plugin.json + marketplace.json 동기화
    - Flutter 앱: pubspec.yaml의 version 필드 (패치 + 빌드 번호 증가)
    - Node.js: package.json의 version 필드 (패치 버전 증가)
-7. **문서 업데이트**는 버전이 명시된 곳을 기준으로 찾아서 업데이트합니다.
+8. **문서 업데이트**는 버전이 명시된 곳을 기준으로 찾아서 업데이트합니다.
