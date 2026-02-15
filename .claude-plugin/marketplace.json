@@ -58,6 +58,19 @@
       "category": "workflow",
       "keywords": ["claude", "claude.md", "skills", "organize", "modular", "progressive-disclosure", "context"],
       "homepage": "https://github.com/waymakerlabs/claude-plugins"
+    },
+    {
+      "name": "verify-skills",
+      "version": "1.0.0",
+      "description": "Self-maintaining code verification framework - auto-generate and run project-specific verify skills",
+      "author": {
+        "name": "waymakerlabs",
+        "email": "peter@waymakerlabs.com"
+      },
+      "source": "./plugins/verify-skills",
+      "category": "workflow",
+      "keywords": ["verify", "validation", "code-review", "quality", "skills", "automation"],
+      "homepage": "https://github.com/waymakerlabs/claude-plugins"
     }
   ]
 }

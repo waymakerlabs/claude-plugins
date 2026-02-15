@@ -1,0 +1,10 @@
+{
+  "name": "verify-skills",
+  "version": "1.0.0",
+  "description": "Self-maintaining code verification framework - auto-generate and run project-specific verify skills",
+  "author": {
+    "name": "waymakerlabs",
+    "github": "waymakerlabs"
+  },
+  "keywords": ["verify", "validation", "code-review", "quality", "skills", "automation"]
+}
