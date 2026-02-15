@@ -226,6 +226,47 @@ awesomejun의 [Awesome Statusline](https://github.com/awesomejun/awesome-claude-
 
 ---
 
+## ▶ verify-skills
+
+> 자가 유지보수형 코드 검증 프레임워크 - 프로젝트별 verify 스킬을 자동 생성하고 실행.
+
+[codefactory-co/kimoring-ai-skills](https://github.com/codefactory-co/kimoring-ai-skills) 기반.
+
+**스킬:**
+
+| 스킬 | 설명 |
+|------|------|
+| `/manage-skills` | 세션 변경사항 분석 → verify 스킬 자동 생성/업데이트 |
+| `/verify-implementation` | 등록된 모든 verify 스킬 순차 실행 → 통합 검증 보고서 |
+
+**동작 방식:**
+
+```
+1. 코드 작업
+2. /manage-skills 실행
+   → git diff 분석 → verify 스킬 생성 제안
+   → 승인 시 .claude/skills/verify-*/SKILL.md 자동 생성
+3. /verify-implementation 실행
+   → 모든 verify 스킬 실행 → 통합 보고서 → 자동 수정 제안
+4. PR 생성
+```
+
+#### 설치
+
+```bash
+/plugin install verify-skills@waymakerlabs-claude-plugins
+```
+
+#### 사용법
+
+```bash
+/manage-skills                    # 변경사항 분석, verify 스킬 생성/업데이트
+/verify-implementation            # 모든 verify 스킬 실행
+/verify-implementation api        # 특정 verify 스킬만 실행
+```
+
+---
+
 ## 문제 해결
 
 ### Usage가 N/A로 표시됨

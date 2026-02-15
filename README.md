@@ -226,6 +226,47 @@ Uses `~/.claude/wrap-up-config.json` (shared with wrap-up):
 
 ---
 
+## ▶ verify-skills
+
+> Self-maintaining code verification framework - auto-generate and run project-specific verify skills.
+
+Based on [codefactory-co/kimoring-ai-skills](https://github.com/codefactory-co/kimoring-ai-skills).
+
+**Skills:**
+
+| Skill | Description |
+|-------|-------------|
+| `/manage-skills` | Analyze session changes and auto-create/update verify skills |
+| `/verify-implementation` | Run all registered verify skills and generate unified report |
+
+**How It Works:**
+
+```
+1. Write code
+2. /manage-skills
+   → Analyze git diff → Suggest verify skill creation
+   → Creates .claude/skills/verify-*/SKILL.md on approval
+3. /verify-implementation
+   → Run all verify skills → Unified report → Auto-fix suggestions
+4. Create PR
+```
+
+#### Install
+
+```bash
+/plugin install verify-skills@waymakerlabs-claude-plugins
+```
+
+#### Usage
+
+```bash
+/manage-skills                    # Analyze changes, create/update verify skills
+/verify-implementation            # Run all verify skills
+/verify-implementation api        # Run specific verify skill only
+```
+
+---
+
 ## Troubleshooting
 
 ### Usage shows N/A
