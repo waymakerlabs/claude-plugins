@@ -22,7 +22,7 @@
     },
     {
       "name": "wrap-up",
-      "version": "1.0.6",
+      "version": "1.0.7",
       "description": "Session wrap-up skill - Obsidian documentation + Git commit. Supports both git projects and non-git areas",
       "author": {
         "name": "waymakerlabs",
