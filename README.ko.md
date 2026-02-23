@@ -267,6 +267,43 @@ awesomejun의 [Awesome Statusline](https://github.com/awesomejun/awesome-claude-
 
 ---
 
+## ▶ plan-and-build
+
+> 구조화된 개발 워크플로우 - Research → Plan → Annotation Cycle → Implementation.
+
+Boris Tane의 "How I Use Claude Code" 블로그에서 영감을 받았습니다. AI에게 바로 코딩을 시키지 않고, **리서치, 계획, 구현**을 분리하여 의사결정은 사람이, 실행은 AI가 합니다.
+
+**워크플로우:**
+
+```
+/plan-and-build {작업 설명}
+    │
+    ├─ Research: 코드베이스 심층 분석 → research.md
+    ├─ Plan: 코드 스니펫 포함 구현 계획 → plan.md
+    ├─ Annotation Cycle: plan.md에 인라인 주석 → AI가 반영
+    │   └─ 만족할 때까지 반복
+    ├─ Todo: plan.md에 체크리스트 추가
+    ├─ Implementation: 계획대로 기계적 실행
+    └─ 완료 보고
+```
+
+**핵심 원칙:** "구현 시작"이라고 할 때까지 코드를 건드리지 않습니다. 모든 문서는 `docs/plan-and-build/`에 보존되어 나중에 참고할 수 있습니다.
+
+#### 설치
+
+```bash
+/plugin install plan-and-build@waymakerlabs-claude-plugins
+```
+
+#### 사용법
+
+```bash
+/plan-and-build 사용자 인증 시스템 추가
+/plan-and-build 모놀리식 UserService를 도메인별로 분리
+```
+
+---
+
 ## 문제 해결
 
 ### Usage가 N/A로 표시됨

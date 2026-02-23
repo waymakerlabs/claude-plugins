@@ -267,6 +267,43 @@ Based on [codefactory-co/kimoring-ai-skills](https://github.com/codefactory-co/k
 
 ---
 
+## ▶ plan-and-build
+
+> Structured development workflow: Research → Plan → Annotation Cycle → Implementation.
+
+Inspired by Boris Tane's "How I Use Claude Code" blog post. Instead of asking AI to code right away, this skill separates **research, planning, and implementation** — humans make decisions, AI executes.
+
+**Workflow:**
+
+```
+/plan-and-build {task description}
+    │
+    ├─ Research: Deep codebase analysis → research.md
+    ├─ Plan: Implementation plan with code snippets → plan.md
+    ├─ Annotation Cycle: You add inline comments → AI updates plan
+    │   └─ Repeat until satisfied
+    ├─ Todo: Checklist added to plan.md
+    ├─ Implementation: Execute plan mechanically
+    └─ Done: Summary report
+```
+
+**Key Principle:** No code changes until you say "구현 시작" (start implementation). All documents are preserved in `docs/plan-and-build/` for future reference.
+
+#### Install
+
+```bash
+/plugin install plan-and-build@waymakerlabs-claude-plugins
+```
+
+#### Usage
+
+```bash
+/plan-and-build Add user authentication system
+/plan-and-build Refactor monolithic UserService into domain services
+```
+
+---
+
 ## Troubleshooting
 
 ### Usage shows N/A

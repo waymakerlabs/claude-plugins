@@ -1,0 +1,10 @@
+{
+  "name": "plan-and-build",
+  "version": "1.0.0",
+  "description": "Structured workflow: Research → Plan → Annotation Cycle → Implementation",
+  "author": {
+    "name": "waymakerlabs",
+    "email": "peter@waymakerlabs.com"
+  },
+  "keywords": ["plan", "build", "workflow", "research", "implementation", "structured"]
+}

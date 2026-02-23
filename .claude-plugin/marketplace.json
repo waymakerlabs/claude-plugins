@@ -84,6 +84,19 @@
       "category": "tools",
       "keywords": ["statusline", "minimal", "clean", "nord", "zai"],
       "homepage": "https://github.com/waymakerlabs/claude-plugins"
+    },
+    {
+      "name": "plan-and-build",
+      "version": "1.0.0",
+      "description": "Structured workflow: Research → Plan → Annotation Cycle → Implementation",
+      "author": {
+        "name": "waymakerlabs",
+        "email": "peter@waymakerlabs.com"
+      },
+      "source": "./plugins/plan-and-build",
+      "category": "workflow",
+      "keywords": ["plan", "build", "workflow", "research", "implementation", "structured"],
+      "homepage": "https://github.com/waymakerlabs/claude-plugins"
     }
   ]
 }
