@@ -1,0 +1,10 @@
+{
+  "name": "minimal-statusline-zai",
+  "version": "1.0.0",
+  "description": "Minimal single-line statusline for z.ai API with Nord Aurora theme",
+  "author": {
+    "name": "waymakerlabs",
+    "github": "waymakerlabs"
+  },
+  "keywords": ["statusline", "minimal", "clean", "nord", "zai"]
+}
