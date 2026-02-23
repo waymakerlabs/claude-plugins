@@ -71,6 +71,19 @@
       "category": "workflow",
       "keywords": ["verify", "validation", "code-review", "quality", "skills", "automation"],
       "homepage": "https://github.com/waymakerlabs/claude-plugins"
+    },
+    {
+      "name": "minimal-statusline-zai",
+      "version": "1.0.0",
+      "description": "Minimal single-line statusline for z.ai API with Nord Aurora theme",
+      "author": {
+        "name": "waymakerlabs",
+        "email": "peter@waymakerlabs.com"
+      },
+      "source": "./plugins/minimal-statusline-zai",
+      "category": "tools",
+      "keywords": ["statusline", "minimal", "clean", "nord", "zai"],
+      "homepage": "https://github.com/waymakerlabs/claude-plugins"
     }
   ]
 }
