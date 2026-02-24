@@ -22,8 +22,8 @@
     },
     {
       "name": "wrap-up",
-      "version": "1.0.7",
-      "description": "Session wrap-up skill - Obsidian documentation + Git commit. Supports both git projects and non-git areas",
+      "version": "1.1.0",
+      "description": "Session wrap-up skill - Obsidian documentation + Git commit with parallel execution. Supports both git projects and non-git areas",
       "author": {
         "name": "waymakerlabs",
         "email": "peter@waymakerlabs.com"
@@ -96,6 +96,32 @@
       "source": "./plugins/plan-and-build",
       "category": "workflow",
       "keywords": ["plan", "build", "workflow", "research", "implementation", "structured"],
+      "homepage": "https://github.com/waymakerlabs/claude-plugins"
+    },
+    {
+      "name": "math-exam",
+      "version": "1.0.0",
+      "description": "수학 시험지/문제지 PDF 생성 - 중1~고3 학력평가/수능 형식, 한컴 수식 → LaTeX 자동 변환",
+      "author": {
+        "name": "waymakerlabs",
+        "email": "peter@waymakerlabs.com"
+      },
+      "source": "./plugins/math-exam",
+      "category": "workflow",
+      "keywords": ["math", "exam", "pdf", "latex", "수학", "시험지", "학력평가"],
+      "homepage": "https://github.com/waymakerlabs/claude-plugins"
+    },
+    {
+      "name": "linear",
+      "version": "1.0.0",
+      "description": "Linear issue management, dev cycle automation, and planning workflows",
+      "author": {
+        "name": "waymakerlabs",
+        "email": "peter@waymakerlabs.com"
+      },
+      "source": "./plugins/linear",
+      "category": "workflow",
+      "keywords": ["linear", "issue", "project-management", "sprint", "dev-cycle", "planning"],
       "homepage": "https://github.com/waymakerlabs/claude-plugins"
     }
   ]

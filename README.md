@@ -117,7 +117,7 @@ Based on [Awesome Statusline](https://github.com/awesomejun/awesome-claude-plugi
 
 ## ▶ wrap-up
 
-> Session wrap-up skill - Obsidian documentation + Git commit in one go.
+> Session wrap-up skill - Obsidian documentation + Git commit with **parallel execution**. (v1.1.0)
 
 **Features:**
 
@@ -127,18 +127,26 @@ Based on [Awesome Statusline](https://github.com/awesomejun/awesome-claude-plugi
 | Handoff | Generate handoff document (single file, overwrites previous) |
 | Doc Update | Auto-update related docs (project overview, etc.) |
 | Git Commit/Push | Commit and push code changes |
+| Parallel Execution | Data gathering + document creation run concurrently via Task agents |
 
 > **Note**: Handoff maintains only one file. Previous handoff is deleted and a new timestamped file is created, so you can see when the last session ended.
 
-**Execution Flow:**
+**Execution Flow (Parallel):**
 
 ```
 /wrap-up
     │
+    Phase 1 [Sequential]
     ├─ Check config (ask for Obsidian vault path if not set)
     ├─ Find project folder (ask to create if not found)
-    ├─ Create/update daily log
-    ├─ Generate handoff document
+    │
+    Phase 2 [Parallel] ⚡
+    ├─ git diff ∥ git log ∥ read previous daily-log ∥ read previous handoff
+    │
+    Phase 3 [Parallel] ⚡
+    ├─ Agent A: Daily Log  ∥  Agent B: Handoff  ∥  Agent C: Version Update
+    │
+    Phase 4 [Sequential]
     ├─ Update related documents
     ├─ Git commit & push
     └─ Output next session prompt
@@ -300,6 +308,53 @@ Inspired by Boris Tane's "How I Use Claude Code" blog post. Instead of asking AI
 ```bash
 /plan-and-build Add user authentication system
 /plan-and-build Refactor monolithic UserService into domain services
+```
+
+---
+
+## ▶ linear
+
+> Linear issue management, dev cycle automation, and planning workflows.
+
+**Skills:**
+
+| Skill | Description |
+|-------|-------------|
+| `/linear` | General Linear management - issue CRUD, bug triage, team workload analysis, labeling, sprint retrospectives |
+| `/linear-dev` | Dev cycle automation - start issues (branch creation), create PRs, merge & cleanup, next task suggestions |
+| `/linear-plan` | Planning & structuring - Epic decomposition, sprint planning, release planning with milestones |
+
+**Dev Cycle Flow:**
+
+```
+/linear-dev start LOG-101  →  Code  →  /linear-dev pr  →  Review  →  /linear-dev finish
+                                                                            │
+                                                                            ▼
+                                                                /linear-dev start LOG-102
+```
+
+**Core Principles:**
+- 1 Issue = 1 Branch = 1 PR
+- PR-reviewable size (200-400 lines)
+- Auto state transitions via GitHub-Linear integration
+
+#### Install
+
+```bash
+/plugin install linear@waymakerlabs-claude-plugins
+```
+
+#### Usage
+
+```bash
+/linear 내 이슈 보여줘              # List my issues
+/linear-dev start LOG-101          # Start working on an issue
+/linear-dev pr                     # Create PR from current branch
+/linear-dev finish                 # Merge PR + cleanup
+/linear-dev next                   # Show next tasks by priority
+/linear-plan 기능 분해              # Decompose feature into sub-tasks
+/linear-plan 스프린트 계획           # Sprint planning
+/linear-plan 릴리즈 계획            # Release planning with milestones
 ```
 
 ---
