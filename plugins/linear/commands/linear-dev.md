@@ -263,7 +263,7 @@ git branch -d {브랜치명}
 브랜치명에서 추출한 이슈의 상위 이슈(parent)를 확인하고, 같은 parent의 다음 Todo 이슈를 조회합니다:
 
 ```
-list_issues(parentId: "{parentId}", state: "Todo")
+list_issues(parentId: "{parentId}", state: "Todo", includeArchived: false)
 ```
 
 ```
@@ -290,7 +290,7 @@ list_issues(parentId: "{parentId}", state: "Todo")
 ### Step 1. 내 Todo 이슈 조회
 
 ```
-list_issues(assignee: "me", state: "Todo")
+list_issues(assignee: "me", state: "Todo", includeArchived: false)
 ```
 
 ### Step 2. 우선순위 정렬 & 출력

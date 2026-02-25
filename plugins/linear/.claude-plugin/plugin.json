@@ -1,10 +1,10 @@
 {
   "name": "linear",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Linear issue management, dev cycle automation, and planning workflows",
   "author": {
     "name": "waymakerlabs",
     "github": "waymakerlabs"
   },
-  "keywords": ["linear", "issue", "project-management", "sprint", "dev-cycle", "planning"]
+  "keywords": ["linear", "issue", "project-management", "sprint", "dev-cycle", "planning", "task"]
 }

@@ -75,8 +75,29 @@ Linear MCP 도구를 사용하여 이슈, 프로젝트, 팀 워크플로우를 �
 **"내 이슈" 조회 시:**
 
 ```
-list_issues(assignee: "me")
+list_issues(assignee: "me", includeArchived: false)
 ```
+
+**이슈 리스트 조회 시 (프로젝트 우선):**
+
+1. 현재 작업 중인 로컬 프로젝트 이름 파악:
+   ```bash
+   # git remote에서 리포지토리 이름 추출
+   git remote get-url origin 2>/dev/null | sed 's/.*\///' | sed 's/.git$//'
+   # 또는 디렉토리 이름 사용
+   basename $(git rev-parse --show-toplevel 2>/dev/null)
+   ```
+2. `list_projects(team: "{팀명}")`로 Linear 프로젝트 목록 조회
+3. 로컬 프로젝트명과 매칭되는 Linear 프로젝트가 있으면:
+   ```
+   list_issues(team: "{팀명}", project: "{매칭된프로젝트}", includeArchived: false)
+   ```
+4. 매칭되는 프로젝트가 없으면 팀 전체 이슈 조회:
+   ```
+   list_issues(team: "{팀명}", includeArchived: false)
+   ```
+
+**중요:** 아카이브된 이슈는 제외하려면 항상 `includeArchived: false`를 사용합니다.
 
 ### Step 3: 실행
 
