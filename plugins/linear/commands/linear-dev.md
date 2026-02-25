@@ -208,9 +208,11 @@ get_issue(id: "{이슈ID}")
 - [ ] {설정/환경}
 ```
 
-### Step 3. OMC 팀 실행
+### Step 3. OMC 팀 실행 (필수: Skill 툴 사용)
 
-작업을 병렬로 실행합니다:
+**⚠️ 중요: 반드시 `Skill` 툴로 `oh-my-claudecode:team`을 호출해야 합니다.**
+- `Task` 툴의 executor 서브에이전트를 사용하지 마세요
+- 내부 병렬 실행이 아닌, 외부 CLI tmux 세션으로 실행해야 합니다
 
 **Frontend 작업이 있는 경우:**
 ```
@@ -229,26 +231,35 @@ Codex CLI 팀원에게 backend 작업 할당:
 - 테스트 작성
 ```
 
-### Step 4. 실행 프롬프트
+### Step 4. Skill 툴로 팀 스폰 (필수)
 
-OMC 팀을 스폰하여 병렬 작업을 지시합니다:
+**반드시 아래와 같이 `Skill` 툴을 사용하세요:**
 
 ```
-Skill: oh-my-claudecode:team
+Skill 툴 호출:
+skill: oh-my-claudecode:team
+prompt: |
+  팀 구성:
+  - Frontend 작업: Gemini CLI (gemini)
+  - Backend 작업: Codex CLI (codex)
 
-팀 구성:
-- Frontend 작업: Gemini CLI (gemini)
-- Backend 작업: Codex CLI (codex)
+  작업 내용:
+  {분류된 작업 목록}
 
-작업 내용:
-{분류된 작업 목록}
+  각 팀원은 담당 영역의 체크리스트 항목을 완료하세요.
+  - Gemini: {frontend 작업들}
+  - Codex: {backend 작업들}
 
-각 팀원은 담당 영역의 체크리스트 항목을 완료하세요.
-- Gemini: {frontend 작업들}
-- Codex: {backend 작업들}
-
-완료 후 변경사항을 보고하세요.
+  완료 후 변경사항을 보고하세요.
 ```
+
+**❌ 절대 사용 금지:**
+- `Task` 툴의 `oh-my-claudecode:executor` 서브에이전트
+- 내부 병렬 Task 호출
+
+**✅ 반드시 사용:**
+- `Skill` 툴로 `oh-my-claudecode:team` 호출
+- 외부 tmux 세션으로 실제 CLI 프로세스 실행
 
 ### Step 5. 진행상황 업데이트
 
