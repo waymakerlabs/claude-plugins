@@ -1,0 +1,9 @@
+{
+  "name": "math-exam",
+  "version": "1.0.0",
+  "description": "수학 시험지/문제지 PDF 생성 - 중1~고3 학력평가/수능 형식, 한컴 수식 → LaTeX 자동 변환",
+  "author": {
+    "name": "waymakerlabs",
+    "email": "peter@waymakerlabs.com"
+  }
+}
