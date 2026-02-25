@@ -22,8 +22,8 @@
     },
     {
       "name": "wrap-up",
-      "version": "1.1.0",
-      "description": "Session wrap-up skill - Obsidian documentation + Git commit with parallel execution. Supports both git projects and non-git areas",
+      "version": "1.0.8",
+      "description": "Session wrap-up skill - Obsidian documentation + Git commit in one go. Auto-generate daily log and handoff docs",
       "author": {
         "name": "waymakerlabs",
         "email": "peter@waymakerlabs.com"
