@@ -359,6 +359,82 @@ Inspired by Boris Tane's "How I Use Claude Code" blog post. Instead of asking AI
 
 ---
 
+## ▶ llm-wiki
+
+> LLM Wiki recall helper - Search Obsidian vault by keyword and group results in Karpathy's 4-layer LLM Wiki structure (Topics / Entities / Syntheses / Sources) with quality self-check.
+
+**Sub-commands:**
+
+| Command | Description |
+|---|---|
+| `/llm-wiki:search <keyword>` | 4-layer recall search + quality self-check report |
+
+(Future sub-commands: `promote`, `audit`, `classify`)
+
+**Output Format:**
+
+1. Match count summary
+2. Grouped tables by layer (Synthesis → Topic → Entity → derived/Archive)
+3. Recommended reading order (3-5 steps)
+4. ★ Recall quality self-check (missing / noise / latent candidates / tag boost suggestions)
+
+**Natural Language Triggers:**
+
+```
+"vault에서 하네스 도구 관련 자료 보여줘"
+"Codex와 Claude Code 협업 자료 비교해줘"
+"AI Browser Agent 관련 스크랩 인벤토리"
+```
+
+**Search Scope:**
+
+```
+{vault}/{llmWikiWorkspace}/
+├── 60. Topics/                ← Operational perspective
+├── 70. Entities/              ← Sub-grouped by kind
+│   └── tools, plugins, skills, repos, sites, tips
+├── 80. Syntheses/             ← Comparison · judgment
+├── 20. Raw Sources/derived/   ← Distilled notes
+├── 30. Briefs/                ← Legacy (only if matched)
+├── 40. Research/              ← Legacy (only if matched)
+└── 90. Archive/               ← Original sources
+```
+
+#### Install
+
+```bash
+/plugin install llm-wiki@waymakerlabs-claude-plugins
+```
+
+#### Usage
+
+```bash
+/llm-wiki:search 하네스                  # Korean keyword
+/llm-wiki:search Codex review loop       # English keyword
+/llm-wiki:search Antigravity             # Multi-layer matches
+```
+
+#### Config
+
+Uses `~/.claude/wrap-up-config.json` (shared with wrap-up / obsidian-documents):
+
+```json
+{
+  "obsidianVault": "/path/to/obsidian/vault",
+  "llmWikiWorkspace": "006. 레제 작업장"
+}
+```
+
+If `llmWikiWorkspace` is missing, the plugin auto-detects by searching for a folder containing all three: `60. Topics/`, `70. Entities/`, `80. Syntheses/`.
+
+#### Design Principle
+
+- **Recall essence = Karpathy's 4-layer ordering** (Sources → Topics → Entities → Syntheses)
+- **Noise visibility**: Surface false-positive matches so users can see them immediately
+- **Latent candidate hint**: Suggest entities that don't match the keyword but belong structurally to the same domain — useful for tag-augmentation decisions
+
+---
+
 ## Troubleshooting
 
 ### Usage shows N/A

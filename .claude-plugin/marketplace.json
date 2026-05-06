@@ -123,6 +123,19 @@
       "category": "workflow",
       "keywords": ["linear", "issue", "project-management", "sprint", "dev-cycle", "planning"],
       "homepage": "https://github.com/waymakerlabs/claude-plugins"
+    },
+    {
+      "name": "llm-wiki",
+      "version": "1.0.0",
+      "description": "LLM Wiki recall helper - Search Obsidian vault by keyword, group results by 4-layer LLM Wiki structure (Topics/Entities/Syntheses/Sources) with quality self-check",
+      "author": {
+        "name": "waymakerlabs",
+        "email": "peter@waymakerlabs.com"
+      },
+      "source": "./plugins/llm-wiki",
+      "category": "workflow",
+      "keywords": ["llm-wiki", "obsidian", "옵시디언", "wiki", "위키", "recall", "회상", "search", "검색", "knowledge-management", "지식관리"],
+      "homepage": "https://github.com/waymakerlabs/claude-plugins"
     }
   ]
 }
