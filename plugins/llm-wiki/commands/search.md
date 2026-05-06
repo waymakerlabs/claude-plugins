@@ -25,7 +25,7 @@ argument-hint: "[검색 키워드 — 한글·영문 둘 다 가능, 콤마로 �
 
 ## 실행 흐름
 
-### Step 1: 설정 확인 — vault 위치
+### Step 1: 설정 확인 — vault 위치 (read-only)
 
 설정 파일: `~/.claude/wrap-up-config.json` (obsidian-documents / wrap-up plugin과 공유).
 
@@ -36,18 +36,28 @@ argument-hint: "[검색 키워드 — 한글·영문 둘 다 가능, 콤마로 �
 }
 ```
 
+**중요**: 이 명령어는 **read-only**다. 어떤 경우에도 `~/.claude/wrap-up-config.json`을 자동으로 수정하지 않는다. 사용자 시스템 설정은 사용자가 직접 결정한다.
+
 **`obsidianVault`만 있고 `llmWikiWorkspace`가 없으면**:
 
-vault 안에서 다음 경로 패턴이 존재하는 폴더를 자동 탐색:
+vault 안에서 다음 경로 패턴이 모두 존재하는 폴더를 *임시 메모리*에서만 자동 탐색:
 - `*/60. Topics/`
 - `*/70. Entities/`
 - `*/80. Syntheses/`
 
-위 3개가 모두 존재하는 폴더를 LLM Wiki workspace로 판정. 후보가 1개면 자동 채택, 여러 개면 AskUserQuestion으로 사용자 확인. 채택된 폴더명을 `~/.claude/wrap-up-config.json`의 `llmWikiWorkspace`에 저장.
+위 3개가 모두 존재하는 폴더가 1개면 그것을 본 호출에 한해 LLM Wiki workspace로 사용. 여러 개면 AskUserQuestion으로 사용자에게 1회 선택 받기 (config 저장 안 함). 후보가 0개면 사용자에게 안내하고 종료.
+
+응답 마지막에 다음 안내 1줄 추가:
+
+> 💡 매번 자동 탐색을 피하려면 `~/.claude/wrap-up-config.json`에 다음 줄을 직접 추가하세요: `"llmWikiWorkspace": "{탐색된 폴더명}"`
 
 **설정 파일 자체가 없으면**:
 
-AskUserQuestion으로 vault 경로를 받고 위 자동 탐색 절차 진행.
+AskUserQuestion으로 vault 경로를 임시로 받아 본 호출만 처리. config 자동 생성하지 않음. 응답 마지막에 wrap-up 또는 obsidian-documents plugin 셋업을 권유.
+
+**`llmWikiWorkspace`가 이미 설정되어 있으면**:
+
+그 값을 그대로 사용. 자동 탐색·수정 일체 안 함.
 
 ### Step 2: 검색 키워드 정규화
 
@@ -167,9 +177,14 @@ for d in search_dirs:
 - 자동 분류 정정 (회상만 — vault 파일 변경 0건).
 - frontmatter 임의 수정.
 - 매칭 자료를 다른 폴더로 이동.
+- **`~/.claude/wrap-up-config.json` 자동 생성·수정** (read-only 원칙).
+- 사용자 시스템 설정 파일 어떤 형태든 자동 수정.
+
+설정 변경이 필요하면 사용자가 직접 편집하거나, 별도 `/llm-wiki:configure` sub-command(v1.1 후보)를 통해 명시 호출로만 진행.
 
 ## 확장 sub-command 후보 (다음 버전)
 
+- `/llm-wiki:configure` — `~/.claude/wrap-up-config.json` 갱신을 사용자 명시 호출로만 진행 (자동 저장 금지 원칙)
 - `/llm-wiki:promote` — promotion candidates 누적 후보 검토 + 승격 안내
 - `/llm-wiki:audit` — review-suggested 큐 일괄 점검
 - `/llm-wiki:classify` — inbox 새 자료 1건 분류 (수동 호출 PoC)

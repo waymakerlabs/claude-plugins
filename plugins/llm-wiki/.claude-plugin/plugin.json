@@ -1,6 +1,6 @@
 {
   "name": "llm-wiki",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "LLM Wiki 회상·분류 도우미. Obsidian vault에 누적한 4계층 LLM Wiki(Topics/Entities/Syntheses/Sources)에서 키워드로 자료를 회상하고 비교 정리합니다.",
   "author": {
     "name": "waymakerlabs",

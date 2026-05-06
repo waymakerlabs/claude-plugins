@@ -126,8 +126,8 @@
     },
     {
       "name": "llm-wiki",
-      "version": "1.0.0",
-      "description": "LLM Wiki recall helper - Search Obsidian vault by keyword, group results by 4-layer LLM Wiki structure (Topics/Entities/Syntheses/Sources) with quality self-check",
+      "version": "1.0.1",
+      "description": "LLM Wiki recall helper - Search Obsidian vault by keyword, group results by 4-layer LLM Wiki structure (Topics/Entities/Syntheses/Sources) with quality self-check. Strictly read-only.",
       "author": {
         "name": "waymakerlabs",
         "email": "peter@waymakerlabs.com"
