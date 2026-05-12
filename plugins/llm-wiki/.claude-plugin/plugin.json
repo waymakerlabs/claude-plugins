@@ -1,7 +1,7 @@
 {
   "name": "llm-wiki",
-  "version": "1.0.1",
-  "description": "LLM Wiki 회상·분류 도우미. Obsidian vault에 누적한 4계층 LLM Wiki(Topics/Entities/Syntheses/Sources)에서 키워드로 자료를 회상하고 비교 정리합니다.",
+  "version": "1.1.0",
+  "description": "LLM Wiki 회상·분류 도우미. 4계층 LLM Wiki(Topics/Entities/Syntheses/Sources) 키워드 회상(/llm-wiki:search) + 00. Inbox 자동 분류(/llm-wiki:classify, dry-run/live 모드). home-macmini schedule에서 무인 호출 가능.",
   "author": {
     "name": "waymakerlabs",
     "github": "waymakerlabs"
@@ -16,6 +16,13 @@
     "회상",
     "search",
     "검색",
+    "classify",
+    "분류",
+    "ingest",
+    "inbox",
+    "automation",
+    "자동화",
+    "schedule",
     "knowledge-management",
     "지식관리"
   ]

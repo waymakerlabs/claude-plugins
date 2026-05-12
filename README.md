@@ -361,15 +361,16 @@ Inspired by Boris Tane's "How I Use Claude Code" blog post. Instead of asking AI
 
 ## ▶ llm-wiki
 
-> LLM Wiki recall helper - Search Obsidian vault by keyword and group results in Karpathy's 4-layer LLM Wiki structure (Topics / Entities / Syntheses / Sources) with quality self-check.
+> LLM Wiki recall + ingest helper - Search Obsidian vault by keyword (read-only) and auto-classify `00. Inbox` content into Karpathy's 4-layer LLM Wiki structure (Topics / Entities / Syntheses / Sources). Designed for home-macmini scheduled execution.
 
 **Sub-commands:**
 
-| Command | Description |
-|---|---|
-| `/llm-wiki:search <keyword>` | 4-layer recall search + quality self-check report |
+| Command | Description | Version |
+|---|---|---|
+| `/llm-wiki:search <keyword>` | 4-layer recall search + quality self-check report (strictly read-only) | v1.0.1 |
+| `/llm-wiki:classify [--mode dry-run\|live]` | Auto-classify `00. Inbox` per migration plan §8 + classification rules v1.1 + classification prompt v1.1. Suitable for unattended `home-macmini` schedule. | v1.1.0 |
 
-(Future sub-commands: `promote`, `audit`, `classify`)
+(Future sub-commands: `configure`, `audit`, `promote`)
 
 **Output Format:**
 
@@ -409,9 +410,17 @@ Inspired by Boris Tane's "How I Use Claude Code" blog post. Instead of asking AI
 #### Usage
 
 ```bash
+# Recall (read-only)
 /llm-wiki:search 하네스                  # Korean keyword
 /llm-wiki:search Codex review loop       # English keyword
 /llm-wiki:search Antigravity             # Multi-layer matches
+
+# Inbox auto-classify
+/llm-wiki:classify                       # Default: --mode dry-run (safe, no vault changes)
+/llm-wiki:classify --mode live           # Actual classification + archive
+
+# Unattended (home-macmini schedule)
+claude --print "/llm-wiki:classify --mode dry-run"   # daily KST 01:00
 ```
 
 #### Config

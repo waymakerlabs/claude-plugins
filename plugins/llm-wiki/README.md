@@ -4,20 +4,28 @@
 
 ## Sub-commands
 
-| 명령 | 동작 |
-|---|---|
-| `/llm-wiki:search <키워드>` | 4계층 회상 검색 + 자기점검 리포트 |
+| 명령 | 동작 | 버전 |
+|---|---|---|
+| `/llm-wiki:search <키워드>` | 4계층 회상 검색 + 자기점검 리포트 (strictly read-only) | v1.0.1 |
+| `/llm-wiki:classify [--mode dry-run\|live]` | `00. Inbox` 자동 분류 (마이그레이션 계획 §8 + classification rules v1.1 + classification prompt v1.1 그대로 구현). home-macmini schedule용 무인 호출 가능 | v1.1.0 |
 
-(추가 sub-command는 다음 버전에서: `promote`, `audit`, `classify`)
+(추가 sub-command 후보: `configure` / `audit` / `promote`)
 
 ## 자연어 트리거 예시
 
 이 plugin이 활성화되어 있으면 슬래시 명령 없이도 다음과 같은 표현에 반응합니다:
 
+### search (회상)
 - "vault에서 하네스 도구 관련 자료 보여줘"
 - "Codex와 Claude Code 협업 자료 비교해줘"
 - "AI Browser Agent 관련 스크랩 인벤토리"
 - "레제 작업장에서 Antigravity 검색"
+
+### classify (분류)
+- "inbox 분류해줘" (기본 dry-run)
+- "오늘 inbox 처리해줘"
+- "ingest 돌려줘"
+- 무인 자동: home-macmini schedule이 매일 KST 01:00에 호출
 
 ## 출력 형식
 
