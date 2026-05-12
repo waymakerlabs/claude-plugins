@@ -6,8 +6,21 @@
 
 | 명령 | 동작 | 버전 |
 |---|---|---|
+| `/llm-wiki:capture <URL\|텍스트>` | 외부 자료(URL/메모/묶음) → `00. Inbox` intake 적재. URL 토큰 redaction + SSRF 방지 + 4단계 중복 검출 + fetch 실패 시 사용자 메모 보존. **자동 자료 병합 X** (`same_candidate` 라벨만). Telegram(openclaw) 어댑터에서 호출 가능 | v1.2.0 |
 | `/llm-wiki:search <키워드>` | 4계층 회상 검색 + 자기점검 리포트 (strictly read-only) | v1.0.1 |
 | `/llm-wiki:classify [--mode dry-run\|live]` | `00. Inbox` 자동 분류 (마이그레이션 계획 §8 + classification rules v1.1 + classification prompt v1.1 그대로 구현). home-macmini schedule용 무인 호출 가능 | v1.1.0 |
+
+LLM Wiki 운영 데이터 흐름:
+
+```
+[외부 자료]
+   ↓ /llm-wiki:capture (intake — 보안·정규화·중복검출)
+[00. Inbox]
+   ↓ /llm-wiki:classify (분류 — 매일 KST 01:00)
+[60. Topics / 70. Entities / 80. Syntheses / 20. Raw Sources/derived]
+   ↑ /llm-wiki:search (회상 — read-only)
+[사용자 질의]
+```
 
 (추가 sub-command 후보: `configure` / `audit` / `promote`)
 
@@ -26,6 +39,12 @@
 - "오늘 inbox 처리해줘"
 - "ingest 돌려줘"
 - 무인 자동: home-macmini schedule이 매일 KST 01:00에 호출
+
+### capture (intake)
+- "이거 저장해줘 https://..."
+- "이거 inbox에 넣어줘"
+- "스크랩해줘 ..."
+- 채널 어댑터: openclaw bot이 Telegram 메시지를 받아 `claude --print "/llm-wiki:capture {본문}"` 호출
 
 ## 출력 형식
 

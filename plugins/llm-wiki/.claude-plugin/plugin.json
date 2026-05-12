@@ -1,7 +1,7 @@
 {
   "name": "llm-wiki",
-  "version": "1.1.0",
-  "description": "LLM Wiki 회상·분류 도우미. 4계층 LLM Wiki(Topics/Entities/Syntheses/Sources) 키워드 회상(/llm-wiki:search) + 00. Inbox 자동 분류(/llm-wiki:classify, dry-run/live 모드). home-macmini schedule에서 무인 호출 가능.",
+  "version": "1.2.0",
+  "description": "LLM Wiki intake·회상·분류 통합 도우미. /llm-wiki:capture (외부 자료 → 00. Inbox 적재, intake 계층) + /llm-wiki:search (4계층 회상, read-only) + /llm-wiki:classify (inbox 자동 분류, dry-run/live). Telegram/openclaw 채널 어댑터에서 capture 호출 가능, home-macmini schedule에서 classify 무인 호출 가능.",
   "author": {
     "name": "waymakerlabs",
     "github": "waymakerlabs"
@@ -18,11 +18,18 @@
     "검색",
     "classify",
     "분류",
+    "capture",
+    "intake",
+    "scrape",
+    "스크랩",
+    "url-fetch",
     "ingest",
     "inbox",
     "automation",
     "자동화",
     "schedule",
+    "telegram",
+    "openclaw-adapter",
     "knowledge-management",
     "지식관리"
   ]

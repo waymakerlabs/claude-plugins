@@ -361,14 +361,27 @@ Inspired by Boris Tane's "How I Use Claude Code" blog post. Instead of asking AI
 
 ## ▶ llm-wiki
 
-> LLM Wiki recall + ingest helper - Search Obsidian vault by keyword (read-only) and auto-classify `00. Inbox` content into Karpathy's 4-layer LLM Wiki structure (Topics / Entities / Syntheses / Sources). Designed for home-macmini scheduled execution.
+> LLM Wiki intake + recall + classify integrated helper for Karpathy's 4-layer LLM Wiki structure (Topics / Entities / Syntheses / Sources). Capture external URLs/memos into `00. Inbox` with security redaction, retrieve by keyword (read-only), and auto-classify on schedule.
 
 **Sub-commands:**
 
 | Command | Description | Version |
 |---|---|---|
+| `/llm-wiki:capture <URL\|text>` | External URL/memo/bundle → `00. Inbox` intake. URL token redaction + SSRF block + 4-stage dedupe + fetch fallback (login-required pages kept with user note). **No auto bundling** (`same_candidate` labels only). Callable from Telegram(openclaw) adapter. | v1.2.0 |
 | `/llm-wiki:search <keyword>` | 4-layer recall search + quality self-check report (strictly read-only) | v1.0.1 |
 | `/llm-wiki:classify [--mode dry-run\|live]` | Auto-classify `00. Inbox` per migration plan §8 + classification rules v1.1 + classification prompt v1.1. Suitable for unattended `home-macmini` schedule. | v1.1.0 |
+
+**LLM Wiki data flow:**
+
+```
+[external sources]
+   ↓ /llm-wiki:capture  (intake — security redact, normalize, dedupe)
+[00. Inbox]
+   ↓ /llm-wiki:classify  (classification — daily KST 01:00)
+[60. Topics / 70. Entities / 80. Syntheses / 20. Raw Sources/derived]
+   ↑ /llm-wiki:search    (recall — read-only)
+[user query]
+```
 
 (Future sub-commands: `configure`, `audit`, `promote`)
 
@@ -410,6 +423,11 @@ Inspired by Boris Tane's "How I Use Claude Code" blog post. Instead of asking AI
 #### Usage
 
 ```bash
+# Capture (intake — URL → 00. Inbox)
+/llm-wiki:capture https://example.com/article            # Single URL
+/llm-wiki:capture <pasted text with URLs and notes>      # Bundle / notes mixed
+claude --print "/llm-wiki:capture {message body}"        # From openclaw / channel adapter
+
 # Recall (read-only)
 /llm-wiki:search 하네스                  # Korean keyword
 /llm-wiki:search Codex review loop       # English keyword

@@ -126,15 +126,15 @@
     },
     {
       "name": "llm-wiki",
-      "version": "1.1.0",
-      "description": "LLM Wiki recall + ingest helper - /llm-wiki:search (read-only 4-layer recall) + /llm-wiki:classify (00. Inbox auto-classification with dry-run/live modes, designed for home-macmini scheduled execution).",
+      "version": "1.2.0",
+      "description": "LLM Wiki intake + recall + classify integrated helper. /llm-wiki:capture (external URL/memo → 00. Inbox intake with security redaction + 4-stage dedupe) + /llm-wiki:search (read-only 4-layer recall) + /llm-wiki:classify (inbox auto-classification, dry-run/live). Designed for Telegram(openclaw) adapter + home-macmini schedule.",
       "author": {
         "name": "waymakerlabs",
         "email": "peter@waymakerlabs.com"
       },
       "source": "./plugins/llm-wiki",
       "category": "workflow",
-      "keywords": ["llm-wiki", "obsidian", "옵시디언", "wiki", "위키", "recall", "회상", "search", "검색", "classify", "분류", "ingest", "inbox", "automation", "자동화", "schedule", "knowledge-management", "지식관리"],
+      "keywords": ["llm-wiki", "obsidian", "옵시디언", "wiki", "위키", "recall", "회상", "search", "검색", "classify", "분류", "capture", "intake", "스크랩", "ingest", "inbox", "automation", "자동화", "schedule", "telegram", "openclaw-adapter", "knowledge-management", "지식관리"],
       "homepage": "https://github.com/waymakerlabs/claude-plugins"
     }
   ]
