@@ -2,10 +2,10 @@
 # ============================================================================
 # Minimal Statusline by WaymakerLabs
 # ============================================================================
-# Single line: Model | path (branch) | Context left % | 5H % (time) | 7D % (day)
+# Single line: Model | path (branch) | Context used % | 5H % (time) | 7D % (day)
 # No progress bars - just clean gradient-colored percentages
 # ============================================================================
-# v1.4.3 - Fix version comparison bug
+# v1.5.0 - Show real context usage % (C 33%) instead of Full/Half label
 # ============================================================================
 
 input=$(cat)
@@ -72,28 +72,15 @@ get_nord_gradient_color() {
     echo "$r;$g;$b"
 }
 
-# For context status: returns "label|r;g;b"
-get_context_status() {
+# For context usage %: stepped bands aligned to ~90% auto-compact
+#   safe → dumb zone → warning → compact imminent
+get_context_color() {
     local pct=$1
-    local label r g b
-
-    if [[ $pct -gt 50 ]]; then
-        label="Full"
-        r=163; g=190; b=140  # Green (#A3BE8C)
-    elif [[ $pct -gt 30 ]]; then
-        label="Half"
-        r=235; g=203; b=139  # Yellow (#EBCB8B)
-    elif [[ $pct -gt 15 ]]; then
-        label="Low"
-        r=208; g=135; b=112  # Orange (#D08770)
-    elif [[ $pct -gt 5 ]]; then
-        label="Compact"
-        r=191; g=97; b=106   # Red (#BF616A)
-    else
-        label="Compact!"
-        r=191; g=97; b=106   # Red (#BF616A)
+    if   [[ $pct -ge 85 ]]; then echo "191;97;106"    # Red    - compact imminent (~90% auto-compact)
+    elif [[ $pct -ge 75 ]]; then echo "208;135;112"   # Orange - warning, compaction approaching
+    elif [[ $pct -ge 50 ]]; then echo "235;203;139"   # Yellow - dumb zone
+    else                          echo "163;190;140"  # Green  - safe
     fi
-    echo "${label}|${r};${g};${b}"
 }
 
 # ============================================================================
@@ -131,7 +118,7 @@ LINE1="${MODEL_DISPLAY} | ${DIR_DISPLAY} ${GIT_DISPLAY}"
 # Line 2: Context + 5H + 7D (no bars, just percentages)
 # ============================================================================
 
-# Calculate context remaining until auto-compact (80% threshold)
+# Context usage % (matches the Claude app's "used" figure, e.g. 332.3k/1.0M = 33%)
 CONTEXT_USED=0
 if [[ "$CURRENT_USAGE" != "null" && -n "$CURRENT_USAGE" ]]; then
     INPUT_TOKENS=$(echo "$CURRENT_USAGE" | jq -r '.input_tokens // 0')
@@ -140,21 +127,11 @@ if [[ "$CURRENT_USAGE" != "null" && -n "$CURRENT_USAGE" ]]; then
     CURRENT_TOKENS=$((INPUT_TOKENS + CACHE_CREATE + CACHE_READ))
     [[ "$CONTEXT_SIZE" -gt 0 ]] && CONTEXT_USED=$((CURRENT_TOKENS * 100 / CONTEXT_SIZE))
 fi
+[[ $CONTEXT_USED -gt 100 ]] && CONTEXT_USED=100
 
-# Context left = 80% (auto-compact threshold) - used%
-CONTEXT_LEFT=$((80 - CONTEXT_USED))
-[[ $CONTEXT_LEFT -lt 0 ]] && CONTEXT_LEFT=0
-
-CTX_STATUS=$(get_context_status "$CONTEXT_LEFT")
-CTX_LABEL=$(echo "$CTX_STATUS" | cut -d'|' -f1)
-CTX_COLOR=$(echo "$CTX_STATUS" | cut -d'|' -f2)
-
-# Bold for Compact! (urgent)
-if [[ "$CTX_LABEL" == "Compact!" ]]; then
-    CTX_DISPLAY="${BOLD}\033[38;2;${CTX_COLOR}m${CTX_LABEL}${RESET}"
-else
-    CTX_DISPLAY="\033[38;2;${CTX_COLOR}m${CTX_LABEL}${RESET}"
-fi
+# Color by usage band: green(safe) → yellow(dumb zone) → orange(warn) → red(compact imminent)
+CTX_COLOR=$(get_context_color "$CONTEXT_USED")
+CTX_DISPLAY="${C_AURORA_PURPLE}C${RESET} ${BOLD}\033[38;2;${CTX_COLOR}m${CONTEXT_USED}%${RESET}"
 
 # Usage data
 get_usage_data() {
