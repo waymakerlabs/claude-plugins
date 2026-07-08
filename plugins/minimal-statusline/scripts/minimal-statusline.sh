@@ -5,6 +5,7 @@
 # Single line: Model | path (branch) | Context used % | 5H % (time) | 7D % (day)
 # No progress bars - just clean gradient-colored percentages
 # ============================================================================
+# v1.6.0 - Show current effort level next to the model name
 # v1.5.0 - Show real context usage % (C 33%) instead of Full/Half label
 # ============================================================================
 
@@ -15,6 +16,10 @@ MODEL=$(echo "$input" | jq -r '.model.display_name // "Unknown"')
 CURRENT_DIR=$(echo "$input" | jq -r '.workspace.current_dir // "."')
 CONTEXT_SIZE=$(echo "$input" | jq -r '.context_window.context_window_size // 200000')
 CURRENT_USAGE=$(echo "$input" | jq -r '.context_window.current_usage // null')
+
+# Effort level isn't part of the statusline stdin payload — it's set via
+# /effort and persisted in the user's global settings.json, so read it there.
+EFFORT=$(jq -r '.effortLevel // empty' "$HOME/.claude/settings.json" 2>/dev/null)
 
 # ============================================================================
 # Colors (Nord theme)
@@ -87,7 +92,10 @@ get_context_color() {
 # Line 1: Model | Style | Directory + Git
 # ============================================================================
 
-MODEL_DISPLAY="${BOLD}${C_FROST_TEAL}${MODEL}${RESET}"
+EFFORT_DISPLAY=""
+[[ -n "$EFFORT" ]] && EFFORT_DISPLAY=" ${C_POLAR}(${EFFORT})${RESET}"
+
+MODEL_DISPLAY="${BOLD}${C_FROST_TEAL}${MODEL}${RESET}${EFFORT_DISPLAY}"
 
 DIR_DISPLAY="${C_SNOW}${CURRENT_DIR/$HOME/~}${RESET}"
 

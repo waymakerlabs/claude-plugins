@@ -11,6 +11,7 @@ Minimal single-line statusline with Nord Aurora theme.
 | Element | Color | Hex |
 |---------|-------|-----|
 | Model | Frost Teal | #8FBCBB |
+| Effort | Polar Night (dimmed) | #4C566A |
 | Directory | Snow Storm | #D8DEE9 |
 | Git Branch | Aurora Green | #A3BE8C |
 | Git Dirty | Aurora Yellow | #EBCB8B |
@@ -38,12 +39,12 @@ Green    Yellow    Orange     Red
 ## Layout
 
 ```
-Model | Directory (branch)status | C % | 5H % (time) | 7D % (day)
+Model (effort) | Directory (branch)status | C % | 5H % (time) | 7D % (day)
 ```
 
 Example:
 ```
-Opus 4.8 | ~/Dev (main)✓ | C 33% | 5H 8% (2h58m) | 7D 15% (Fri)
+Opus 4.8 (high) | ~/Dev (main)✓ | C 33% | 5H 8% (2h58m) | 7D 15% (Fri)
 ```
 
 ### Layout Elements
@@ -51,6 +52,7 @@ Opus 4.8 | ~/Dev (main)✓ | C 33% | 5H 8% (2h58m) | 7D 15% (Fri)
 | Position | Element | Description |
 |----------|---------|-------------|
 | 1 | Model | Current Claude model name |
+| 1b | Effort | Current reasoning effort (`/effort`), read from `settings.json` — hidden if unset |
 | 2 | Directory | Working directory with git branch and status |
 | 3 | Context (`C`) | Context window usage % — matches the Claude app's "used" figure (see below) |
 | 4 | 5H | 5-hour API usage % and reset time |
