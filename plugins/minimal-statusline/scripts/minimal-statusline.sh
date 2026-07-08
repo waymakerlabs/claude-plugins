@@ -93,7 +93,7 @@ get_context_color() {
 # ============================================================================
 
 EFFORT_DISPLAY=""
-[[ -n "$EFFORT" ]] && EFFORT_DISPLAY=" ${C_POLAR}(${EFFORT})${RESET}"
+[[ -n "$EFFORT" ]] && EFFORT_DISPLAY=" ${C_POLAR}[${EFFORT}]${RESET}"
 
 MODEL_DISPLAY="${BOLD}${C_FROST_TEAL}${MODEL}${RESET}${EFFORT_DISPLAY}"
 

@@ -39,12 +39,12 @@ Green    Yellow    Orange     Red
 ## Layout
 
 ```
-Model (effort) | Directory (branch)status | C % | 5H % (time) | 7D % (day)
+Model [effort] | Directory (branch)status | C % | 5H % (time) | 7D % (day)
 ```
 
 Example:
 ```
-Opus 4.8 (high) | ~/Dev (main)✓ | C 33% | 5H 8% (2h58m) | 7D 15% (Fri)
+Opus 4.8 [high] | ~/Dev (main)✓ | C 33% | 5H 8% (2h58m) | 7D 15% (Fri)
 ```
 
 ### Layout Elements
