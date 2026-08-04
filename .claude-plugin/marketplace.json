@@ -22,7 +22,7 @@
     },
     {
       "name": "wrap-up",
-      "version": "1.0.9",
+      "version": "1.0.10",
       "description": "Session wrap-up skill - Obsidian documentation + Git commit in one go. Auto-generate daily log and handoff docs, with a pre-commit verification gate",
       "author": {
         "name": "waymakerlabs",
