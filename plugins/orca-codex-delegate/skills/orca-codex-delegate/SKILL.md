@@ -164,9 +164,13 @@ oracle·검증 명령과 결과 / 다음 수정 task 필요 여부.
 
 ## 7. 적용 범위
 
-이 skill은 **이 Mac의 로컬 Claude Code 세션**에 적용된다(전역 `~/.claude/skills/`에 있으므로 로컬
-프로젝트 전체에서 발견됨). Cloud/Cowork 등 원격 세션에는 자동으로 전파되지 않는다 — 그런 세션에서
-같은 절차가 필요하면 계정 skill 업로드 또는 repo-level skill/plugin 배포를 별도로 검토한다.
+이 skill은 `waymakerlabs-claude-plugins` 마켓플레이스에서 `/plugin install
+orca-codex-delegate@waymakerlabs-claude-plugins`로 설치한 **로컬 Claude Code 세션**에 적용된다.
+설치 후 호출은 plugin-scoped 이름을 쓴다: `Skill(orca-codex-delegate:orca-codex-delegate)` — bare
+이름(`orca-codex-delegate`)은 같은 이름의 다른 항목(예: standalone 개인 skill)이 존재하면 그쪽을
+가리킬 수 있으므로 항상 scoped 이름을 명시한다. Cloud/Cowork 등 원격 세션에는 이 plugin이 자동으로
+전파되지 않는다 — 그런 세션에서 같은 절차가 필요하면 해당 세션에서도 마켓플레이스를 추가하고
+설치해야 한다.
 
 ## 8. 명령·경로 표기 원칙
 

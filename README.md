@@ -486,7 +486,7 @@ Does not cover base Orca CLI usage (see the `orca-cli`/`orchestration` skills fi
 The skill activates automatically when the coordinator decides to delegate to Codex ("get codex to review this", "hand implementation to codex") or ask it directly:
 
 ```bash
-Skill(orca-codex-delegate)
+Skill(orca-codex-delegate:orca-codex-delegate)
 ```
 
 ---

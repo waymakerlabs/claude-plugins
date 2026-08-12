@@ -1,6 +1,6 @@
 {
   "name": "orca-codex-delegate",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Tracked Orca Run/Task orchestration procedures for delegating review or implementation work to Codex — read-only crosscheck and write-enabled implementation delegation, worker profiles, known Orca CLI pitfalls, and finding-report format.",
   "author": {
     "name": "waymakerlabs",
