@@ -136,6 +136,19 @@
       "category": "workflow",
       "keywords": ["llm-wiki", "obsidian", "옵시디언", "wiki", "위키", "recall", "회상", "search", "검색", "classify", "분류", "capture", "intake", "스크랩", "ingest", "inbox", "automation", "자동화", "schedule", "telegram", "openclaw-adapter", "knowledge-management", "지식관리"],
       "homepage": "https://github.com/waymakerlabs/claude-plugins"
+    },
+    {
+      "name": "orca-codex-delegate",
+      "version": "1.0.0",
+      "description": "Tracked Orca Run/Task orchestration procedures for delegating review or implementation work to Codex — read-only crosscheck and write-enabled implementation delegation, worker profiles, known Orca CLI pitfalls, and finding-report format. Requires the Orca desktop app with orchestration enabled.",
+      "author": {
+        "name": "waymakerlabs",
+        "email": "peter@waymakerlabs.com"
+      },
+      "source": "./plugins/orca-codex-delegate",
+      "category": "workflow",
+      "keywords": ["orca", "codex", "orchestration", "delegation", "review", "crosscheck", "worker", "run-task-dispatch", "claude-code"],
+      "homepage": "https://github.com/waymakerlabs/claude-plugins"
     }
   ]
 }

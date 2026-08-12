@@ -462,6 +462,35 @@ If `llmWikiWorkspace` is missing, the plugin auto-detects by searching for a fol
 
 ---
 
+## ▶ orca-codex-delegate
+
+> Tracked [Orca](https://www.onorca.dev) Run/Task orchestration procedures for delegating review or implementation work to Codex. Claude Code acts as coordinator (plan, decompose, review, decide), Codex acts as worker (investigate, implement, test). Requires the Orca desktop app with orchestration enabled.
+
+**Covers:**
+
+- **Crosscheck protocol (read-only)** — Claude's own changes get an external Codex review via the `orca-review` worker profile.
+- **Implementation-delegation protocol (write)** — Codex implements, Claude reviews the diff directly (no Codex self-review round).
+- **Common pitfalls** — `--worktree active` mistargeting, `check --wait` replay + multi-JSON parsing, `run-create` re-binding, `worker-read`/`worker-release` returning `dispatch_not_found`.
+- Standardized finding format (`[BLOCK]`/`[WARN]`/`[NIT]` + aggregate counts).
+
+Does not cover base Orca CLI usage (see the `orca-cli`/`orchestration` skills first) or full ownership handoff to another Claude Code session.
+
+#### Install
+
+```bash
+/plugin install orca-codex-delegate@waymakerlabs-claude-plugins
+```
+
+#### Usage
+
+The skill activates automatically when the coordinator decides to delegate to Codex ("get codex to review this", "hand implementation to codex") or ask it directly:
+
+```bash
+Skill(orca-codex-delegate)
+```
+
+---
+
 ## Troubleshooting
 
 ### Usage shows N/A

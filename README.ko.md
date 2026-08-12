@@ -304,6 +304,35 @@ Boris Tane의 "How I Use Claude Code" 블로그에서 영감을 받았습니다.
 
 ---
 
+## ▶ orca-codex-delegate
+
+> Claude Code가 코디네이터, Codex가 실행자인 [Orca](https://www.onorca.dev) orchestration 위임 절차. Orca 데스크톱 앱 + orchestration 기능이 필요합니다.
+
+**다루는 것:**
+
+- **크로스체크 프로토콜(읽기전용)** — Claude가 만든 것을 codex가 `orca-review` 프로필로 외부 검토.
+- **구현위임 프로토콜(쓰기)** — codex가 구현한 것을 Claude가 직접 검토(codex 자체 재검토 요구 안 함).
+- **공통 실측 함정** — `--worktree active` 오조준, `check --wait` replay·다중 JSON 파싱, `run-create` 바인딩 이동, `worker-read`/`worker-release`의 `dispatch_not_found`.
+- 표준화된 finding 형식(`[BLOCK]`/`[WARN]`/`[NIT]` + 집계).
+
+Orca CLI 자체 기본 사용법(`orca-cli`/`orchestration` skill 참조)이나 다른 Claude Code 세션으로의 full handoff는 다루지 않습니다.
+
+#### 설치
+
+```bash
+/plugin install orca-codex-delegate@waymakerlabs-claude-plugins
+```
+
+#### 사용법
+
+"codex한테 리뷰 시켜줘" / "구현은 codex한테 맡겨" 같은 요청, 또는 코디네이터가 위임을 결정했을 때 자동 매칭됩니다. 직접 호출도 가능합니다:
+
+```bash
+Skill(orca-codex-delegate)
+```
+
+---
+
 ## 문제 해결
 
 ### Usage가 N/A로 표시됨
