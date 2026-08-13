@@ -1,0 +1,9 @@
+{
+  "name": "focused-analysis",
+  "version": "1.0.0",
+  "description": "Dual independent-track cross-verification for hard diagnostic questions — an Opus subagent and Orca/codex orchestration run in parallel on the same question, then Claude synthesizes agreement/disagreement into one final judgment.",
+  "author": {
+    "name": "waymakerlabs",
+    "email": "peter@waymakerlabs.com"
+  }
+}

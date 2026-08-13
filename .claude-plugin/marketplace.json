@@ -149,6 +149,19 @@
       "category": "workflow",
       "keywords": ["orca", "codex", "orchestration", "delegation", "review", "crosscheck", "worker", "run-task-dispatch", "claude-code"],
       "homepage": "https://github.com/waymakerlabs/claude-plugins"
+    },
+    {
+      "name": "focused-analysis",
+      "version": "1.0.0",
+      "description": "Dual independent-track cross-verification for hard diagnostic questions — an Opus subagent and Orca/codex orchestration run in parallel on the same question, then Claude synthesizes agreement/disagreement into one final judgment. Triggered by '집중 분석해줘'/'상세 분석해줘'. Requires the orca-codex-delegate plugin.",
+      "author": {
+        "name": "waymakerlabs",
+        "email": "peter@waymakerlabs.com"
+      },
+      "source": "./plugins/focused-analysis",
+      "category": "workflow",
+      "keywords": ["analysis", "cross-verification", "orca", "codex", "opus", "dual-track", "집중분석", "상세분석", "claude-code"],
+      "homepage": "https://github.com/waymakerlabs/claude-plugins"
     }
   ]
 }
