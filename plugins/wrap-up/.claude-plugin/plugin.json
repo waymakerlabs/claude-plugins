@@ -1,7 +1,7 @@
 {
   "name": "wrap-up",
-  "version": "1.0.10",
-  "description": "Session wrap-up skill - Obsidian documentation + Git commit in one go. Auto-generate daily log and handoff docs, with a pre-commit verification gate",
+  "version": "1.0.11",
+  "description": "Session wrap-up skill - Obsidian documentation + Git commit in one go. Auto-generate daily log and handoff docs with explicit parallel-delegation next-steps, with a pre-commit verification gate that defaults to orca-codex-delegate when available",
   "author": {
     "name": "waymakerlabs",
     "github": "waymakerlabs"
