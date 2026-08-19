@@ -312,6 +312,7 @@ Boris Tane의 "How I Use Claude Code" 블로그에서 영감을 받았습니다.
 
 - **크로스체크 프로토콜(읽기전용)** — Claude가 만든 것을 codex가 `orca-review` 프로필로 외부 검토.
 - **구현위임 프로토콜(쓰기)** — codex가 구현한 것을 Claude가 직접 검토(codex 자체 재검토 요구 안 함).
+- **병렬 배치가 기본값** — 독립적인 하위작업이 여럿이면 순차 1개씩이 아니라 Run 1개 + Task 전부 선언 + 여러 worker 동시 dispatch로 처리하고 `check --wait`로 fan-in.
 - **공통 실측 함정** — `--worktree active` 오조준, `check --wait` replay·다중 JSON 파싱, `run-create` 바인딩 이동, `worker-read`/`worker-release`의 `dispatch_not_found`.
 - 표준화된 finding 형식(`[BLOCK]`/`[WARN]`/`[NIT]` + 집계).
 

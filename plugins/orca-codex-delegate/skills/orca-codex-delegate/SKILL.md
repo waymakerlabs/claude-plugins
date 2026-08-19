@@ -29,6 +29,12 @@ description: >-
 Claude(coordinator) = 계획·분해·Task 작성·결과 검토·최종 판단·사용자 보고.
 Codex(worker) = 코드/문서 조사, 파일 수정·구현, 테스트 작성·실행, 재현, 결과 보고.
 
+**기본값은 병렬이다.** 위임할 작업을 독립적인 하위작업 여러 개로 쪼갤 수 있으면, 순차로 한 라운드씩
+Task→worker→완료대기를 반복하지 않는다. Run 1개에 독립 Task를 전부 먼저 만들고 여러 worker를
+동시에 dispatch한 뒤 fan-in한다(§5-1의 병렬 배치 절차). 순차 1개씩 처리는 하위작업이 서로
+의존하거나(체인) 정말 1건뿐일 때만 쓴다 — "일단 하나 시키고 끝나면 다음 하나 시키기"를 기본
+패턴으로 쓰지 않는다.
+
 ## 2. 사전 점검 (처음 쓰기 전에만, 세션당 1회)
 
 - `orca status --json` — 런타임 가용성. 미가용이면 `codex:codex-rescue` subagent로 폴백하고 폴백 사실을
@@ -55,6 +61,14 @@ Codex(worker) = 코드/문서 조사, 파일 수정·구현, 테스트 작성·�
 - **"지금 사용자가 보고 있는 worktree"가 계약 자체일 때** → `--worktree current`(또는 low-level
   경로에서 `active`)가 맞는 선택이다. 이 경우 `path:`로 바꾸면 오히려 사용자 의도와 다른 고정 경로를
   참조하게 된다.
+- **병렬 배치일 때**: 여러 worker가 서로 다른 파일을 건드리면 같은 worktree를 공유해도 된다 — 파일
+  경합이 없는데 "병렬이니까"라는 이유만으로 worktree를 새로 만들지 않는다. 다만 그 공유 worktree에
+  **다른 세션(다른 Claude 탭·다른 codex 터미널)이 이미 살아서 작업 중**이면(`orca terminal list --json`
+  으로 확인), 사용자가 명시적으로 그 세션과의 격리를 요청했거나 파일이 겹칠 위험이 있을 때 top-level
+  worktree를 새로 만든다: `orca worktree create --name <배치명> --no-parent --setup skip --json`
+  (이 배치에 datasets 등 gitignore 픽스처가 필요 없으면 `--setup skip`으로 디스크 낭비를 피한다 —
+  워크트리별 gitignore 데이터셋 사본이 누적돼 디스크를 먹은 실측 사례가 있다). 배치가 끝나
+  Claude 직접 검증(§5-5)과 필요한 병합까지 마쳤으면 `git worktree remove`로 정리한다.
 - 확실하지 않으면 worker 생성 직후 실제 대상이 맞는지 확인한다(워커의 cwd 또는 `orca terminal list
   --json`의 worktree 필드 대조).
 
@@ -67,6 +81,8 @@ Codex(worker) = 코드/문서 조사, 파일 수정·구현, 테스트 작성·�
    --peek --format --json`으로 자기 Run의 미확인 메일만 점검한다. `--all`은 이력 조회일 뿐 배수가
    아니고, 이전 Run의 결과를 새 리뷰 결과로 해석하지 않는다. **`run-create`를 프로브로 재호출하지
    않는다** — 코디네이터 바인딩이 새 Run으로 옮겨간다(실측). run id는 `run-create` 응답에서 바로 잡는다.
+   리뷰할 관점·대상이 서로 독립적으로 여러 개면(예: 파일별·관심사별) 같은 Run 안에 Task를 전부 만들고
+   `orca-review` worker 여러 개를 동시에 dispatch한다 — §1의 병렬 기본값·§5-1과 같은 원칙이다.
 2. `orca orchestration task-create --run <run_id> --spec "..." --json`으로 task를 만든다. spec에는
    범위·읽기 전용 여부·검증할 주장/파일/테스트·시작/종료 snapshot(HEAD, branch, `git status --short`,
    대상 diff 또는 commit)·독립 oracle 또는 negative control 1개를 구체적으로 적는다. 리뷰 요청이면
@@ -112,36 +128,71 @@ oracle·검증 명령과 결과 / 다음 수정 task 필요 여부.
 ## 5. 구현위임 절차 (쓰기)
 
 크로스체크의 반대 방향 — codex가 구현하는 것을 Claude가 오케스트레이션하고 직접 크로스체크한다.
+**기본값은 병렬이다** — 독립적인 하위작업이 둘 이상이면 순차로 한 라운드씩 돌리지 않고, 1단계에서
+전부 한꺼번에 Task로 만들어 동시에 여러 worker에 배정한다. "하나 시키고 끝나면 다음 하나" 루프는
+하위작업이 서로 의존하거나 정말 1건뿐일 때만 쓴다.
 
 0. **처음 쓰기 전에 가능성부터 테스트한다** — §2 사전 점검을 실행하고 결과를 짧게 보고한다.
-1. **세션 첫 위임에서만** `orca skills get orchestration --full`로 최신 계약을 확인한다. 사용자가
+
+1. **병렬화 판단 및 배치 — 매 위임마다 반드시 먼저 한다.** 위임할 작업을 하위작업 단위로 쪼개보고,
+   서로 파일·의존관계가 겹치지 않는 것이 둘 이상이면:
+   - `orca orchestration run-create --objective "<배치 전체 목표>" --json` — **이 배치 전체에 1번만**
+     부른다. 응답에서 run id를 바로 잡는다(재호출 시 코디네이터 바인딩이 옮겨간다 — §6-4).
+   - 독립적인 하위작업 전부를 `task-create --run <run_id> --spec "..." --json`으로 먼저 선언한다
+     (의존관계가 있는 것만 `--deps '["<선행 task_id>"]'`로 연결하고, 체인은 3-4단계를 넘기지 않는다).
+   - `orca orchestration task-list --run <run_id> --ready --json`으로 지금 바로 돌릴 수 있는 Task를
+     확인한다.
+   - §3 기준으로 worktree를 고른 뒤, ready한 Task마다 worker terminal을 **동시에** 만들고(각각
+     `orca terminal create --command "codex --profile orca-implement"`), 각각 `tui-idle` 대기 후
+     **같은 wave에서 전부** `dispatch --task <id> --to <handle> --inject`한다. 하나 만들고 끝날 때까지
+     기다렸다가 다음 하나를 만드는 순차 루프를 기본 경로로 쓰지 않는다.
+   - 독립적인 하위작업이 딱 1건이거나 전부가 서로 의존하는 체인일 때만 순차 1개씩 처리한다 — 이때도
+     run-create/task-create는 그대로 쓴다(추적을 위해 임의로 생략하지 않는다).
+
+2. **세션 첫 위임에서만** `orca skills get orchestration --full`로 최신 계약을 확인한다. 사용자가
    "직접 크로스체크하겠다"고 명시했으므로 **감독형(coordinated subtask)**으로 분류한다 — full handoff가
-   아니라 Run→Task→dispatch --inject→check --wait→worker_done 경로를 그대로 따른다.
-2. **워커는 §3 기준으로 worktree를 고르고** `orca terminal create --command "codex --profile
-   orca-implement"`로 띄운다(low-level 경로). `worker-start --agent codex` 조합형이 codex CLI 업데이트
-   프롬프트로 막히는 경우가 있으니, 막히면 low-level 경로로 폴백한다.
+   아니라 Run→Task→dispatch --inject→check --wait→worker_done 경로를 그대로 따른다. `worker-start
+   --agent codex` 조합형이 codex CLI 업데이트 프롬프트로 막히는 경우가 있으니, 막히면 위 1단계의
+   low-level 경로(`terminal create` + `dispatch --inject`)로 진행한다.
+
 3. **task spec은 구체적으로 쓴다** — 수정 대상 파일 경로(정확히 그 파일만, 범위 밖 수정 금지 명시)·
    근거가 되는 실제 코드 위치(함수명·대략 라인, "grep으로 재확인" 지시)·요구사항 각 항목·해당 리포의
    금지 표현/스타일 가이드가 있으면 명시·**git commit은 하지 않는다(조정자가 리뷰 후 처리)**를 매번
-   명시한다. 인용부호가 복잡한 heredoc은 커밋위생 훅에 토큰화 실패로 막힐 수 있으므로, spec이 길면
-   임시 파일에 쓰고 `$(cat 파일)`로 전달한 뒤 즉시 삭제한다.
-4. `worker_done` 수신 후 **codex 자체 재검토를 요구하지 않는다** — 대신 Claude(조정자)가 직접:
+   명시한다. **병렬 배치일 때는 각 Task spec에 "다른 worker가 동시에 <다른 파일/범위>를 건드리고
+   있으니 그건 이 작업 범위에서 제외"처럼 서로의 범위를 명시**해 두 worker가 같은 파일을 동시에
+   건드리는 충돌을 방지한다. 인용부호가 복잡한 heredoc은 커밋위생 훅에 토큰화 실패로 막힐 수 있으므로,
+   spec이 길면 임시 파일에 쓰고 `$(cat 파일)`로 전달한 뒤 즉시 삭제한다.
+
+4. **fan-in.** `check --wait --types worker_done,escalation,question --timeout-ms <n>`으로 대기한다.
+   병렬 배치에서는 여러 `worker_done`이 서로 다른 시각에 도착한다 — 매 delivery를 받을 때마다
+   `payload.taskId`/`dispatchId`로 어느 worker의 결과인지 구분하고, 처리 후 `--ack <deliveryId>`한
+   다음에도 **다른 Task가 아직 안 끝났으면 같은 run에 대해 계속 기다린다.** 하나 끝났다고 배치 전체가
+   끝난 것으로 보지 않는다. `task-list --ready`에 새로 풀리는 Task가 있으면 그것도 즉시 같은 방식으로
+   동시에 배정한다.
+
+5. `worker_done` 수신 후 **codex 자체 재검토를 요구하지 않는다** — 대신 Claude(조정자)가 완료된
+   Task마다 직접:
    ① `git diff --stat`/`git status --short`로 변경 범위가 spec대로인지 확인
    ② 변경 내용이 근거로 든 실제 코드·자산과 사실적으로 일치하는지 그 코드를 직접 열어 대조
    ③ 해당 리포의 금지 표현·문서 톤 일치 여부 확인.
    §4의 finding 형식(BLOCK/WARN/NIT)을 그대로 써도 되고, 간단한 변경이면 서술형으로 대체해도 된다 —
    핵심은 "codex가 잘했다고 보고했다"를 그대로 받지 않고 직접 확인하는 것이다.
-5. **되돌리기 어려운 고위험 변경**(스키마·배포/보안 설정·계약 문서·비가역 런타임 동작)이면 Claude
+
+6. **되돌리기 어려운 고위험 변경**(스키마·배포/보안 설정·계약 문서·비가역 런타임 동작)이면 Claude
    직접 리뷰에 더해 별도 codex 리뷰 워커(§4 크로스체크 절차)를 추가로 돌린다 — 고위험 판단 기준은 이
    skill이 정의하지 않는다. 호출한 세션의 `~/.claude/CLAUDE.md` 운영 규칙을 참조한다(같은 기준을 두
    곳에 중복 정의하면 드리프트가 재발한다 — 2026-08-12에 이 skill을 분리하며 실제로 발견한 문제와
    같은 종류).
-6. **정리**: `orca orchestration worker-release --dispatch <id>`가 `dispatch_not_found`를 반환할 수
-   있다(이 Orca 버전은 `worker_done` 처리 시점에 capability를 이미 자동 회수하는 것으로 보인다 —
-   `capability_revoked_at`이 완료 시각과 동일한 것으로 실측). 에러로 취급하지 말고 `orca terminal
-   close --terminal <handle>`로 대체 정리한다.
-7. 이 절차로 이미 Claude가 직접 크로스체크를 마쳤다면, 별도 wrap-up류 codex 크로스체크 게이트는 그
-   라운드에서 생략해도 된다 — 단, §5의 고위험 기준에 해당하면 생략하지 않는다.
+
+7. **정리**: 완료된 Task마다 `orca orchestration worker-release --dispatch <id>`를 시도한다.
+   `dispatch_not_found`를 반환할 수 있다(이 Orca 버전은 `worker_done` 처리 시점에 capability를 이미
+   자동 회수하는 것으로 보인다 — `capability_revoked_at`이 완료 시각과 동일한 것으로 실측). 에러로
+   취급하지 말고 `orca terminal close --terminal <handle>`로 대체 정리한다. §3에서 병렬 배치용으로
+   격리 worktree를 새로 만들었다면, 전 Task가 완료·직접검증·(승인 시) 병합까지 끝난 뒤
+   `git worktree remove`로 정리한다.
+
+8. 이 절차로 이미 Claude가 직접 크로스체크를 마쳤다면, 별도 wrap-up류 codex 크로스체크 게이트는 그
+   라운드에서 생략해도 된다 — 단, §6의 고위험 기준에 해당하면 생략하지 않는다.
 
 최종 보고에 짧게 포함: Run/task/dispatch ID·codex 프로필과 실제 모델/effort(확인한 값)·위임한 변경
 범위·**Claude가 직접 확인한 항목과 근거(파일:라인)**·추가 codex 리뷰 필요 여부(고위험이면 실행
@@ -159,7 +210,7 @@ oracle·검증 명령과 결과 / 다음 수정 task 필요 여부.
 5. **`worker-read --dispatch <id>`는 워커 종료 후 `dispatch_not_found`** — agent terminal이 이미
    소멸했기 때문. finding 전문은 `orca terminal read --terminal <handle>`의 `result.terminal.tail`
    (문자열 배열)에서 읽고 ANSI 이스케이프를 지운다. 워커 handle을 기록해두면 편하다.
-6. **`worker-release`의 `dispatch_not_found`** — §5-6 참조. 완료 시점에 capability가 이미 자동
+6. **`worker-release`의 `dispatch_not_found`** — §5-7 참조. 완료 시점에 capability가 이미 자동
    회수된 것으로 보임. 에러로 취급 말고 `terminal close`로 대체.
 
 ## 7. 적용 범위

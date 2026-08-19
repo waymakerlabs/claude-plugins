@@ -470,6 +470,7 @@ If `llmWikiWorkspace` is missing, the plugin auto-detects by searching for a fol
 
 - **Crosscheck protocol (read-only)** — Claude's own changes get an external Codex review via the `orca-review` worker profile.
 - **Implementation-delegation protocol (write)** — Codex implements, Claude reviews the diff directly (no Codex self-review round).
+- **Parallel batch is the default** — independent sub-tasks get one Run with every Task declared up front, dispatched to multiple concurrent workers, and fanned in via `check --wait`, instead of one sequential worker at a time.
 - **Common pitfalls** — `--worktree active` mistargeting, `check --wait` replay + multi-JSON parsing, `run-create` re-binding, `worker-read`/`worker-release` returning `dispatch_not_found`.
 - Standardized finding format (`[BLOCK]`/`[WARN]`/`[NIT]` + aggregate counts).
 
