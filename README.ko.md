@@ -125,10 +125,11 @@ awesomejun의 [Awesome Statusline](https://github.com/awesomejun/awesome-claude-
 |------|------|
 | Daily Log | 오늘 작업 내용을 daily log에 기록 |
 | Handoff | 다음 세션을 위한 handoff 문서 생성 (단일 파일 유지) |
+| 검증 게이트 | 커밋 전 리포에 이미 정의된 typecheck/lint/test/build를 자동 감지·실행. 코드 리뷰 게이트는 Orca+codex가 설정돼 있으면 `orca-codex-delegate`가 기본값 |
 | 문서 업데이트 | 프로젝트 소개 등 관련 문서 자동 업데이트 |
 | Git Commit/Push | 코드 변경사항 커밋 및 푸시 |
 
-> **참고**: Handoff는 항상 하나의 파일만 유지합니다. 이전 handoff는 삭제되고 타임스탬프가 포함된 새 파일이 생성되어, 마지막 세션 종료 시점을 확인할 수 있습니다.
+> **참고**: Handoff는 항상 하나의 파일만 유지합니다. 이전 handoff는 삭제되고 타임스탬프가 포함된 새 파일이 생성되어, 마지막 세션 종료 시점을 확인할 수 있습니다. "다음 단계" 섹션은 각 항목의 대상 파일과 독립/의존 여부를 명시해서 적기 때문에, 다음 세션(또는 `orca-codex-delegate`)이 어떤 항목을 codex에게 병렬로 위임해도 되는지 판단할 수 있습니다.
 
 **실행 흐름:**
 
@@ -137,8 +138,11 @@ awesomejun의 [Awesome Statusline](https://github.com/awesomejun/awesome-claude-
     │
     ├─ 설정 확인 (없으면 Obsidian vault 경로 물어봄)
     ├─ 프로젝트 폴더 확인 (없으면 생성 여부 물어봄)
+    ├─ 현재 세션 작업 내용 파악
     ├─ Daily log 생성/업데이트
-    ├─ Handoff 문서 생성
+    ├─ Handoff 문서 생성 (다음 단계에 독립/의존 표기)
+    ├─ 검증 게이트 (결정적 검사 → 코드 리뷰, Orca+codex면 orca-codex-delegate 기본값)
+    ├─ 프로젝트 버전 업데이트
     ├─ 관련 문서 업데이트
     ├─ Git commit & push
     └─ 다음 세션 시작 프롬프트 출력

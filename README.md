@@ -117,7 +117,7 @@ Based on [Awesome Statusline](https://github.com/awesomejun/awesome-claude-plugi
 
 ## ▶ wrap-up
 
-> Session wrap-up skill - Obsidian documentation + Git commit with **parallel execution**. (v1.1.0)
+> Session wrap-up skill - Obsidian documentation + Git commit in one go, with a pre-commit verification gate.
 
 **Features:**
 
@@ -125,31 +125,28 @@ Based on [Awesome Statusline](https://github.com/awesomejun/awesome-claude-plugi
 |---------|-------------|
 | Daily Log | Record today's work in daily log |
 | Handoff | Generate handoff document (single file, overwrites previous) |
+| Verification Gate | Auto-detect and run the repo's own typecheck/lint/test/build before committing; defaults to `orca-codex-delegate` for the code-review gate when Orca+codex is configured |
 | Doc Update | Auto-update related docs (project overview, etc.) |
 | Git Commit/Push | Commit and push code changes |
-| Parallel Execution | Data gathering + document creation run concurrently via Task agents |
 
-> **Note**: Handoff maintains only one file. Previous handoff is deleted and a new timestamped file is created, so you can see when the last session ended.
+> **Note**: Handoff maintains only one file. Previous handoff is deleted and a new timestamped file is created, so you can see when the last session ended. The "Next steps" section is written with each item's file scope and independence/dependency marked explicitly, so a successor session (or `orca-codex-delegate`) can tell which items are safe to dispatch to codex in parallel.
 
-**Execution Flow (Parallel):**
+**Execution Flow (Sequential, 10 steps):**
 
 ```
 /wrap-up
     │
-    Phase 1 [Sequential]
-    ├─ Check config (ask for Obsidian vault path if not set)
-    ├─ Find project folder (ask to create if not found)
-    │
-    Phase 2 [Parallel] ⚡
-    ├─ git diff ∥ git log ∥ read previous daily-log ∥ read previous handoff
-    │
-    Phase 3 [Parallel] ⚡
-    ├─ Agent A: Daily Log  ∥  Agent B: Handoff  ∥  Agent C: Version Update
-    │
-    Phase 4 [Sequential]
-    ├─ Update related documents
-    ├─ Git commit & push
-    └─ Output next session prompt
+    1. Check config (ask for Obsidian vault path if not set)
+    2. Confirm work type & find project folder
+    3. Analyze this session's work (collect changed/read files, decisions, dead ends)
+    4. Write/update daily log
+    5. Write handoff doc (next steps marked independent vs. dependent)
+    6. Verification gate — deterministic checks, then code review
+       (orca-codex-delegate by default when Orca+codex is available)
+    7. Bump project version
+    8. Update related docs
+    9. Git commit & push
+    10. Print next-session start prompt
 ```
 
 #### Install
