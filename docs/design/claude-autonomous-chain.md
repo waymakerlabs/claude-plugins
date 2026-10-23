@@ -275,7 +275,8 @@ legacy-lens memory:
 | 전제 | 현재 상태 | 확인 방법 |
 |---|---|---|
 | 프록시가 Opus 5.5 `effort: xhigh`를 받음 | HTTP 200 확인. 실제 적용 여부는 UNVERIFIED | 구현 시 사용량·응답으로 확인 |
-| Claude Code 에이전트 frontmatter가 `effort: xhigh`를 받음 | **검증 통과·적용 UNVERIFIED** (2026-10-23, Claude Code 2.1.309, `claude -p --plugin-dir`). 4개 정의가 경고 없이 로드됨. 음성 시험(`effort: bogus-level`)에서 `invalid effort … Valid options: low, medium, high, xhigh, max or an integer` 경고 → 키를 읽고 xhigh를 허용값으로 검증함. API 요청에 실린 effort 값은 로그에 나오지 않아 미확인 | 첫 실사용에서 사용량·응답으로 확인 |
+| Claude Code 에이전트 frontmatter가 `effort: xhigh`를 받음 | **요청까지 확인·모델 적용 UNVERIFIED** (2026-10-23, Claude Code 2.1.309, `claude -p --plugin-dir`). 4개 정의가 경고 없이 로드됨. 음성 시험(`effort: bogus-level`)에서 `invalid effort … Valid options: low, medium, high, xhigh, max or an integer` 경고. 서브에이전트 기록(`~/.claude/projects/<probe>/…/subagents/*.jsonl`)의 API 요청에 `output_config.effort`가 worker `high`, planner-deep `xhigh`로 실림(구현 Sol 1차 N1이 지적, debug 로그만 보고 미확인이라 쓴 것을 정정). 프록시·모델이 그 effort를 실제 적용했는지는 미확인 | 첫 실사용에서 사용량·응답으로 확인 |
+| 서브에이전트가 보고서 파일을 쓰고 경로만 반환 | 하니스가 서브에이전트마다 "report .md를 쓰지 말고 최종 메시지로 반환, 단 다른 도구의 입력 파일은 괜찮다" 지시를 붙임(구현 Sol 1차 B4). 보고서를 조정자 `Read`·`git commit` 입력으로 명시(`task-brief.md` §6). **실측 확인** (2026-10-23, 임시 git 리포 task 1개를 `chain-worker`로 실행): 보고서 파일 작성(8항목), 반환값은 `<경로> — DONE <요약>` 한 줄, HEAD 불변·staged 0·변경은 `calc.py`와 보고서뿐, 영향 시험 통과 | 병렬 worker 여럿의 무커밋 동작은 첫 실사용에서 확인 |
 | 플러그인 에이전트 frontmatter의 `model`이 적용됨 | **확인** (같은 실측). `chain-worker`(model: sonnet) 호출이 `dispatching to firstParty model=claude-sonnet-5-5`, `modelUsage`에 `claude-sonnet-5-5` 별도 집계. `chain-planner-deep`은 `claude-opus-5-5` | — |
 | Orca 탭의 `opencode run --agent review-sol`이 사람 입력 없이 끝남 | 1차 검토로 확인: 약 7분 만에 무인 완료, `REVIEW-DONE` 출력. 결과 파일은 쓰지 않음(읽기 전용 정의 우선) → 출력 캡처로 변경(§10) | 2차 검토에서 재확인 |
 | 같은 작업 트리에서 worker 여럿이 동시에 경로 지정 커밋 | Sol 1차가 git 소스로 반증: 경로 지정 커밋도 index를 잠금 → 커밋은 조정자만(§7) | 구현 후 소규모 시험 체인에서 worker 무커밋 동작 확인 |

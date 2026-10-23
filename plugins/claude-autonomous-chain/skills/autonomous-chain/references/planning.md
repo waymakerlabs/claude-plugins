@@ -1,6 +1,13 @@
 # 계획 지침 (chain-planner / chain-planner-deep)
 
-계획 세션의 조정자가 planner에게 이 파일의 절대 경로를 넘긴다. planner는 끝까지 읽고 따른다.
+계획 세션의 조정자가 planner에게 이 파일의 절대 경로를 넘긴다. planner는 끝까지 읽고 따른다. `chain-planner`와 `chain-planner-deep` 모두 이 파일이 공통 계약이다(에이전트 정의끼리는 서로 상속되지 않는다).
+
+## 0. 하지 말 것 (공통)
+
+- 제품 코드·설정 수정. 쓰기는 지시서가 정한 계획 문서 경로(와 지시서가 명시한 보조 문서)에만 한다.
+- index·작업 트리를 바꾸는 git 명령(`add`, `commit`, `stash`, `reset`, `checkout`, `restore`, `clean`, `push` 등). git을 읽을 때는 `GIT_OPTIONAL_LOCKS=0`을 붙인다. index 쓰기는 조정자만 한다.
+- 서브에이전트 생성, 외부 시스템 쓰기, 새 비용 발생.
+- probe가 필요하면 `/tmp` 아래 임시 사본이나 읽기 전용 명령으로 한다. 리포를 바꾸는 probe는 첫 웨이브 task로 넘긴다.
 
 ## 1. 입력
 
