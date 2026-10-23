@@ -17,11 +17,15 @@
 
 - `HEAD`: `git -C <리포> rev-parse HEAD`
 - 커밋된 변경 범위: `git diff <base>..<HEAD> -- <경로들>` 또는 커밋 목록
-- **작업 트리 식별자**(무커밋 경로이거나 미커밋 변경이 검토 대상일 때 필수). tracked 변경과 untracked 신규 파일 내용을 모두 포함한다. index를 쓰지 않는다.
+- **작업 트리 식별자**(무커밋 경로이거나 미커밋 변경이 검토 대상일 때 필수). tracked 변경과 untracked 신규 파일 내용을 모두 포함하되, **검토 절차가 스스로 쓰는 체인 메타데이터는 제외**한다. 제외하지 않으면 요청 파일·결과 파일·상태 기록만으로 검토 전후 식별자가 달라진다. index를 쓰지 않는다.
 
   ```bash
-  cd <리포> && { GIT_OPTIONAL_LOCKS=0 git diff HEAD --binary; GIT_OPTIONAL_LOCKS=0 git ls-files --others --exclude-standard -z | xargs -0 shasum -a 256; } | shasum -a 256 | cut -c1-64
+  # 제외 대상: 체인의 reviews 폴더, 상태 파일, 질문 대기열. 프로파일 state가 다른 경로면 그 파일과 옆의 questions.md로 바꾼다.
+  META=( ":(exclude)docs/chain/<chain-id>/reviews" ":(exclude)docs/chain/<chain-id>/state.md" ":(exclude)docs/chain/<chain-id>/questions.md" )
+  cd <리포> && { GIT_OPTIONAL_LOCKS=0 git diff HEAD --binary -- . "${META[@]}"; GIT_OPTIONAL_LOCKS=0 git ls-files --others --exclude-standard -z -- . "${META[@]}" | xargs -0 shasum -a 256; } | shasum -a 256 | cut -c1-64
   ```
+
+  검토 전후 같은 `META`로 계산한다. worker 보고서(`reports/`)와 제품 파일은 제외하지 않는다(검토 중에는 바뀌지 않아야 하는 대상이다).
 
   같은 명령의 파일 목록(`GIT_OPTIONAL_LOCKS=0 git status --short`)도 함께 적고, 검토 범위를 "`HEAD` + 이 작업 트리 변경"으로 명시한다.
 - 문서 검토면 대상 파일 SHA-256(`shasum -a 256 <경로>`).
@@ -61,7 +65,7 @@ BLOCK은 구체적 오동작, 요구 누락·모순, 중대한 회귀, 권한·�
 마지막 줄에 `REVIEW-DONE`을 출력하고 종료합니다.
 ```
 
-요청 파일 자체는 검토 대상 snapshot에 넣지 않는다(커밋하지 않아도 되고, 작업 트리 식별자 계산 전에 만들면 식별자에 들어가므로 **식별자를 먼저 계산**한다).
+요청 파일 자체는 검토 대상 snapshot에 넣지 않는다(커밋하지 않아도 된다). 요청·결과 파일은 `reviews/` 아래에 두므로 작업 트리 식별자의 `META` 제외에 걸려, 만드는 순서와 관계없이 식별자에 들어가지 않는다.
 
 ## 3. 기동
 
@@ -98,7 +102,7 @@ orca terminal create --worktree <active|path:등록경로> --title "$TITLE" --co
 1. ANSI 색 코드를 지우고, **이번 nonce 표식 줄 앞까지만** 본다. 그 범위에서 새 `^# 판정:`이 시작될 때마다 이전 결과를 버리고, 마지막 판정 블록이 `^REVIEW-DONE$`으로 닫히지 않았으면 **빈 결과**로 둔다.
 
    ```bash
-   sed -E 's/\x1b\[[0-9;]*m//g' "$LOG" | awk -v m="^SOL-EXIT-$NONCE=" '
+   sed -E 's/\x1b\[[0-9;]*m//g' "$LOG" | awk -v m="^SOL-EXIT-$NONCE=[0-9]+$" '
      $0 ~ m {exit}
      /^# 판정:/ {buf=""; on=1; last=""}
      on {buf=buf $0 "\n"}
@@ -110,7 +114,7 @@ orca terminal create --worktree <active|path:등록경로> --title "$TITLE" --co
 2. 추출 결과를 검사한다. 하나라도 어기면 `unverified`로 기록하고 1회 재시도한다.
    - 비어 있지 않고 `# 판정: SHIP` 또는 `# 판정: BLOCK`으로 시작
    - `## 검증 원장`(또는 동등한 snapshot 줄)에 요청한 HEAD SHA(앞 12자 이상)와 작업 트리 식별자·대상 SHA(요청에 있던 것)가 **그대로** 있다. 다르면 이전 회차 인용이거나 리뷰어의 시험 문자열이다.
-3. 검토 전후 snapshot 대조: `HEAD`, 작업 트리 식별자(§2 명령 재실행), 대상 파일 SHA가 요청 때와 같은지 확인한다. `git status --short`만으로는 같은 경로의 내용 변경을 알 수 없으므로 식별자로 본다. 리뷰어가 파일을 바꿨으면 그 변경을 되돌리지 말고 기록한 뒤 질문 대기열에 올린다.
+3. 검토 전후 snapshot 대조: `HEAD`, 작업 트리 식별자(§2 명령을 같은 `META`로 재실행), 대상 파일 SHA가 요청 때와 같은지 확인한다. `git status --short`만으로는 같은 경로의 내용 변경을 알 수 없으므로 식별자로 본다. 리뷰어가 파일을 바꿨으면 그 변경을 되돌리지 말고 기록한 뒤 질문 대기열에 올린다.
 4. 상태 파일에 기록: 게이트, 회차, snapshot(HEAD·작업 트리 식별자·대상 SHA), 리뷰 세션 ID, nonce, 판정, 결과 파일 경로, BLOCK id 목록.
 5. 탭 정리: `orca terminal close --terminal <handle> --tab --json`.
 
