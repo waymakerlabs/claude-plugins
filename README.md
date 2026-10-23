@@ -489,7 +489,7 @@ Skill(orca-codex-delegate:orca-codex-delegate)
 
 ---
 
-## ▶ claude-autonomous-chain
+## ▶ auto-chain
 
 > Milestone → wave → task autonomous execution for large multi-session work. Opus plans, GPT-6.1 Sol (OpenCode `review-sol` in an Orca tab) reviews, parallel Claude worker subagents implement, and one lean coordinator session per milestone integrates, verifies and hands off to the next milestone via an Orca tab.
 
@@ -505,7 +505,7 @@ Skill(orca-codex-delegate:orca-codex-delegate)
 #### Install
 
 ```bash
-/plugin install claude-autonomous-chain@waymakerlabs-claude-plugins
+/plugin install auto-chain@waymakerlabs-claude-plugins
 ```
 
 #### Usage
@@ -513,7 +513,7 @@ Skill(orca-codex-delegate:orca-codex-delegate)
 Ask for an autonomous chain on a large task ("자율체인으로 진행해"), or invoke it directly:
 
 ```bash
-Skill(claude-autonomous-chain:autonomous-chain)
+Skill(auto-chain:autonomous-chain)
 ```
 
 ---

@@ -37,7 +37,7 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 | 검토 | OpenCode `review-sol` (Orca 탭) | GPT-6.1 Sol high | 계획 검토, 웨이브 고위험 검토, 마일스톤 최종 검토 |
 | 조정 | 메인 세션 | 세션 모델 | 마일스톤 조정, 기록, 통합 검증 |
 
-- 모델과 effort는 에이전트 frontmatter에 고정돼 있다. `Agent` 호출 때 `model`을 넘겨 덮어쓰지 않는다. 호출할 때는 `subagent_type`에 플러그인 접두사가 붙은 이름(`claude-autonomous-chain:chain-worker` 등)을 쓴다.
+- 모델과 effort는 에이전트 frontmatter에 고정돼 있다. `Agent` 호출 때 `model`을 넘겨 덮어쓰지 않는다. 호출할 때는 `subagent_type`에 플러그인 접두사가 붙은 이름(`auto-chain:chain-worker` 등)을 쓴다.
 - worker 등급은 planner가 task마다 표시한 대로 따른다. "중요해 보인다"는 이유로 올리지 않는다.
 - worker는 서브에이전트를 다시 만들지 않는다(정의에서 `Agent` 도구가 빠져 있다).
 - 실제로 적용된 모델·effort를 확인하지 못하면 상태 파일에 `unverified`로 두고 통과로 추론하지 않는다.
@@ -73,7 +73,7 @@ wave N:
 
 ### worker 기동
 
-- `Agent`(`subagent_type: claude-autonomous-chain:<worker 등급>`)로 띄운다. 같은 웨이브의 독립 task는 한 메시지에서 여러 개를 동시에 띄운다(`run_in_background: true`도 가능).
+- `Agent`(`subagent_type: auto-chain:<worker 등급>`)로 띄운다. 같은 웨이브의 독립 task는 한 메시지에서 여러 개를 동시에 띄운다(`run_in_background: true`도 가능).
 - 지시서에는 다음만 넣는다. 계획 전문을 붙이지 않는다.
   - 공통 지시서 `references/task-brief.md` 절대 경로 (+ 프로파일 `task-brief`가 있으면 그 경로)
   - 리포 절대 경로, 계획 문서 경로와 task 절 위치(`M1-W1-T03`)
