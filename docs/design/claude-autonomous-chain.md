@@ -308,4 +308,16 @@ legacy-lens memory:
 
 원문: `docs/design/reviews/claude-autonomous-chain-review-1-result.md`, `…-review-2-result.md`
 
+### 구현 검토 (무거운 게이트, 같은 Sol 세션 `ses_e99024e2…`)
+
+| 회차 | 대상 HEAD | 판정 | finding | 반영 |
+|---|---|---|---|---|
+| 1/3 | `7b01b51` | BLOCK | B1 종료 표식이 로그에 안 남고 `$?`가 tee 값 / B2 추출이 "마지막으로 완결된" 판정 반환 / B3 planner-deep 금지 미전달 / B4 보고서 파일과 하니스 지시 충돌 / B5 무커밋 경로 snapshot 미식별 / N1 effort 요청 기록 정정 | `83dc911` |
+| 2/3 | `83dc911` | BLOCK | B1~B4 해소, B5 일부 / B6 작업 트리 식별자에 검토 메타데이터 포함 / N3 추출 경계 정규식 | `112579d` |
+| 3/3 | `112579d` | **SHIP** | B5·B6 해소, N3 해소, 새 BLOCK 없음 / N4 조정자 시험식 오타(증거는 유효) | — |
+
+결과: `docs/design/reviews/claude-autonomous-chain-impl-review-{1,2,3}-result.md`. 2·3차는 수정한 nonce 배선(`SOL-EXIT-<요청 SHA 12자>=`)으로 기동해 실제 로그에서 표식 기록·대기 종료·마지막 판정 추출을 확인했다(3차 로그 175행에는 리뷰어가 조정자 세션 기록을 대조하며 인용한 `# 판정: BLOCK`이 있었으나, 추출은 표식 직전의 SHIP 블록을 골랐다).
+
+미검증으로 남은 것: 병렬 worker 여럿의 무커밋 동작, 마일스톤 인계 실운행, 프록시·모델의 effort 실제 적용.
+
 2차 SHIP 이후 반영한 변경(리뷰 회차 2단계, N4, N5)은 리뷰 지적을 받아들이거나 사용자가 결정한 사항이고 새 설계 판단이 아니어서 재검토하지 않는다. 구현 단계의 Sol 검토에서 함께 본다.
