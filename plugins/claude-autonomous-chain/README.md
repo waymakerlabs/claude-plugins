@@ -1,0 +1,42 @@
+# claude-autonomous-chain
+
+큰 작업을 **milestone → wave → task**로 나누고, 마일스톤 하나를 Claude Code 세션 하나가 조정하며, task는 병렬 서브에이전트가 구현하는 자율 진행 skill입니다. 계획은 Opus, 검토는 다른 계열 모델(GPT-6.1 Sol, OpenCode `review-sol`)이 맡습니다. 프로젝트마다 다른 절차는 프로파일 파일로 정합니다.
+
+## 구성
+
+| 구성 | 설명 |
+|------|------|
+| skill `autonomous-chain` | 계획 세션·마일스톤 세션 절차, 조정자 규율, 검증 예산, Sol 게이트, 멈춤 조건 |
+| agent `chain-planner` | 계획(Opus, high) |
+| agent `chain-planner-deep` | 되돌리기 어려운 설계 계획(Opus, xhigh) |
+| agent `chain-worker` | 명세가 있는 task 구현(Sonnet, high) |
+| agent `chain-worker-deep` | 상태·동시성·권한 경계 task, 실패 재시도(Opus, high) |
+| `references/` | 계획 지침, worker 공통 지시서, Sol 검토 절차, 프로파일 형식 |
+
+## 핵심 규칙
+
+- 조정자는 worker의 코드를 읽지 않습니다. 보고서와 웨이브 통합 검증으로 확인합니다.
+- worker는 stage·commit·push를 하지 않습니다. 커밋은 조정자가 보고서의 변경 파일 목록으로 하나씩 합니다(index 잠금 충돌 방지).
+- 전체 검증은 웨이브 통합과 마일스톤 마감 때 1회씩만 합니다.
+- 질문이 생겨도 멈추지 않고 추천안으로 진행하며, 권한 밖 작업만 대기열에 올립니다.
+- 이 skill의 기본값이나 리뷰 SHIP은 push·외부 쓰기 승인을 만들지 않습니다.
+
+## 프로젝트 프로파일
+
+프로젝트 루트 `.claude/autonomous-chain.md`에 검증 명령, 병렬 상한, 커밋·push 정책, 시점별 추가 절차(`on-task-done` 등)를 둡니다. 없으면 기본값으로 동작합니다. 형식은 `skills/autonomous-chain/references/profile.md`를 보세요.
+
+## 설치
+
+```bash
+/plugin install claude-autonomous-chain@waymakerlabs-claude-plugins
+```
+
+## 요구사항
+
+- [Orca](https://www.onorca.dev) 데스크톱 앱(런타임 ready) — Sol 검토 탭과 마일스톤 세션 인계에 사용
+- OpenCode CLI + `review-sol` 에이전트 정의(`ai-gateway-openai/gpt-6.1-sol#high`)
+- 전역 CLAUDE.md의 「Orca 탭 방식 후속 세션 인계 프로토콜」(마일스톤 인계 절차)
+
+## 설계
+
+`docs/design/claude-autonomous-chain.md` (Sol 검토 기록: `docs/design/reviews/`)
