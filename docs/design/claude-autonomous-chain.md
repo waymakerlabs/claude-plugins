@@ -329,14 +329,17 @@ legacy-lens memory:
 | 확인 항목 | 결과 | 증거 |
 |---|---|---|
 | 병렬 worker 무커밋 → 조정자 경로 지정 커밋 | **확인** | `chain-worker` 3개 동시 실행 중 HEAD `4f6bd6c` 불변·staged 0·`index.lock` 없음. 보고서 변경 파일 목록 = `git status` 이름 목록(목록 밖 0). 조정자 커밋 `9083834`·`8f8aa69`·`17322f1` 순차 성공, 이후 status 깨끗. verify.full 19 tests OK(4 기존 + 15 신규) |
-| 마일스톤 인계 실운행 | M2 세션에서 기록 | — |
+| 마일스톤 인계 실운행 | **확인**(부모 pty 종료만 unverified) | M2 세션이 Orca 탭("Trial-1 M2 handoff")에서 단일 라인 프롬프트(상태 파일 + handoff 경로 포인터)로 시작했다. `current: M2 / W1`을 승계해 계획·계획 검토 없이 M2-W1-T01부터 착수했다. 부모 탭 `close --tab` → `ok: true`, `closeMode: tab`, `ptyKilled: false`. 이후 `terminal list`에 부모 handle 0건(탭 제거 확인). 셸 프로세스 종료 여부는 미확인 |
 | effort 실제 적용 | **요청만 확인, 적용 unverified** | 서브에이전트 기록의 모든 요청에 planner `claude-opus-5.5`/`effort: high`, worker `claude-sonnet-5.5`/`effort: high`. thinking 블록 0건, 기록된 output_tokens는 스트리밍 중간값(11~77)뿐이라 사용량으로 판정 불가. Sol은 로그에 모델·effort 표시 없음 |
 
 Sol 게이트: 계획(무거움) round 1/3 SHIP `ses_e98e647d…`(NOTE: argparse 오류는 `SystemExit(2)`), M1 최종(무거움) round 1/3 SHIP `ses_e98e2c47…`. 두 번 모두 nonce 표식·마지막 판정 추출·snapshot 대조가 설계대로 동작했다. M1 최종 검토의 작업 트리 식별자는 `e3b0c442…`(빈 입력 해시)로, META 제외 덕분에 상태 파일을 갱신해도 식별자가 바뀌지 않았다.
+
+M2 결과: 인계받은 세션이 `chain-worker` 1개로 M2-W1-T01(`trial.cli`)을 실행(DONE, test_cli 8 OK) → 조정자 경로 지정 커밋 `5f8d182` → verify.full 27 tests OK, skip 0 → Sol 최종(무거움) round 1/3 **SHIP** `ses_e98ddf51…`(BLOCK 0, NOTE 1: worker 보고서의 `chunk` 인자 없음 설명이 부정확, 요구와는 충돌 없음) → 마감 커밋 `3d54d62`. nonce `530fb84ad905` 표식, 마지막 판정 추출, 전후 snapshot(HEAD `5f8d182`, 작업 트리 식별자 `e3b0c442…`) 대조가 세 번째로 설계대로 동작했다. M2 worker 요청 17건도 `claude-sonnet-5.5`/`effort: high`, thinking 0건으로 M1과 같다(적용 unverified 유지). 체인 trial-1 종료.
 
 발견한 결함·차이:
 
 - K1 `task-brief.md` §6이 보고서 파일 자신을 "변경 파일"에 넣을지 정하지 않아 worker 3명이 포함/생략/별도 표기로 갈렸다(Sol M1 NOTE도 같은 지적). 조정자는 보고서를 각 task 커밋에 함께 넣어 처리했다. 제안: "보고서 파일은 목록에 넣지 않는다. 조정자가 task 커밋에 함께 넣는다"로 고정.
 - K2 SKILL.md §3-5는 계획 세션이 M1을 새 탭으로 열게 하지만, 이번 시험은 handoff 지시로 계획 세션이 M1까지 진행했다. 계획 직후 맥락이 충분하면 같은 세션에서 M1을 이어가는 선택지를 허용할지 정해야 한다(사용자 확인 대상).
 - K3 대상 리포가 Orca 미등록이면 Sol 탭을 다른 등록 worktree(`path:`)에 열어야 한다(sol-review §3에 이미 있음, 실제로 필요했음). 인계 탭도 같은 문제라 §9에 같은 주의가 필요하다.
+- K4 인계 프로토콜 규칙 10은 "close 실패는 무시"만 정하고, `close --tab`이 `ok: true`이면서 `ptyKilled: false`인 경우(탭은 없어지고 부모 셸이 남았을 수 있음)를 정하지 않는다. 부모 세션이 끝난 뒤의 셸이면 해가 없지만, 부모 에이전트가 아직 돌고 있었다면 같은 worktree에 편집 소유자가 둘이 될 수 있다. 제안: child가 `ptyKilled`를 기록하고, false면 `terminal list`로 탭 제거를 확인하는 단계를 둔다(부모 강제 종료는 하지 않음).
 - 환경: `opencode`는 `~/.zshrc`의 셸 함수(게이트웨이 키 갱신)이며, Orca 탭의 대화형 셸에서 해석돼 인증 오류 없이 동작했다(간접 증거).
