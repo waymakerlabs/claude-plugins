@@ -48,7 +48,9 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 2. **권한 확인 1회**: 로컬 커밋, push, 외부 시스템 쓰기, 새 비용(유료 API·인프라). 프로파일에 상시 정책(`commit`·`push`)이 있으면 그 값을 쓰고 다시 묻지 않는다. 결과를 상태 파일 `authority`에 기록한다. 이 스킬의 기본값, 리뷰 SHIP, 추천안 선택은 승인을 새로 만들지 않는다.
 3. planner 호출: 설계가 되돌리기 어려우면 `chain-planner-deep`, 아니면 `chain-planner`. 지시서에는 `references/planning.md` 절대 경로, 목표, `authority`, 기존 상태 경로, 프로파일 경로, 계획 문서 경로(기본 `docs/chain/<chain-id>/plan.md`)만 넣는다.
 4. 계획 `review: required`면 Sol 계획 검토(§6). BLOCK은 같은 planner에 delta만 넘겨 고친다(`SendMessage`로 이어가거나, 새 호출이면 BLOCK 결과 경로와 고칠 절만 넘긴다).
-5. 상태 파일과 질문 대기열을 만들고(§8), 인계 문서를 쓴 뒤 M1 세션을 Orca 탭으로 연다(§9).
+5. 상태 파일과 질문 대기열을 만든다(§8). 그다음 M1 진행 방식을 고른다.
+   - 기본: 인계 문서를 쓴 뒤 M1 세션을 Orca 탭으로 연다(§9).
+   - 계획 세션의 맥락이 아직 충분하면 같은 세션에서 M1을 이어서 진행해도 된다(§4 절차 그대로). 이 경우 상태 파일 "## 결정"에 그렇게 했다고 남기고, 인계는 M1→M2부터 한다.
 
 ## 4. 마일스톤 세션 (조정자)
 
@@ -179,6 +181,8 @@ questions: docs/chain/<id>/questions.md
 ## 9. 인계
 
 - 마일스톤 인계와 다음 세션 기동은 전역 CLAUDE.md의 「Orca 탭 방식 후속 세션 인계 프로토콜」을 그대로 따른다(이 스킬에 다시 쓰지 않는다). 단 그 프로토콜 규칙 4·8의 Codex 크로스체크는 이 스킬의 Sol 게이트로 대체한다.
-- 인계 프롬프트 예: `<상태 파일 절대 경로>와 <인계 문서 절대 경로>를 읽고 claude-autonomous-chain 스킬로 M<n+1>을 진행해.`
+- 인계 프롬프트 예: `<상태 파일 절대 경로>와 <인계 문서 절대 경로>를 읽고 auto-chain 스킬로 M<n+1>을 진행해.`
+- 대상 리포가 Orca에 등록되지 않았으면 `--worktree active`가 `selector_not_found`로 실패한다. 인계 탭도 Sol 탭과 같이 등록된 worktree(`path:<등록 경로>`)에 열고, 인계 문서에 "실행 위치"와 "git은 `git -C <리포>`"를 적는다.
+- 부모 탭 정리(child 쪽): `orca terminal close --tab` 응답의 `ok`와 `ptyKilled`를 상태 파일에 기록한다. `ok: true`인데 `ptyKilled: false`이면 `orca terminal list`에서 부모 handle이 사라졌는지 확인하고 결과를 남긴다. 부모 프로세스를 강제로 끝내지는 않는다. 목록에 남아 있으면 같은 worktree에 편집 소유자가 둘일 수 있으니 질문 대기열에 올리고, 부모가 고치던 파일은 건드리지 않는다.
 - 일지는 프로파일 `daily-log` 시점에 쓴다. 매 마일스톤 daily-log+handoff를 이중으로 만들지 않고 상태 파일을 재사용하며, 인계 문서에는 상태 파일에 없는 실행 맥락만 보탠다.
 - 맥락이 부족해지면 마일스톤 도중이라도 안전한 지점에서 인계하고 같은 마일스톤을 새 세션이 이어받는다. 진행 중인 worker·리뷰가 있으면 결과 회수 책임을 인계 문서에 적는다.
