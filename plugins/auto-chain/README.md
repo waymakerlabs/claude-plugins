@@ -1,4 +1,4 @@
-# claude-autonomous-chain
+# auto-chain
 
 큰 작업을 **milestone → wave → task**로 나누고, 마일스톤 하나를 Claude Code 세션 하나가 조정하며, task는 병렬 서브에이전트가 구현하는 자율 진행 skill입니다. 계획은 Opus, 검토는 다른 계열 모델(GPT-6.1 Sol, OpenCode `review-sol`)이 맡습니다. 프로젝트마다 다른 절차는 프로파일 파일로 정합니다.
 
@@ -28,8 +28,10 @@
 ## 설치
 
 ```bash
-/plugin install claude-autonomous-chain@waymakerlabs-claude-plugins
+/plugin install auto-chain@waymakerlabs-claude-plugins
 ```
+
+1.0.x(`claude-autonomous-chain`)에서 옮길 때는 옛 플러그인을 지우고(`/plugin uninstall claude-autonomous-chain@waymakerlabs-claude-plugins`) 새 이름으로 설치합니다. 호출 이름이 `auto-chain:autonomous-chain`, 에이전트 접두사가 `auto-chain:`으로 바뀝니다. 이름을 바꾼 이유는 `claude-`로 시작하는 이름을 `claude plugin validate`가 예약어로 거부하기 때문입니다.
 
 ## 요구사항
 
