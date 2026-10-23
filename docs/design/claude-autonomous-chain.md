@@ -321,3 +321,22 @@ legacy-lens memory:
 미검증으로 남은 것: 병렬 worker 여럿의 무커밋 동작, 마일스톤 인계 실운행, 프록시·모델의 effort 실제 적용.
 
 2차 SHIP 이후 반영한 변경(리뷰 회차 2단계, N4, N5)은 리뷰 지적을 받아들이거나 사용자가 결정한 사항이고 새 설계 판단이 아니어서 재검토하지 않는다. 구현 단계의 Sol 검토에서 함께 본다.
+
+### 첫 실사용 시험 trial-1 (2026-10-23, `/Users/peter/Dev/chain-trial`)
+
+목표: 모듈 3개에 기능 1개씩(M1, 웨이브 1, 병렬 task 3) + CLI(M2, task 1). verify.full = `python3 -m unittest discover -s tests -t .`(pytest 미설치). 상태 원장: `chain-trial/docs/chain/trial-1/state.md`.
+
+| 확인 항목 | 결과 | 증거 |
+|---|---|---|
+| 병렬 worker 무커밋 → 조정자 경로 지정 커밋 | **확인** | `chain-worker` 3개 동시 실행 중 HEAD `4f6bd6c` 불변·staged 0·`index.lock` 없음. 보고서 변경 파일 목록 = `git status` 이름 목록(목록 밖 0). 조정자 커밋 `9083834`·`8f8aa69`·`17322f1` 순차 성공, 이후 status 깨끗. verify.full 19 tests OK(4 기존 + 15 신규) |
+| 마일스톤 인계 실운행 | M2 세션에서 기록 | — |
+| effort 실제 적용 | **요청만 확인, 적용 unverified** | 서브에이전트 기록의 모든 요청에 planner `claude-opus-5.5`/`effort: high`, worker `claude-sonnet-5.5`/`effort: high`. thinking 블록 0건, 기록된 output_tokens는 스트리밍 중간값(11~77)뿐이라 사용량으로 판정 불가. Sol은 로그에 모델·effort 표시 없음 |
+
+Sol 게이트: 계획(무거움) round 1/3 SHIP `ses_e98e647d…`(NOTE: argparse 오류는 `SystemExit(2)`), M1 최종(무거움) round 1/3 SHIP `ses_e98e2c47…`. 두 번 모두 nonce 표식·마지막 판정 추출·snapshot 대조가 설계대로 동작했다. M1 최종 검토의 작업 트리 식별자는 `e3b0c442…`(빈 입력 해시)로, META 제외 덕분에 상태 파일을 갱신해도 식별자가 바뀌지 않았다.
+
+발견한 결함·차이:
+
+- K1 `task-brief.md` §6이 보고서 파일 자신을 "변경 파일"에 넣을지 정하지 않아 worker 3명이 포함/생략/별도 표기로 갈렸다(Sol M1 NOTE도 같은 지적). 조정자는 보고서를 각 task 커밋에 함께 넣어 처리했다. 제안: "보고서 파일은 목록에 넣지 않는다. 조정자가 task 커밋에 함께 넣는다"로 고정.
+- K2 SKILL.md §3-5는 계획 세션이 M1을 새 탭으로 열게 하지만, 이번 시험은 handoff 지시로 계획 세션이 M1까지 진행했다. 계획 직후 맥락이 충분하면 같은 세션에서 M1을 이어가는 선택지를 허용할지 정해야 한다(사용자 확인 대상).
+- K3 대상 리포가 Orca 미등록이면 Sol 탭을 다른 등록 worktree(`path:`)에 열어야 한다(sol-review §3에 이미 있음, 실제로 필요했음). 인계 탭도 같은 문제라 §9에 같은 주의가 필요하다.
+- 환경: `opencode`는 `~/.zshrc`의 셸 함수(게이트웨이 키 갱신)이며, Orca 탭의 대화형 셸에서 해석돼 인증 오류 없이 동작했다(간접 증거).
