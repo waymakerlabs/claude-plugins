@@ -275,7 +275,8 @@ legacy-lens memory:
 | 전제 | 현재 상태 | 확인 방법 |
 |---|---|---|
 | 프록시가 Opus 5.5 `effort: xhigh`를 받음 | HTTP 200 확인. 실제 적용 여부는 UNVERIFIED | 구현 시 사용량·응답으로 확인 |
-| Claude Code 에이전트 frontmatter가 `effort: xhigh`를 받음 | 미확인 (`effort: high`는 동작 기록 있음) | 정의 작성 후 새 세션에서 호출 |
+| Claude Code 에이전트 frontmatter가 `effort: xhigh`를 받음 | **검증 통과·적용 UNVERIFIED** (2026-10-23, Claude Code 2.1.309, `claude -p --plugin-dir`). 4개 정의가 경고 없이 로드됨. 음성 시험(`effort: bogus-level`)에서 `invalid effort … Valid options: low, medium, high, xhigh, max or an integer` 경고 → 키를 읽고 xhigh를 허용값으로 검증함. API 요청에 실린 effort 값은 로그에 나오지 않아 미확인 | 첫 실사용에서 사용량·응답으로 확인 |
+| 플러그인 에이전트 frontmatter의 `model`이 적용됨 | **확인** (같은 실측). `chain-worker`(model: sonnet) 호출이 `dispatching to firstParty model=claude-sonnet-5-5`, `modelUsage`에 `claude-sonnet-5-5` 별도 집계. `chain-planner-deep`은 `claude-opus-5-5` | — |
 | Orca 탭의 `opencode run --agent review-sol`이 사람 입력 없이 끝남 | 1차 검토로 확인: 약 7분 만에 무인 완료, `REVIEW-DONE` 출력. 결과 파일은 쓰지 않음(읽기 전용 정의 우선) → 출력 캡처로 변경(§10) | 2차 검토에서 재확인 |
 | 같은 작업 트리에서 worker 여럿이 동시에 경로 지정 커밋 | Sol 1차가 git 소스로 반증: 경로 지정 커밋도 index를 잠금 → 커밋은 조정자만(§7) | 구현 후 소규모 시험 체인에서 worker 무커밋 동작 확인 |
 | 요청한 모델·effort가 실제로 적용됨 | 미확인 | 첫 실사용에서 실제 적용된 모델·effort를 상태 파일에 기록. 확인하지 못하면 `unverified`로 두고 통과로 추론하지 않음(Sol 1차 N3) |

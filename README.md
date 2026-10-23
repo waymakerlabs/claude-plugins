@@ -489,6 +489,35 @@ Skill(orca-codex-delegate:orca-codex-delegate)
 
 ---
 
+## ▶ claude-autonomous-chain
+
+> Milestone → wave → task autonomous execution for large multi-session work. Opus plans, GPT-6.1 Sol (OpenCode `review-sol` in an Orca tab) reviews, parallel Claude worker subagents implement, and one lean coordinator session per milestone integrates, verifies and hands off to the next milestone via an Orca tab.
+
+**Covers:**
+
+- **Four agents with fixed model/effort** — `chain-planner` (Opus high), `chain-planner-deep` (Opus xhigh), `chain-worker` (Sonnet high), `chain-worker-deep` (Opus high).
+- **Lean coordinator** — never reads worker code or reruns worker tests; workers never stage/commit, the coordinator commits each task's reported paths one at a time (avoids `index.lock` races).
+- **Verification budget** — full verification once per wave integration and once at milestone close.
+- **Sol gates** — plan review, wave high-risk review (light, 1 round), milestone final review (heavy, max 3 rounds); verdict taken from the last `# 판정:` block with a matching snapshot.
+- **Authority ceiling** — skill defaults and review SHIP never create push/external-write approval.
+- **Project profile** — `.claude/autonomous-chain.md` sets verify commands, parallelism, commit/push policy and per-stage hooks.
+
+#### Install
+
+```bash
+/plugin install claude-autonomous-chain@waymakerlabs-claude-plugins
+```
+
+#### Usage
+
+Ask for an autonomous chain on a large task ("자율체인으로 진행해"), or invoke it directly:
+
+```bash
+Skill(claude-autonomous-chain:autonomous-chain)
+```
+
+---
+
 ## Troubleshooting
 
 ### Usage shows N/A

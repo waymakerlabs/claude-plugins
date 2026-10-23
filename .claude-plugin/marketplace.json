@@ -162,6 +162,19 @@
       "category": "workflow",
       "keywords": ["analysis", "cross-verification", "orca", "codex", "opus", "dual-track", "집중분석", "상세분석", "claude-code"],
       "homepage": "https://github.com/waymakerlabs/claude-plugins"
+    },
+    {
+      "name": "claude-autonomous-chain",
+      "version": "1.0.0",
+      "description": "Milestone → wave → task autonomous execution for large multi-session work. Opus plans, GPT-6.1 Sol (OpenCode review-sol via Orca) reviews, parallel Claude worker subagents implement, and a lean coordinator session per milestone integrates, verifies and hands off to the next milestone via an Orca tab. Per-project hooks via .claude/autonomous-chain.md. Requires Orca, OpenCode CLI and the review-sol agent.",
+      "author": {
+        "name": "waymakerlabs",
+        "email": "peter@waymakerlabs.com"
+      },
+      "source": "./plugins/claude-autonomous-chain",
+      "category": "workflow",
+      "keywords": ["autonomous", "chain", "milestone", "wave", "subagent", "orca", "opencode", "sol", "opus", "자율체인", "claude-code"],
+      "homepage": "https://github.com/waymakerlabs/claude-plugins"
     }
   ]
 }
