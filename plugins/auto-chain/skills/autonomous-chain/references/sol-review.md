@@ -105,7 +105,8 @@ Orca에 **등록된** worktree에 탭을 연다. 대상 리포가 등록되지 �
 REQ="<요청 파일 절대 경로>"
 NONCE="$(shasum -a 256 "$REQ" | cut -c1-12)"   # 회차마다 요청이 다르므로 nonce도 다르다
 TITLE="chain-<chain-id>-<gate>-<n>"            # 세션 식별용 고유 제목
-LOG="<리포>/docs/chain/<chain-id>/reviews/<gate>-<n>.log"
+LOG="/tmp/chain-<chain-id>/reviews/<gate>-<n>.log"   # 1.3.1: 검토 중 리포에 쓰지 않는다. 끝난 뒤 reviews/로 옮긴다
+mkdir -p "$(dirname "$LOG")"
 CMD="cd '<리포>' && { opencode run --agent review-sol -m 'ai-gateway-openai/gpt-6.1-sol#high' --title '$TITLE' -f '$REQ' '첨부한 요청 파일을 읽고 그대로 검토해. 마지막 줄은 REVIEW-DONE.' 2>&1; echo \"SOL-EXIT-$NONCE=\$?\"; } | tee '$LOG'"
 orca terminal create --worktree <active|path:등록경로> --title "$TITLE" --command "$CMD" --json
 ```
@@ -113,7 +114,7 @@ orca terminal create --worktree <active|path:등록경로> --title "$TITLE" --co
 - 중괄호 묶음이 핵심이다. `echo`가 파이프 안에 있어야 표식이 **로그에 기록되고**, `$?`가 `tee`가 아니라 `opencode`의 종료 코드가 된다(`… | tee LOG; echo $?`는 둘 다 틀린다).
 - `create`는 시도당 1회. 응답 전체에서 handle을 즉시 추출한다(잘라서 잃으면 `orca terminal list`로 title 기반 재확보, 재create 금지).
 - 재검토는 같은 리뷰 세션을 재개한다: `opencode run -s <ses_id> --agent review-sol -m … -f '<round k 요청>' …` (같은 중괄호·nonce 배선). 세션 ID는 첫 회차 후 `cd <리포> && opencode session list --format json`에서 `$TITLE`과 같은 제목을 찾아 상태 파일에 기록한다. 찾지 못하면 새 세션으로 하되 요청에 직전 결과 파일 경로를 넣는다.
-- **리뷰가 진행되는 동안 대상 문서·코드를 고치지 않는다.** 독립 작업(다른 웨이브의 비대상 파일 등)은 계속해도 된다.
+- **리뷰가 진행되는 동안 조정자는 리포에 파일을 쓰지 않는다**(SKILL.md §6 검증 예산과 같은 규칙). 로그·결과 파일은 `/tmp/chain-<chain-id>/`에 두고, 판정을 기록한 뒤 `reviews/`로 옮긴다. 읽기·다음 단계 준비(지시서 초안은 `/tmp`에)는 계속해도 된다.
 
 ## 4. 대기
 
@@ -153,7 +154,7 @@ orca terminal create --worktree <active|path:등록경로> --title "$TITLE" --co
    - 비어 있지 않고 `# 판정: SHIP` 또는 `# 판정: BLOCK`으로 시작
    - `## 검증 원장`(또는 동등한 snapshot 줄)에 요청한 HEAD SHA(앞 12자 이상)와 작업 트리 식별자·대상 SHA(요청에 있던 것)가 **그대로** 있다. 다르면 이전 회차 인용이거나 리뷰어의 시험 문자열이다.
 3. 검토 전후 snapshot 대조: `HEAD`, 작업 트리 식별자(§2 명령을 같은 `META`로 재실행), 대상 파일 SHA가 요청 때와 같은지 확인한다. `git status --short`만으로는 같은 경로의 내용 변경을 알 수 없으므로 식별자로 본다. 리뷰어가 파일을 바꿨으면 그 변경을 되돌리지 말고 기록한 뒤 질문 대기열에 올린다.
-4. 상태 파일에 기록: 게이트, 회차, snapshot(HEAD·작업 트리 식별자·대상 SHA), 리뷰 세션 ID, nonce, 판정, 결과 파일 경로, BLOCK id 목록. BLOCK마다 계열을 정해 결함 계열 원장에 반영하고(SKILL.md §6-1), 전수 점검 조건에 걸리는지 본다.
+4. 상태 파일에 기록: 게이트, 회차, snapshot(HEAD·작업 트리 식별자·대상 SHA), 리뷰 세션 ID, nonce, 판정, 결과 파일 경로, BLOCK id 목록. (1.3.1) BLOCK id 옆에 계열 id를 함께 적는다(`B8:C1`). 원장에는 발생 줄 한 줄만 덧붙이고, 별도 분류 단계를 두지 않는다. 그 계열이 2회째면 SKILL.md §6-1 우선순위대로 처리한다.
 5. 탭 정리: `orca terminal close --terminal <handle> --tab --json`.
 
 ## 6. 장애 처리
