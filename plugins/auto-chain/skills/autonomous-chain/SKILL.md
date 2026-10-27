@@ -34,6 +34,7 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 | 계획(깊이) | `chain-planner-deep` | Opus xhigh | 스키마, 외부 계약, 동시성, 보안처럼 되돌리기 어려운 설계 |
 | 구현 | `chain-worker` | Sonnet high | 명세가 있는 task (기본) |
 | 구현(판단) | `chain-worker-deep` | Opus high | 상태·동시성·권한 경계나 원인 조사가 핵심일 때, `chain-worker` 실패 후 재시도 |
+| 구현(최상위) | `chain-worker-xhigh` | Opus xhigh | 처음부터 배정하지 않는다. `chain-worker-deep`으로도 실패했을 때만(§7 등급 상향) |
 | 검토 | OpenCode `review-sol` (Orca 탭) | GPT-6.1 Sol high | 계획 검토, 웨이브 고위험 검토, 마일스톤 최종 검토 |
 | 조정 | 메인 세션 | 세션 모델 | 마일스톤 조정, 기록, 통합 검증 |
 
@@ -45,26 +46,27 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 ## 3. 계획 세션
 
 1. 목표·기존 상태 확인. 프로파일(`.claude/autonomous-chain.md`)을 읽는다(형식: `references/profile.md`).
-2. **권한 확인 1회**: 로컬 커밋, push, 외부 시스템 쓰기, 새 비용(유료 API·인프라). 프로파일에 상시 정책(`commit`·`push`)이 있으면 그 값을 쓰고 다시 묻지 않는다. 결과를 상태 파일 `authority`에 기록한다. 이 스킬의 기본값, 리뷰 SHIP, 추천안 선택은 승인을 새로 만들지 않는다.
-3. planner 호출: 설계가 되돌리기 어려우면 `chain-planner-deep`, 아니면 `chain-planner`. 지시서에는 `references/planning.md` 절대 경로, 목표, `authority`, 기존 상태 경로, 프로파일 경로, 계획 문서 경로(기본 `docs/chain/<chain-id>/plan.md`)만 넣는다.
+2. **권한 확인 1회**: 로컬 커밋, push, 외부 시스템 쓰기, 새 비용(유료 API·인프라), 그리고 **상한 초과 사다리**(`escalation`, §6). 프로파일에 상시 정책(`commit`·`push`·`escalation`)이 있으면 그 값을 쓰고 다시 묻지 않는다. 결과를 상태 파일 `authority`에 기록한다. 이 스킬의 기본값, 리뷰 SHIP, 추천안 선택은 승인을 새로 만들지 않는다.
+   - `escalation`을 물을 때는 추천 사다리를 함께 보인다: `[extra-rounds:2, worker:chain-worker-xhigh, worker:opencode-work-sol-xhigh, stop]`. 답이 없으면 `[stop]`(지금처럼 3회 뒤 멈춤)이다.
+3. planner 호출: 설계가 되돌리기 어려우면 `chain-planner-deep`, 아니면 `chain-planner`. 지시서에는 `references/planning.md` 절대 경로, 목표, `authority`, 기존 상태 경로, 프로파일 경로, 결함 계열 원장 경로(이전 체인 것이 있으면), 계획 문서 경로(기본 `docs/chain/<chain-id>/plan.md`)만 넣는다.
 4. 계획 `review: required`면 Sol 계획 검토(§6). BLOCK은 같은 planner에 delta만 넘겨 고친다(`SendMessage`로 이어가거나, 새 호출이면 BLOCK 결과 경로와 고칠 절만 넘긴다).
-5. 상태 파일과 질문 대기열을 만든다(§8). 그다음 M1 진행 방식을 고른다.
+5. 상태 파일, 질문 대기열, 결함 계열 원장(§6-1)을 만든다(§8). 원장이 이미 있으면(프로파일 `defect-classes`로 체인끼리 공유) 새로 만들지 않는다. 그다음 M1 진행 방식을 고른다.
    - 기본: 인계 문서를 쓴 뒤 M1 세션을 Orca 탭으로 연다(§9).
    - 계획 세션의 맥락이 아직 충분하면 같은 세션에서 M1을 이어서 진행해도 된다(§4 절차 그대로). 이 경우 상태 파일 "## 결정"에 그렇게 했다고 남기고, 인계는 M1→M2부터 한다.
 
 ## 4. 마일스톤 세션 (조정자)
 
 ```text
-착수: 인계·상태 확인 → [on-milestone-start]
+착수: 인계·상태 확인 → [on-milestone-start] → 진행 보드
 wave N:
-  task 병렬 기동 (상한 parallel-max, 소유 파일 겹치면 순차)
+  task 병렬 기동 (상한 parallel-max, 소유 파일 겹치면 순차) → 진행 감시 기동(§10)
   task 완료 → 보고서 확인 → (authority에 커밋이 있으면) 조정자가 task 파일만 경로 지정 커밋
-           → 상태 갱신 → [on-task-done]
-웨이브 통합: verify.full 1회 → 고위험 task 묶음 Sol 검토(가벼운 게이트) → BLOCK 수정
-           → [on-wave-integrated] → push (authority에 있을 때)
+           → 상태 갱신 → [on-task-done] → 진행 보드
+웨이브 통합: verify.full 1회 → 고위험 task 묶음 Sol 검토(가벼운 게이트) → BLOCK 계열 분류(§6-1) → BLOCK 수정
+           → [on-wave-integrated] → push (authority에 있을 때) → 진행 보드
 마감 (마지막 웨이브 통합과 합침):
-     종료 조건 확인 → verify.full → Sol 최종 검토(무거운 게이트) → BLOCK 수정
-     → [on-milestone-close] → wrap-up·인계 → 다음 마일스톤 탭 기동
+     종료 조건 확인 → verify.full → Sol 최종 검토(무거운 게이트) → BLOCK 계열 분류 → BLOCK 수정
+     → [on-milestone-close] → wrap-up·인계 → 진행 보드 → 다음 마일스톤 탭 기동
 ```
 
 - 대괄호는 프로파일 훅 절이다. 비어 있으면 공통 동작만 한다.
@@ -78,6 +80,7 @@ wave N:
   - 공통 지시서 `references/task-brief.md` 절대 경로 (+ 프로파일 `task-brief`가 있으면 그 경로)
   - 리포 절대 경로, 계획 문서 경로와 task 절 위치(`M1-W1-T03`)
   - 관련 결정 번호·절, 고위험 여부
+  - 결함 계열 원장 경로(§6-1)와 이 task에 해당하는 계열 id(조정자가 owns·AC를 보고 고른다. 없으면 "해당 없음")
   - 보고서 경로: `docs/chain/<chain-id>/reports/<task-id>.md`
 - 반환값은 `<보고서 경로> — <결과> <요약>` 한 줄이다. 그 이상이 돌아와도 diff는 읽지 않는다.
 - 보고서 파일은 조정자의 `Read`·`git commit -- <경로>` 입력이다. 반환된 경로에 파일이 없으면 worker 실패로 보고 §7 실패 처리를 따른다(최종 메시지 내용으로 커밋 목록을 대신하지 않는다).
@@ -115,7 +118,7 @@ wave N:
 | 웨이브 통합 | 해당 웨이브의 고위험 task 변경 묶음 | 고위험 task가 있을 때 push 전 | 가벼움 | 1회 |
 | 마일스톤 마감 | 마일스톤 전체 변경, 종료 조건, 실행 증거 | 항상 | 무거움 | 3회 |
 
-- **무거운 게이트**: 재검토 요청에 회차(`round 2/3`)를 적는다. 같은 finding이 두 번 연속 나오면 근거를 붙여 1회 반박할 수 있다(회차에 포함). 3회 뒤에도 BLOCK이면 통과로 처리하지 않고 멈춤 조건 6으로 보고한다.
+- **무거운 게이트**: 재검토 요청에 회차(`round 2/3`)를 적는다. 같은 finding이 두 번 연속 나오면 근거를 붙여 1회 반박할 수 있다(회차에 포함). 3회 뒤에도 BLOCK이면 통과로 처리하지 않고 **상한 초과 사다리**로 간다(아래).
 - **가벼운 게이트**: 리뷰 1회 → BLOCK 수정 → 영향 시험으로 조정자가 확인 → 재검토 없이 진행. 수정 항목은 마일스톤 최종 검토 범위에 넣는다. 동의하지 않는 BLOCK은 반박 근거와 함께 질문 대기열에 남기고 진행한다.
 - BLOCK은 구체적 오동작, 요구 누락, 중대한 회귀, 권한·데이터 오류, 핵심 검증 누락으로 한정한다. 취향·문서 형식은 완료를 막지 않는다.
 - 리뷰가 진행되는 동안 대상 문서·코드를 고치지 않는다.
@@ -123,13 +126,48 @@ wave N:
 - 검토 증거(snapshot, 리뷰 세션 ID, 회차, 판정)를 상태 파일에 기록한다. 검토 뒤에 대상이 바뀌면 바뀐 범위만 delta 검토한다.
 - Sol 장애(1회 재시도 후): 웨이브 고위험 검토는 Opus 보조 검토로 진행하고 `sol-pending`을 남겨 최종 검토에 넣는다. 계획 검토·마일스톤 최종 검토는 대체하지 않고 `unverified` + 멈춤 조건 5.
 
+### 상한 초과 사다리 (`authority.escalation`)
+
+무거운 게이트가 3회 뒤에도 BLOCK이면 사용자에게 묻지 않고 `escalation`의 다음 칸으로 간다. 사용자가 미리 승인한 순서이므로 질문 대기열에는 "사다리 n칸 진입"으로 기록만 남긴다.
+
+| 칸 | 동작 |
+|---|---|
+| `extra-rounds:<k>` | 같은 방식으로 수정 → 재검토를 k회 더 한다(`round 4/3+2`처럼 적는다) |
+| `worker:chain-worker-deep` / `worker:chain-worker-xhigh` | 다음 BLOCK 수정 worker를 그 등급으로 올린다. 재검토 1회. §7 등급 상향으로 이미 그 등급 이상을 썼으면 건너뛴다 |
+| `worker:opencode-<agent>` | 다음 BLOCK 수정을 OpenCode `<agent>`(예: `work-sol-xhigh`)로 Orca 탭에서 구현한다. 기동·대기·결과 확인은 `references/sol-review.md` §3~§5의 nonce 배선을 그대로 쓰고, 요청 파일 대신 worker 지시서(`briefs/<task-id>.md`, 형식은 `references/task-brief.md`)를 넘긴다. 재검토 1회 |
+| `stop` | 멈춤 조건 6 |
+
+- 칸마다 진입 시점, 사유(BLOCK id·계열), 결과를 상태 파일 "## Sol 검토"에 적는다.
+- 사다리 도중이라도 BLOCK 계열이 전수 점검 조건(§6-1)에 걸리면 전수 점검 task를 먼저 한다. 전수 점검은 칸을 소모하지 않는다.
+- 사다리는 마일스톤마다 처음부터 다시 쓴다. 칸에 없는 행동(새 비용, `authority` 밖 worker)은 하지 않는다.
+
+## 6-1. 결함 계열 원장과 전수 점검
+
+같은 종류의 결함이 호출자만 바꿔 계속 나오면 회차가 늘어난다. 이를 막기 위해 BLOCK을 **계열** 단위로 쌓고, 다음 worker와 리뷰에 미리 알린다.
+
+- 경로: 프로파일 `defect-classes`, 없으면 `docs/chain/<chain-id>/defect-classes.md`. 조정자만 고친다.
+- 모든 Sol BLOCK(웨이브·최종)과 웨이브 통합 검증 실패를 받으면 계열로 분류한다. Sol 결과에 계열 태그가 있으면 참고하되 판정은 조정자가 한다. 근본 원인(결함을 만드는 코드 패턴)이 같으면 같은 계열이다. 위치·함수가 달라도 같은 계열일 수 있다.
+
+```markdown
+## C<n> <계열 이름>
+- 패턴: <결함을 만드는 코드 모양 한 줄>
+- 올바른 모양: <고친 코드가 따라야 할 규칙 한 줄>
+- 탐지: <후보 위치를 찾는 grep·정적 명령. 없으면 "수동">
+- 발생: <BLOCK id>(<게이트>, <task>) … — 횟수 <n>
+- 전수 점검: 없음 | <task-id> (<결과>)
+```
+
+- **전수 점검 조건**: 한 계열의 발생이 2회가 되면(게이트·마일스톤이 달라도) 그 BLOCK을 위치 하나씩 고치지 않는다. 대신 전수 점검 task(`<M>-SWEEP-C<n>`, `chain-worker-deep`, 고위험)를 연다. 이 task는 ① 탐지 명령으로 후보 위치를 **모두** 뽑아 보고서에 표로 남기고 ② 위치마다 "올바른 모양" 충족 여부와 근거(파일:줄)를 적고 ③ 위반을 모두 고친 뒤 ④ 계열을 직접 겨누는 시험을 넣는다. 재검토 요청에는 이 표를 실행 증거로 넣는다. 전수 점검 뒤에도 같은 계열이 다시 나오면 다음 점검은 §7 등급 상향에 따라 `chain-worker-xhigh`로 한다.
+- 탐지 명령을 만들 수 없는 계열이면 전수 점검 task가 먼저 탐지 방법(정적 목록 도구나 시험)을 만든다.
+- 원장은 worker 지시서(§4)와 Sol 검토 요청(`references/sol-review.md` §2)에 들어간다. 마일스톤 착수 때 이전 마일스톤의 계열을 다음 웨이브 task의 해당 계열로 미리 고른다.
+
 ## 7. 결정, 질문, 멈춤
 
 - 확인할 수 있는 사실은 직접 확인한다.
 - 기술·설계 선택은 추천안으로 정해 진행하고 이유를 기록한다. 결과가 크게 갈리는 선택도 권한 안이면 추천안으로 진행하고 질문 대기열에 남긴다.
 - 정책 충돌, 새 비용, `authority` 밖 작업은 추천안을 대기열에 적고 **그 작업만** 실행하지 않는다. 의존하지 않는 허용 작업은 계속한다.
 - 질문 대기열 `questions.md`(상태 파일 옆) 항목: 질문, 추천안, 실제 택한 선택(또는 "대기"), 되돌리는 비용.
-- 마일스톤 보고 때 확인받지 않은 항목만 요약한다. 마감 후 사용자 지시가 없으면 다음 마일스톤 세션을 자동으로 연다.
+- 마일스톤 보고(§10 진행 보드) 때 확인받지 않은 항목만 요약한다. 마감 후 사용자 지시가 없으면 다음 마일스톤 세션을 자동으로 연다.
 
 **멈추는 경우** (이때만 멈추고 보고한다)
 
@@ -138,13 +176,18 @@ wave N:
 3. 다음 마일스톤의 목표를 계획과 상태에서 찾을 수 없음
 4. 프로파일 `stop-conditions`에 해당
 5. 필수 Sol 게이트(계획 검토, 마일스톤 최종 검토)를 재시도 뒤에도 실행할 수 없음
-6. 무거운 Sol 게이트가 3회 뒤에도 BLOCK
+6. 무거운 Sol 게이트가 3회 뒤에도 BLOCK이고 `escalation` 사다리가 `stop`에 닿음
 
 시간 경과, 침묵, timeout만으로는 멈추지 않는다. timeout이나 빈 응답은 성공으로도 실패로도 세지 않고 `unverified`로 기록한다.
 
+멈출 때는 진행 보드(§10)와 결정이 필요한 질문 id·추천안을 응답에 쓰고, `PushNotification`을 1회 보낸다(예: `giki-parity M3 멈춤: Q21 결정 필요 — 추천 (a)`). 사용자가 자리를 비운 밤 시간에도 대기가 길어지지 않게 하기 위해서다.
+
 ### 실패 처리
 
-- worker 실패: 1회 재시도. `chain-worker`가 실패했으면 재시도는 `chain-worker-deep`(이전 보고서 경로를 지시서에 넣는다). 그래도 실패하면 조정자가 직접 마무리한다(이때는 코드를 읽어도 된다).
+- **등급 상향**: 실패할 때마다 worker를 한 단계 올린다. `chain-worker` → `chain-worker-deep` → `chain-worker-xhigh` → 조정자 직접 마무리(이때는 코드를 읽어도 된다). 지시서에는 이전 시도의 보고서와 BLOCK 결과 경로를 **모두** 넣는다.
+- 여기서 "실패"는 두 가지다. ① worker가 PARTIAL·BLOCKED로 끝나거나 보고서가 없음 ② BLOCK 수정 뒤 재검토(또는 웨이브 통합 검증)에서 **같은 계열**(§6-1)이 다시 나옴. ②는 task가 달라도 계열이 같으면 이어서 센다. 예: FIX1(Sonnet)이 C1을 고쳤는데 재검토에서 C1이 또 나오면 FIX2는 deep, 거기서 또 나오면 FIX3는 xhigh다.
+- 등급 상향은 같은 Claude 서브에이전트 안에서 등급만 바꾸는 것이라 `authority` 승인이 따로 필요 없다. 다른 계열 모델(OpenCode worker)로 바꾸는 것은 `escalation` 사다리에 있을 때만 한다.
+- 처음부터 `chain-worker-deep`이 배정된 task는 첫 실패에서 바로 xhigh로 간다. 이미 xhigh까지 썼으면 사다리의 `worker:chain-worker-*` 칸은 건너뛴다.
 - 같은 task에서 지시·보고 왕복이 2회를 넘으면 그 task만 조정자가 직접 마무리한다. 두 task 연속이면 질문 대기열에 방식 전환을 제안한다.
 - 조정자 커밋 중 `index.lock` 경합(IDE, hook 등)은 구현 실패가 아니다. 잠시 기다려 다시 커밋하고 실패 횟수에 넣지 않는다.
 - 반복 실패에 새 가설이 없으면 그 task를 `blocked`로 기록하고, 의존하지 않는 task는 계속한다.
@@ -159,10 +202,15 @@ chain-id: <id>
 workflow: claude-autonomous-chain-1
 plan: docs/chain/<id>/plan.md
 current: M<n> / W<n>
-authority: { local-commit: yes|no, push: none|wave|milestone, external-write: …, new-cost: … }
+authority: { local-commit: yes|no, push: none|wave|milestone, external-write: …, new-cost: …, escalation: [stop] }
 verify-full: "<명령>"
 questions: docs/chain/<id>/questions.md
+defect-classes: docs/chain/<id>/defect-classes.md
+started: <체인 시작 ISO 시각>          # 진행 보드 경과 시간 기준
 ---
+
+## 마일스톤
+| M | 이름 | 상태(대기|진행|마감 중|완료|멈춤) | 웨이브 | 마감 게이트 | 시작 | 끝 |
 
 ## 진행
 | task | worker | 결과 | 보고서 | 커밋 | 비고(sol-pending 등) |
@@ -186,3 +234,57 @@ questions: docs/chain/<id>/questions.md
 - 부모 탭 정리(child 쪽): `orca terminal close --tab` 응답의 `ok`와 `ptyKilled`를 상태 파일에 기록한다. `ok: true`인데 `ptyKilled: false`이면 `orca terminal list`에서 부모 handle이 사라졌는지 확인하고 결과를 남긴다. 부모 프로세스를 강제로 끝내지는 않는다. 목록에 남아 있으면 같은 worktree에 편집 소유자가 둘일 수 있으니 질문 대기열에 올리고, 부모가 고치던 파일은 건드리지 않는다.
 - 일지는 프로파일 `daily-log` 시점에 쓴다. 매 마일스톤 daily-log+handoff를 이중으로 만들지 않고 상태 파일을 재사용하며, 인계 문서에는 상태 파일에 없는 실행 맥락만 보탠다.
 - 맥락이 부족해지면 마일스톤 도중이라도 안전한 지점에서 인계하고 같은 마일스톤을 새 세션이 이어받는다. 진행 중인 worker·리뷰가 있으면 결과 회수 책임을 인계 문서에 적는다.
+
+## 10. 진행 보고
+
+체인은 몇 시간씩 돈다. 사용자가 언제 화면을 보더라도 전체 중 어디인지 알 수 있게, 정해진 시점에 짧게 보고한다. 보고는 응답 본문 텍스트로 한다(파일·GUI 아님).
+
+### 진행 보드
+
+상태 파일 "## 마일스톤"·"## 진행"·"## Sol 검토"에서 만든다. 10줄 이내, 아래 형식을 고정한다.
+
+```text
+[체인 <chain-id>] M<n>/<총 M> · W<n>/<M의 총 W> · 경과 <h>h<mm>m
+M1 ✔ 완료(최종 SHIP r3) | M2 ▶ 마감 중 | M3 · 대기
+W2: T03 ✔ DONE · T04 ▶ 2/4 AC 시험 중 · T05 · 대기(deps T04)
+게이트: final-M2 r2/3 BLOCK(B8, 계열 C1) → FIX2 진행 | 사다리 0칸
+다음: FIX2 완료 → final-M2 r3 요청
+대기열: Q14 대기 | 계열: C1 ×4(전수 점검 M2-SWEEP-C1 예정)
+```
+
+출력 시점: 마일스톤 착수, task 완료, 웨이브 통합 끝, 게이트 판정, 사다리 칸 진입, 멈춤, 인계 직전. 이 밖의 시점에는 보드를 내지 않는다.
+
+### 중간 보고 (한 줄)
+
+보드 사이에는 아래 이벤트를 한 줄씩 응답에 쓴다. 형식: `[<chain-id> <M/W>] <대상> <내용>`.
+
+- task 기동(어떤 worker 등급으로 몇 개)
+- worker 진행 줄 변경(아래 감시가 알려줌): `[giki-parity M2/W2] T04 3/4 AC · 시험 중 (18분)`
+- Sol 검토 기동과 10분마다의 경과: `[giki-parity M2] final-M2 r2 검토 중 20분 · 로그 412줄`
+- verify.full 시작·결과(수집·skip 총계 포함)
+
+### 감시 기동
+
+조용히 기다리지 않도록, background로 도는 작업마다 `Monitor`를 하나씩 띄운다. 이벤트가 오면 위 한 줄 형식으로 응답에 옮긴다. Monitor는 최대 30분이므로 만료 알림을 받으면 같은 명령으로 다시 띄운다(작업이 끝났으면 다시 띄우지 않는다).
+
+worker 진행 감시(웨이브마다 1개, 그 웨이브의 task id만 본다. bash 3.2 호환):
+
+```bash
+R="<리포>/docs/chain/<chain-id>/reports"; IDS="M2-W2-T03 M2-W2-T04"; S=$(mktemp -d)
+while :; do
+  left=0
+  for id in $IDS; do
+    line=$(grep -m1 '^- 진행:' "$R/$id.md" 2>/dev/null)
+    [ "$line" = "$(cat "$S/$id" 2>/dev/null)" ] || { printf '%s' "$line" > "$S/$id"; [ -n "$line" ] && echo "$id ${line#- 진행: }"; }
+    [ "$line" = "- 진행: 완료" ] || left=1
+  done
+  [ $left = 0 ] && exit 0
+  sleep 20
+done
+```
+
+Sol 검토 감시는 `references/sol-review.md` §4의 감시 명령을 쓴다. 이 감시는 완료 신호 대기도 함께 한다.
+
+- 감시 출력은 진행 알림일 뿐이다. task 완료 판정은 worker 반환과 보고서, Sol 판정은 nonce 표식과 결과 추출로만 한다.
+- 웨이브의 worker가 모두 반환했는데 감시가 남아 있으면(worker가 `- 진행: 완료`를 못 쓰고 끝난 경우) `TaskStop`으로 끝낸다.
+- 진행 이벤트가 30분 넘게 없으면 그 사실을 한 줄로 보고한다(멈춤은 아니다).

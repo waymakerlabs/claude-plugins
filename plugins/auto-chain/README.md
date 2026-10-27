@@ -11,6 +11,7 @@
 | agent `chain-planner-deep` | 되돌리기 어려운 설계 계획(Opus, xhigh) |
 | agent `chain-worker` | 명세가 있는 task 구현(Sonnet, high) |
 | agent `chain-worker-deep` | 상태·동시성·권한 경계 task, 실패 재시도(Opus, high) |
+| agent `chain-worker-xhigh` | deep으로도 실패한 task·결함 계열 재수정(Opus, xhigh). 처음부터 배정하지 않음 |
 | `references/` | 계획 지침, worker 공통 지시서, Sol 검토 절차, 프로파일 형식 |
 
 ## 핵심 규칙
@@ -20,6 +21,9 @@
 - 전체 검증은 웨이브 통합과 마일스톤 마감 때 1회씩만 합니다.
 - 질문이 생겨도 멈추지 않고 추천안으로 진행하며, 권한 밖 작업만 대기열에 올립니다.
 - 이 skill의 기본값이나 리뷰 SHIP은 push·외부 쓰기 승인을 만들지 않습니다.
+- (1.2.0) 진행 보드와 한 줄 중간 보고를 정해진 시점에 냅니다. worker 보고서의 `- 진행:` 줄과 Sol 로그는 `Monitor`로 감시합니다.
+- (1.2.0) BLOCK을 결함 계열 원장(`defect-classes.md`)에 쌓습니다. 같은 계열이 2회 나오면 위치별 수정을 멈추고 전수 점검 task로 바꿉니다.
+- (1.2.0) 무거운 게이트가 3회 뒤에도 BLOCK이면 계획 때 승인받은 `escalation` 사다리를 따라 진행합니다. 멈출 때는 푸시 알림을 보냅니다.
 
 ## 프로젝트 프로파일
 

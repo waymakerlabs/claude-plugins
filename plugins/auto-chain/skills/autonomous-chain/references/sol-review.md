@@ -45,7 +45,11 @@
 - 작업 트리 식별자: `<64자>` (미커밋 변경 포함 시). 변경 파일: <git status --short 목록>. 미커밋 변경은 `git diff HEAD`와 신규 파일 직접 읽기로 봅니다.
 - 대상 파일 SHA-256: `<경로>` `<sha>` (문서 검토일 때)
 - 요구·종료 조건: <계획 문서 경로와 절>
-- 실행 증거: <상태 파일의 검증 포인터>
+- 실행 증거: <상태 파일의 검증 포인터>(전수 점검 task가 있었으면 그 보고서의 위치 표)
+
+## 알려진 결함 계열
+원장: <defect-classes.md 절대 경로>. 이번 범위에 해당하는 계열: <C<n> 목록 | 없음>.
+이 계열들은 지적된 한 위치만 보지 말고 같은 패턴의 다른 호출자까지 이번 회차에 한꺼번에 찾아 BLOCK으로 나열합니다(다음 회차로 미루지 않습니다).
 
 ## 검토 범위
 (재검토면) 1. 직전 BLOCK 각각의 해소 여부 2. 그 수정의 영향 3. 새 근거로 확인한 요청 범위 안의 중대한 결함(이번 수정이 만든 것이 아니어도). 새 근거가 없으면 이미 확인한 영역은 다시 훑지 않습니다.
@@ -57,7 +61,7 @@ BLOCK은 구체적 오동작, 요구 누락·모순, 중대한 회귀, 권한·�
 # 판정: SHIP | BLOCK
 ## (재검토면) 직전 BLOCK 해소
 ## BLOCK
-- [B<n>] <위치> — <결함> / 근거 / 제안
+- [B<n>] [계열: C<n> | 새: <한 줄 패턴>] <위치> — <결함> / 근거 / 제안
 ## NOTE
 ## 검증 원장
 - snapshot: HEAD `<SHA>`, 작업 트리 식별자, 대상 SHA, 검토 전후 동일 여부
@@ -89,10 +93,18 @@ orca terminal create --worktree <active|path:등록경로> --title "$TITLE" --co
 
 - 완료 신호는 ANSI 코드를 지운 로그에서 **이번 nonce의 표식 줄 전체 일치** 하나다: `^SOL-EXIT-<NONCE>=[0-9]+$`. 값이 0이 아니면 검토 실패다.
 - 로그의 `REVIEW-DONE`·`SOL-EXIT=`·`# 판정:` 단순 grep은 완료 신호로 쓰지 않는다(인용과 리뷰어 시험 문자열에 걸린다). Orca 터미널 status도 쓰지 않는다(명령이 끝나도 셸이 남아 `running`으로 보인다).
-- `Bash run_in_background`로 기다리고 완료 알림을 받는다. 화면을 반복해서 읽지 않는다.
+- `Monitor`로 기다린다(SKILL.md §10). 완료 표식이 나오면 `SOL-DONE …` 한 줄을 내고 끝나고, 그 전에는 10분마다 경과 한 줄을 낸다. 조정자는 경과 줄을 사용자에게 한 줄 보고로 옮긴다. 화면을 반복해서 읽지 않는다. `T0`는 기동 때 `date +%s`로 기록한 값을 넣는다. Monitor가 30분에 만료되면 같은 `T0`로 다시 띄워 경과 시간이 이어지게 한다.
 
   ```bash
-  until sed -E 's/\x1b\[[0-9;]*m//g' "$LOG" | grep -qE "^SOL-EXIT-$NONCE=[0-9]+$"; do sleep 15; done
+  LOG='<로그>'; NONCE='<nonce>'; T0=<기동 epoch초>; last=-1
+  while :; do
+    clean=$(sed -E 's/\x1b\[[0-9;]*m//g' "$LOG" 2>/dev/null)
+    done_line=$(printf '%s\n' "$clean" | grep -E "^SOL-EXIT-$NONCE=[0-9]+$" | tail -1)
+    [ -n "$done_line" ] && { echo "SOL-DONE $done_line"; exit 0; }
+    m=$(( ($(date +%s) - T0) / 60 ))
+    if [ $((m / 10)) -gt $last ]; then last=$((m / 10)); echo "검토 중 ${m}분 · 로그 $(printf '%s\n' "$clean" | wc -l | tr -d ' ')줄"; fi
+    sleep 15
+  done
   ```
 
 - 구현 검토는 30분 이상 걸릴 수 있다(리뷰어가 명령을 직접 시험한다). 시간만으로 실패로 보지 않는다. 60분을 넘기면 `orca terminal read --terminal <handle> --screen --json`으로 1회 상태를 보고, 권한 질문 등 입력 대기면 기록 후 탭을 닫고 1회 재시도한다.
@@ -115,7 +127,7 @@ orca terminal create --worktree <active|path:등록경로> --title "$TITLE" --co
    - 비어 있지 않고 `# 판정: SHIP` 또는 `# 판정: BLOCK`으로 시작
    - `## 검증 원장`(또는 동등한 snapshot 줄)에 요청한 HEAD SHA(앞 12자 이상)와 작업 트리 식별자·대상 SHA(요청에 있던 것)가 **그대로** 있다. 다르면 이전 회차 인용이거나 리뷰어의 시험 문자열이다.
 3. 검토 전후 snapshot 대조: `HEAD`, 작업 트리 식별자(§2 명령을 같은 `META`로 재실행), 대상 파일 SHA가 요청 때와 같은지 확인한다. `git status --short`만으로는 같은 경로의 내용 변경을 알 수 없으므로 식별자로 본다. 리뷰어가 파일을 바꿨으면 그 변경을 되돌리지 말고 기록한 뒤 질문 대기열에 올린다.
-4. 상태 파일에 기록: 게이트, 회차, snapshot(HEAD·작업 트리 식별자·대상 SHA), 리뷰 세션 ID, nonce, 판정, 결과 파일 경로, BLOCK id 목록.
+4. 상태 파일에 기록: 게이트, 회차, snapshot(HEAD·작업 트리 식별자·대상 SHA), 리뷰 세션 ID, nonce, 판정, 결과 파일 경로, BLOCK id 목록. BLOCK마다 계열을 정해 결함 계열 원장에 반영하고(SKILL.md §6-1), 전수 점검 조건에 걸리는지 본다.
 5. 탭 정리: `orca terminal close --terminal <handle> --tab --json`.
 
 ## 6. 장애 처리
