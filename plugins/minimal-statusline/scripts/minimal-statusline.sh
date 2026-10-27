@@ -5,6 +5,8 @@
 # Single line: Model | path (branch) | Context used % | 5H % (time) | 7D % (day)
 # No progress bars - just clean gradient-colored percentages
 # ============================================================================
+# v1.6.3 - Read effort from stdin payload (.effort.level) so per-model
+#          overrides display correctly; settings.json is only a fallback
 # v1.6.0 - Show current effort level next to the model name
 # v1.5.0 - Show real context usage % (C 33%) instead of Full/Half label
 # ============================================================================
@@ -17,9 +19,11 @@ CURRENT_DIR=$(echo "$input" | jq -r '.workspace.current_dir // "."')
 CONTEXT_SIZE=$(echo "$input" | jq -r '.context_window.context_window_size // 200000')
 CURRENT_USAGE=$(echo "$input" | jq -r '.context_window.current_usage // null')
 
-# Effort level isn't part of the statusline stdin payload — it's set via
-# /effort and persisted in the user's global settings.json, so read it there.
-EFFORT=$(jq -r '.effortLevel // empty' "$HOME/.claude/settings.json" 2>/dev/null)
+# Effort level: the stdin payload carries the effective value (.effort.level),
+# which already accounts for per-model overrides. Older Claude Code versions
+# don't send it, so fall back to the global settings.json top-level value.
+EFFORT=$(echo "$input" | jq -r '.effort.level // empty')
+[[ -z "$EFFORT" ]] && EFFORT=$(jq -r '.effortLevel // empty' "$HOME/.claude/settings.json" 2>/dev/null)
 
 # ============================================================================
 # Colors (Nord theme)
