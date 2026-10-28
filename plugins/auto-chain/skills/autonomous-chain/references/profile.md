@@ -42,6 +42,7 @@ escalation: [extra-rounds:1, carry-reversible, stop]   # 선택. 무거운 게�
 | `task-brief` | 없음 | worker 지시서에 경로를 추가한다 |
 | `defect-classes` | `docs/chain/<chain-id>/defect-classes.md` | 결함 계열 원장(SKILL.md §6-1). 프로젝트 공용 경로로 두면 다음 체인이 이전 체인의 계열을 이어받는다 |
 | `escalation` | `[extra-rounds:1, carry-reversible, stop]`(1.4.0. 계획 세션에서 다른 값을 받으면 그 값) | 무거운 게이트 3회 뒤 BLOCK일 때 자동으로 밟을 칸 목록(SKILL.md §6). 마지막 칸은 `stop` |
+| `backlog` | `docs/chain/<chain-id>/backlog.md` | 구현 모드에서 미룬 경계 조건 결함 원장(SKILL.md §6-0). 체인끼리 공유하려면 지정 |
 
 `commit`·`push`에 스킬 기본값을 두지 않는 이유: 이 스킬의 기본값이 사용자 승인을 새로 만들면 안 되기 때문이다. `escalation` 기본값(1.4.0)은 승인을 새로 만들지 않는다 — `carry-reversible`은 되돌릴 수 있는 로컬 제품 결함만 넘기고 SHIP으로 기록하지 않으며, 외부 쓰기·push 범위는 `authority` 그대로다. 프로파일 값은 사용자가 그 프로젝트에 미리 둔 정책으로 보고, 계획 세션에서 다시 묻지 않는다.
 
