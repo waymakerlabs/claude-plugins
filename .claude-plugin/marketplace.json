@@ -165,7 +165,7 @@
     },
     {
       "name": "auto-chain",
-      "version": "1.6.0",
+      "version": "1.6.1",
       "description": "Milestone → wave → task autonomous execution for large multi-session work. Opus plans, GPT-6.1 Sol (OpenCode review-sol via Orca) reviews, parallel Claude worker subagents implement, and a lean coordinator session per milestone integrates, verifies and hands off to the next milestone via an Orca tab. Per-project hooks via .claude/autonomous-chain.md. Requires Orca, OpenCode CLI and the review-sol agent.",
       "author": {
         "name": "waymakerlabs",
