@@ -49,7 +49,7 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 
 1. 목표·기존 상태 확인. 프로파일(`.claude/autonomous-chain.md`)을 읽는다(형식: `references/profile.md`).
 2. **권한 확인 1회**: 로컬 커밋, push, 외부 시스템 쓰기, 새 비용(유료 API·인프라), 그리고 **상한 초과 사다리**(`escalation`, §6). 프로파일에 상시 정책(`commit`·`push`·`escalation`)이 있으면 그 값을 쓰고 다시 묻지 않는다. 결과를 상태 파일 `authority`에 기록한다. 이 스킬의 기본값, 리뷰 SHIP, 추천안 선택은 승인을 새로 만들지 않는다.
-   - `escalation`을 물을 때는 추천 사다리를 함께 보인다: `[extra-rounds:2, worker:chain-worker-xhigh, worker:opencode-work-sol-xhigh, stop]`. 답이 없으면 `[stop]`(지금처럼 3회 뒤 멈춤)이다.
+   - `escalation`을 물을 때는 추천 사다리를 함께 보인다: `[extra-rounds:1, carry-reversible, stop]`. 답이 없으면 기본 사다리 `[extra-rounds:1, carry-reversible, stop]`을 쓴다(1.4.0, §6 "상한 초과 사다리"). `stop`은 되돌리기 어려운 대상이 걸린 BLOCK에서만 닿는다.
 3. planner 호출: 설계가 되돌리기 어려우면 `chain-planner-deep`, 아니면 `chain-planner`. 지시서에는 `references/planning.md` 절대 경로, 목표, `authority`, 기존 상태 경로, 프로파일 경로, 결함 계열 원장 경로(이전 체인 것이 있으면), 계획 문서 경로(기본 `docs/chain/<chain-id>/plan.md`)만 넣는다.
 4. 계획 `review: required`면 Sol 계획 검토(§6). BLOCK은 같은 planner에 delta만 넘겨 고친다(`SendMessage`로 이어가거나, 새 호출이면 BLOCK 결과 경로와 고칠 절만 넘긴다).
 5. 상태 파일, 질문 대기열, 결함 계열 원장(§6-1)을 만든다(§8). 원장이 이미 있으면(프로파일 `defect-classes`로 체인끼리 공유) 새로 만들지 않는다. 그다음 M1 진행 방식을 고른다.
@@ -146,18 +146,20 @@ worker에게 BLOCK 수정을 맡길 때 지시서에는 **수정 + 재현 회귀
 
 ### 상한 초과 사다리 (`authority.escalation`)
 
-무거운 게이트가 3회 뒤에도 BLOCK이면 사용자에게 묻지 않고 `escalation`의 다음 칸으로 간다. 사용자가 미리 승인한 순서이므로 질문 대기열에는 "사다리 n칸 진입"으로 기록만 남긴다.
+무거운 게이트가 3회 뒤에도 BLOCK이면 사용자에게 묻지 않고 `escalation`의 다음 칸으로 간다. 질문 대기열에는 "사다리 n칸 진입"으로 기록만 남긴다. 사다리를 따로 받지 않았으면 기본 사다리 `[extra-rounds:1, carry-reversible, stop]`이다(1.4.0). 이유: 상한 도달마다 멈추면 가역적인 UI 결함 하나로 체인이 사용자 응답까지 몇 시간씩 선다(giki-ui-refresh final-G1 r3 BLOCK → 약 7시간 대기 실측).
 
 | 칸 | 동작 |
 |---|---|
 | `extra-rounds:<k>` | 같은 방식으로 수정 → 재검토를 k회 더 한다(`round 4/3+2`처럼 적는다) |
 | `worker:chain-worker-deep` / `worker:chain-worker-xhigh` | 다음 BLOCK 수정 worker를 그 등급으로 올린다. 재검토 1회. §7 등급 상향으로 이미 그 등급 이상을 썼으면 건너뛴다 |
 | `worker:opencode-<agent>` | 다음 BLOCK 수정을 OpenCode `<agent>`(예: `work-sol-xhigh`)로 Orca 탭에서 구현한다. 기동·대기·결과 확인은 `references/sol-review.md` §3~§5의 nonce 배선을 그대로 쓰고, 요청 파일 대신 worker 지시서(`briefs/<task-id>.md`, 형식은 `references/task-brief.md`)를 넘긴다. 재검토 1회 |
+| `carry-reversible` | 남은 BLOCK이 모두 **되돌릴 수 있는 제품 결함**(UI·로컬 코드, 되돌리기 = revert 몇 개)이면 멈추지 않는다. 게이트를 SHIP으로 기록하지 않고 `carried`로 기록한다. 각 finding을 질문 대기열에 "미해결 결함"으로, 다음 웨이브(마지막 마일스톤이면 후속 task)에 수정 task로 올린다. 마일스톤은 **조건부 마감**으로 닫고 마감 보고에 별도 절(아래)을 둔다. 남은 finding에 되돌리기 어려운 대상(스키마·배포/보안 설정·계약 문서·비가역 런타임 동작·외부 시스템 쓰기·main 병합)이 하나라도 걸리면 이 칸을 건너뛰고 다음 칸으로 간다 |
 | `stop` | 멈춤 조건 6 |
 
 - 칸마다 진입 시점, 사유(BLOCK id·계열), 결과를 상태 파일 "## Sol 검토"에 적는다.
 - 사다리 도중이라도 BLOCK 계열이 전수 점검 조건(§6-1)에 걸리면 §6-1 우선순위대로 처리한다(원인 위치가 특정되면 국소 수정 먼저, 전수 점검은 후속). 전수 점검은 칸을 소모하지 않는다.
 - 사다리는 마일스톤마다 처음부터 다시 쓴다. 칸에 없는 행동(새 비용, `authority` 밖 worker)은 하지 않는다.
+- **조건부 마감 보고(1.4.0)**: `carry-reversible`로 넘긴 마일스톤은 마감 진행 보드와 인계 문서에 "## 조건부 마감" 절을 둔다. 한도에 닿은 게이트와 회차, 반영한 추천 수정(커밋), 남은 finding(id·계열·한 줄 요약), 되돌리는 비용, 이월한 task id를 적는다. 남은 finding은 다음 마일스톤 최종 검토 요청의 범위에 넣는다. 사용자 확인 없이 넘어갔다는 사실을 숨기지 않는다. 조건부 마감 뒤 외부 시스템의 '완료' 반영(진척률 100·완료 전이)은 프로파일 훅의 판단을 따른다.
 
 ## 6-1. 결함 계열 원장과 전수 점검
 
@@ -196,7 +198,7 @@ worker에게 BLOCK 수정을 맡길 때 지시서에는 **수정 + 재현 회귀
 3. 다음 마일스톤의 목표를 계획과 상태에서 찾을 수 없음
 4. 프로파일 `stop-conditions`에 해당
 5. 필수 Sol 게이트(계획 검토, 마일스톤 최종 검토)를 재시도 뒤에도 실행할 수 없음
-6. 무거운 Sol 게이트가 3회 뒤에도 BLOCK이고 `escalation` 사다리가 `stop`에 닿음
+6. 무거운 Sol 게이트가 3회 뒤에도 BLOCK이고 `escalation` 사다리가 `stop`에 닿음(기본 사다리에서는 되돌리기 어려운 대상이 걸린 BLOCK일 때만)
 
 시간 경과, 침묵, timeout만으로는 멈추지 않는다. timeout이나 빈 응답은 성공으로도 실패로도 세지 않고 `unverified`로 기록한다.
 
@@ -222,7 +224,7 @@ chain-id: <id>
 workflow: claude-autonomous-chain-1
 plan: docs/chain/<id>/plan.md
 current: M<n> / W<n>
-authority: { local-commit: yes|no, push: none|wave|milestone, external-write: …, new-cost: …, escalation: [stop] }
+authority: { local-commit: yes|no, push: none|wave|milestone, external-write: …, new-cost: …, escalation: [extra-rounds:1, carry-reversible, stop] }
 verify-full: "<명령>"
 questions: docs/chain/<id>/questions.md
 defect-classes: docs/chain/<id>/defect-classes.md
@@ -267,7 +269,7 @@ started: <체인 시작 ISO 시각>          # 진행 보드 경과 시간 기�
 [체인 <chain-id>] M<n>/<총 M> · W<n>/<M의 총 W> · 경과 <h>h<mm>m
 M1 ✔ 완료(최종 SHIP r3) | M2 ▶ 마감 중 | M3 · 대기
 W2: T03 ✔ DONE · T04 ▶ 2/4 AC 시험 중 · T05 · 대기(deps T04)
-게이트: final-M2 r2/3 BLOCK(B8, 계열 C1) → FIX2 진행 | 사다리 0칸
+게이트: final-M2 r2/3 BLOCK(B8, 계열 C1) → FIX2 진행 | 사다리 0칸 (조건부 마감이면 `M2 ✔ 조건부(carried B9)`)
 다음: FIX2 완료 → final-M2 r3 요청
 대기열: Q14 대기 | 계열: C1 ×4(전수 점검 M2-SWEEP-C1 예정)
 ```
