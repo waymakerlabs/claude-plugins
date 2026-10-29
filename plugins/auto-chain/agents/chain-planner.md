@@ -1,6 +1,6 @@
 ---
 name: chain-planner
-description: autonomous-chain 계획 담당(기본). 큰 작업을 milestone → wave → task로 분해하고 task마다 worker 등급·고위험 여부·소유 파일·인수 기준·검증 명령을 표시한 계획 문서를 쓴다. 스키마·외부 계약·동시성·보안처럼 되돌리기 어려운 설계가 핵심이면 chain-planner-deep을 쓴다. autonomous-chain 스킬의 계획 세션에서만 호출한다.
+description: autonomous-chain 계획 담당(최초 계획 뒤의 delta 수정·출시 검토 삽입용). 체인의 최초 계획은 chain-planner-deep이 맡는다. 큰 작업을 milestone → wave → task로 분해하고 task마다 worker 등급·고위험 여부·소유 파일·인수 기준·검증 명령을 표시한 계획 문서를 쓴다. 스키마·외부 계약·동시성·보안처럼 되돌리기 어려운 설계가 핵심이면 chain-planner-deep을 쓴다. autonomous-chain 스킬의 계획 세션에서만 호출한다.
 tools: Read, Write, Edit, Bash
 model: opus
 effort: high

@@ -2,7 +2,7 @@
 name: autonomous-chain
 description: >-
   여러 세션 분량의 큰 작업, 설계 판단이 큰 구조 변경, 또는 사용자가 "자율체인으로" 진행을 명시 요청할 때 사용.
-  milestone → wave → task로 나누고, Opus(chain-planner)가 계획, GPT-6.1 Sol(OpenCode review-sol, Orca 탭)이
+  milestone → wave → task로 나누고, Opus(chain-planner-deep, 최초 계획은 xhigh)가 계획, GPT-6.1 Sol(OpenCode review-sol, Orca 탭)이
   검토, Claude worker 서브에이전트(chain-worker)가 병렬 구현한다. 마일스톤 하나를 세션 하나가 조정하고
   Orca 탭으로 다음 마일스톤 세션을 연다. 프로젝트별 추가 절차는 `.claude/autonomous-chain.md` 프로파일이 정한다.
   작은 수정, 범위가 닫힌 일반 기능, 질문, 규약 검토에는 쓰지 않는다.
@@ -32,8 +32,8 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 
 | 역할 | 에이전트 | 모델·effort | 쓰는 경우 |
 |---|---|---|---|
-| 계획 | `chain-planner` | Opus high | 기본 |
-| 계획(깊이) | `chain-planner-deep` | Opus xhigh | 스키마, 외부 계약, 동시성, 보안처럼 되돌리기 어려운 설계 |
+| 계획 | `chain-planner` | Opus high | (1.6.5) 계획 delta 수정·출시 검토 삽입 등 최초 계획 뒤의 planner 호출(되돌리기 쉬운 설계) |
+| 계획(깊이) | `chain-planner-deep` | Opus xhigh | (1.6.5) 체인의 최초 계획은 항상. 이후 호출은 스키마, 외부 계약, 동시성, 보안처럼 되돌리기 어려운 설계일 때 |
 | 구현 | `chain-worker` | Sonnet high | 명세가 있는 task (기본) |
 | 구현(판단) | `chain-worker-deep` | Opus high | 상태·동시성·권한 경계나 원인 조사가 핵심일 때, `chain-worker` 실패 후 재시도 |
 | 구현(수정) | `chain-worker-xhigh` | Opus xhigh | (1.6.3) 수정 작업의 기본 — 국소 경로(§1)로 끝나지 않는 BLOCK 수정·회귀 수정·원인 조사가 필요한 수정은 처음부터 이 등급. 신규 구현 task에는 처음부터 배정하지 않는다 |
@@ -51,7 +51,7 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 1. 목표·기존 상태 확인. 프로파일(`.claude/autonomous-chain.md`)을 읽는다(형식: `references/profile.md`).
 2. **권한 확인 1회**: 로컬 커밋, push, 외부 시스템 쓰기, 새 비용(유료 API·인프라), 그리고 **상한 초과 사다리**(`escalation`, §6). 프로파일에 상시 정책(`commit`·`push`·`escalation`)이 있으면 그 값을 쓰고 다시 묻지 않는다. 결과를 상태 파일 `authority`에 기록한다. 이 스킬의 기본값, 리뷰 SHIP, 추천안 선택은 승인을 새로 만들지 않는다.
    - `escalation`을 물을 때는 추천 사다리를 함께 보인다: `[extra-rounds:1, carry-reversible, stop]`. 답이 없으면 기본 사다리 `[extra-rounds:1, carry-reversible, stop]`을 쓴다(1.4.0, §6 "상한 초과 사다리"). `stop`은 되돌리기 어려운 대상이 걸린 BLOCK에서만 닿는다.
-3. planner 호출: 설계가 되돌리기 어려우면 `chain-planner-deep`, 아니면 `chain-planner`. 지시서에는 `references/planning.md` 절대 경로, 목표, `authority`, 기존 상태 경로, 프로파일 경로, 결함 계열 원장 경로(이전 체인 것이 있으면), 계획 문서 경로(기본 `docs/chain/<chain-id>/plan.md`)만 넣는다.
+3. planner 호출: (1.6.5) 체인의 **최초 계획은 위험도와 무관하게 항상 `chain-planner-deep`**이다. 최초 계획의 분해 품질이 이후 모든 마일스톤의 회차를 좌우하기 때문이다. 계획 검토 BLOCK 뒤 delta 수정·출시 검토 마일스톤 삽입 같은 이후 호출은 설계가 되돌리기 어려우면 `chain-planner-deep`, 아니면 `chain-planner`. 지시서에는 `references/planning.md` 절대 경로, 목표, `authority`, 기존 상태 경로, 프로파일 경로, 결함 계열 원장 경로(이전 체인 것이 있으면), 계획 문서 경로(기본 `docs/chain/<chain-id>/plan.md`)만 넣는다.
 4. 계획 `review: required`면 Sol 계획 검토(§6). BLOCK은 같은 planner에 delta만 넘겨 고친다(`SendMessage`로 이어가거나, 새 호출이면 BLOCK 결과 경로와 고칠 절만 넘긴다).
 5. 상태 파일, 질문 대기열, 결함 계열 원장(§6-1)을 만든다(§8). 원장이 이미 있으면(프로파일 `defect-classes`로 체인끼리 공유) 새로 만들지 않는다. 그다음 M1 진행 방식을 고른다.
    - 기본: 인계 문서를 쓴 뒤 M1 세션을 Orca 탭으로 연다(§9).

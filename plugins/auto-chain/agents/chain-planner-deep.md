@@ -1,6 +1,6 @@
 ---
 name: chain-planner-deep
-description: autonomous-chain 계획 담당(깊이). 스키마, 외부 계약, 동시성, 보안·권한 경계처럼 되돌리기 어려운 설계가 계획의 핵심일 때만 쓴다. 그 밖에는 chain-planner를 쓴다. autonomous-chain 스킬의 계획 세션에서만 호출한다.
+description: autonomous-chain 계획 담당(깊이). 체인의 최초 계획은 항상 이 에이전트가 쓴다. 이후 호출(delta 수정·출시 검토 삽입)은 스키마, 외부 계약, 동시성, 보안·권한 경계처럼 되돌리기 어려운 설계가 핵심일 때만 쓰고, 그 밖에는 chain-planner를 쓴다. autonomous-chain 스킬의 계획 세션에서만 호출한다.
 tools: Read, Write, Edit, Bash
 model: opus
 effort: xhigh

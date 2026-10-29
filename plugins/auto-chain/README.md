@@ -7,8 +7,8 @@
 | 구성 | 설명 |
 |------|------|
 | skill `autonomous-chain` | 계획 세션·마일스톤 세션 절차, 조정자 규율, 검증 예산, Sol 게이트, 멈춤 조건 |
-| agent `chain-planner` | 계획(Opus, high) |
-| agent `chain-planner-deep` | 되돌리기 어려운 설계 계획(Opus, xhigh) |
+| agent `chain-planner` | 최초 계획 뒤의 delta 수정·출시 검토 삽입(Opus, high) |
+| agent `chain-planner-deep` | 체인의 최초 계획(항상), 이후 되돌리기 어려운 설계 계획(Opus, xhigh) |
 | agent `chain-worker` | 명세가 있는 task 구현(Sonnet, high) |
 | agent `chain-worker-deep` | 상태·동시성·권한 경계 task, 실패 재시도(Opus, high) |
 | agent `chain-worker-xhigh` | deep으로도 실패한 task·결함 계열 재수정(Opus, xhigh). 처음부터 배정하지 않음 |
@@ -25,6 +25,7 @@
 - (1.6.1) Sol 무응답 대비: 재검토(delta)는 이전 세션을 재개하지 않고 새 세션으로 엽니다(맥락 누적 방지). 증거 이미지는 첨부 대신 경로만. 로그가 15분 정체하면 `SOL-STALL`로 보고, 같은 요청을 다시 보내지 않고 맥락을 줄여(r1은 영역 2개로 나눠 동시에) 1회 재시도합니다.
 - (1.6.2) 실패 사다리를 등급 상향에서 시각 전환으로: 원인 모를 실패 1번 → Sol 원인 조사(읽기 전용, `references/sol-review.md` §7) → Sol 안대로 고쳤는데도 실패 → `chain-worker-xhigh`(반박된 가설 전부 첨부) → 그래도 실패 → task blocked·질문 대기열. 오타·flaky·환경 문제와 Sol 안 구현 실수는 세지 않습니다.
 - (1.6.3) 수정 작업은 처음부터 `chain-worker-xhigh`: 원인 위치가 특정된 간단한 수정은 조정자 국소 경로, 그 밖의 BLOCK·회귀·원인 조사 수정은 Sonnet·deep 단계 없이 xhigh로 시작합니다. 신규 구현 task 등급은 그대로(planner 표시). 실패 사다리 = xhigh → Sol 원인 조사 → 새 xhigh(반박된 가설 첨부) → blocked.
+- (1.6.5) 체인의 최초 계획은 위험도와 무관하게 항상 `chain-planner-deep`(Opus xhigh). delta 수정·출시 검토 삽입 같은 이후 planner 호출은 기존 기준(되돌리기 어려우면 deep, 아니면 `chain-planner`).
 - (1.2.0) 진행 보드와 한 줄 중간 보고를 정해진 시점에 냅니다. worker 보고서의 `- 진행:` 줄과 Sol 로그는 `Monitor`로 감시합니다.
 - (1.2.0) BLOCK을 결함 계열 원장(`defect-classes.md`)에 쌓습니다. 같은 계열이 2회 나오면 위치별 수정을 멈추고 전수 점검 task로 바꿉니다.
 - (1.3.0) 원인 위치가 특정된 BLOCK은 worker 없이 조정자가 직접 고치고(재현 회귀 + 영향 시험만), 재검토는 delta 검토(직전 BLOCK 해소 + 그 diff의 직접 회귀)로 받습니다. delta 밖 새 발견은 NOTE → 후속 task.
