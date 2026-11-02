@@ -518,6 +518,33 @@ Skill(auto-chain:autonomous-chain)
 
 ---
 
+## ▶ helpai
+
+> Project helper skill set under the `helpai` namespace. The first skill, `project-setup`, bootstraps the current folder with a private GitHub repo, a fixed `docs/` layout, a milestone ledger and project rules. More project-helper skills will be added to this namespace over time.
+
+**Covers (`project-setup`):**
+
+- **Private GitHub repo** — if the folder is not a git repo (or has no remote), offers to create a private repo named after the folder with the active `gh` account (asks once to confirm the owner), adds a `.gitignore`, makes an initial commit after showing the file list and excluding secret-looking files, then pushes.
+- **Fixed `docs/` layout** — creates `product`, `architecture`, `design`, `plans`, `milestones`, `operations` and `archive`, plus `docs/index.md` that indexes every document under `docs/`. If `docs/` already exists, it back-fills the index and never moves existing files.
+- **Milestone ledger** — creates `docs/milestones/README.md` using milestone IDs `M{plan}-{nn}` (e.g. `M1-01`, `M1-02`). The plan number increments each time a new milestone plan is made.
+- **Project rules** — adds a marker-delimited docs/milestone rules section to the project `CLAUDE.md` (and `AGENTS.md` if present). Safe to re-run: the section is updated in place, never duplicated.
+
+#### Install
+
+```bash
+/plugin install helpai@waymakerlabs-claude-plugins
+```
+
+#### Usage
+
+Run it from the project folder you want to set up:
+
+```bash
+/helpai:project-setup
+```
+
+---
+
 ## Troubleshooting
 
 ### Usage shows N/A

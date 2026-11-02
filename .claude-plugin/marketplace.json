@@ -175,6 +175,19 @@
       "category": "workflow",
       "keywords": ["autonomous", "chain", "milestone", "wave", "subagent", "orca", "opencode", "sol", "opus", "자율체인", "claude-code"],
       "homepage": "https://github.com/waymakerlabs/claude-plugins"
+    },
+    {
+      "name": "helpai",
+      "version": "1.0.0",
+      "description": "Project helper skill set (helpai namespace). project-setup bootstraps a folder: private GitHub repo via gh, a fixed docs/ layout with docs/index.md as the single document index, a milestone ledger (M{plan}-{nn} IDs), and idempotent docs rules in the project CLAUDE.md.",
+      "author": {
+        "name": "waymakerlabs",
+        "email": "peter@waymakerlabs.com"
+      },
+      "source": "./plugins/helpai",
+      "category": "workflow",
+      "keywords": ["helpai", "project-setup", "init", "bootstrap", "github", "docs", "index", "milestone", "claude-md", "claude-code"],
+      "homepage": "https://github.com/waymakerlabs/claude-plugins"
     }
   ]
 }
