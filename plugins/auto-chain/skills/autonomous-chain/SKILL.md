@@ -51,7 +51,7 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 1. 목표·기존 상태 확인. 프로파일(`.claude/autonomous-chain.md`)을 읽는다(형식: `references/profile.md`).
 2. **권한 확인 1회**: 로컬 커밋, push, 외부 시스템 쓰기, 새 비용(유료 API·인프라), 그리고 **상한 초과 사다리**(`escalation`, §6). 프로파일에 상시 정책(`commit`·`push`·`escalation`)이 있으면 그 값을 쓰고 다시 묻지 않는다. 결과를 상태 파일 `authority`에 기록한다. 이 스킬의 기본값, 리뷰 SHIP, 추천안 선택은 승인을 새로 만들지 않는다.
    - `escalation`을 물을 때는 추천 사다리를 함께 보인다: `[extra-rounds:1, carry-reversible, stop]`. 답이 없으면 기본 사다리 `[extra-rounds:1, carry-reversible, stop]`을 쓴다(1.4.0, §6 "상한 초과 사다리"). `stop`은 되돌리기 어려운 대상이 걸린 BLOCK에서만 닿는다.
-3. planner 호출: (1.6.5) 체인의 **최초 계획은 위험도와 무관하게 항상 `chain-planner-deep`**이다. 최초 계획의 분해 품질이 이후 모든 마일스톤의 회차를 좌우하기 때문이다. 계획 검토 BLOCK 뒤 delta 수정·출시 검토 마일스톤 삽입 같은 이후 호출은 설계가 되돌리기 어려우면 `chain-planner-deep`, 아니면 `chain-planner`. (1.7.0) 최초 계획은 **두 층**이다: 전체 마일스톤 골격 + 마일스톤을 가로지르는 결정 + **첫 두 마일스톤만** task 분해, 상한 60분(`references/planning.md` §2-1). 지시서에 상한을 적는다. 지시서에는 `references/planning.md` 절대 경로, 목표, `authority`, 기존 상태 경로, 프로파일 경로, 결함 계열 원장 경로(이전 체인 것이 있으면), 계획 문서 경로(기본 `docs/chain/<chain-id>/plan.md`)만 넣는다.
+3. planner 호출: (1.6.5) 체인의 **최초 계획은 위험도와 무관하게 항상 `chain-planner-deep`**이다. 최초 계획의 분해 품질이 이후 모든 마일스톤의 회차를 좌우하기 때문이다. 계획 검토 BLOCK 뒤 delta 수정·출시 검토 마일스톤 삽입 같은 이후 호출은 설계가 되돌리기 어려우면 `chain-planner-deep`, 아니면 `chain-planner`. (1.7.0) 최초 계획은 **두 층**이다: 전체 마일스톤 골격 + 마일스톤을 가로지르는 결정 + **첫 두 마일스톤만** task 분해(`references/planning.md` §2-1). (1.7.1) 시간 상한은 두지 않는다 — 계획은 충분히 한다. 대신 planner는 뼈대를 먼저 파일로 쓰고 조사를 묶어서 한다(§2-2). 조정자는 계획 문서 frontmatter 바로 다음 `진행:` 줄로 상태를 보고하고, planner를 멈추게 하지 않는다. 지시서에는 `references/planning.md` 절대 경로, 목표, `authority`, 기존 상태 경로, 프로파일 경로, 결함 계열 원장 경로(이전 체인 것이 있으면), 계획 문서 경로(기본 `docs/chain/<chain-id>/plan.md`)만 넣는다.
 4. 계획 `review: required`면 Sol 계획 검토(§6). BLOCK은 같은 planner에 delta만 넘겨 고친다(`SendMessage`로 이어가거나, 새 호출이면 BLOCK 결과 경로와 고칠 절만 넘긴다).
 5. 상태 파일, 질문 대기열, 결함 계열 원장(§6-1)을 만든다(§8). 원장이 이미 있으면(프로파일 `defect-classes`로 체인끼리 공유) 새로 만들지 않는다. 그다음 M1 진행 방식을 고른다.
    - 기본: 인계 문서를 쓴 뒤 M1 세션을 Orca 탭으로 연다(§9).
@@ -61,7 +61,7 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 
 근거: giki-editor-v2 최초 계획 3시간(쓰기 전에 7 마일스톤·55절을 모두 조사), 뒤 마일스톤 task는 결국 조정자가 다시 썼다.
 
-- 계획은 늘 **한 마일스톤 앞서** 있어야 한다. M<n>이 마감되면(on-milestone-close 직후, 인계 전) 조정자가 `chain-planner`(일반 등급, 상한 20분)에 **M<n+2>** task 분해를 맡긴다. 지시서: `references/planning.md` 절대 경로, 계획 문서 경로, 분해할 마일스톤 id, 앞 마일스톤 마감 보고·백로그·결함 계열 원장 경로.
+- 계획은 늘 **한 마일스톤 앞서** 있어야 한다. M<n>이 마감되면(on-milestone-close 직후, 인계 전) 조정자가 `chain-planner`(일반 등급)에 **M<n+2>** task 분해를 맡긴다. 지시서: `references/planning.md` 절대 경로, 계획 문서 경로, 분해할 마일스톤 id, 앞 마일스톤 마감 보고·백로그·결함 계열 원장 경로.
 - planner는 그 마일스톤 절만 채운다(`references/planning.md` §7 delta 규칙). 다른 절·가로지르는 결정은 고치지 않는다.
 - 롤링 분해는 Sol 계획 검토를 받지 않는다. 조정자가 소유 파일 겹침·deps·AC 관찰 가능성만 대조한다.
 - 가로지르는 결정(스키마·외부 계약·저장 형식)을 바꿔야 하면 롤링 분해에서 고치지 않는다. `chain-planner-deep` delta + Sol 계획 검토(가벼운 게이트)로 올린다.

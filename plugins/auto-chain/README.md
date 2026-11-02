@@ -26,7 +26,8 @@
 - (1.6.2) 실패 사다리를 등급 상향에서 시각 전환으로: 원인 모를 실패 1번 → Sol 원인 조사(읽기 전용, `references/sol-review.md` §7) → Sol 안대로 고쳤는데도 실패 → `chain-worker-xhigh`(반박된 가설 전부 첨부) → 그래도 실패 → task blocked·질문 대기열. 오타·flaky·환경 문제와 Sol 안 구현 실수는 세지 않습니다.
 - (1.6.3) 수정 작업은 처음부터 `chain-worker-xhigh`: 원인 위치가 특정된 간단한 수정은 조정자 국소 경로, 그 밖의 BLOCK·회귀·원인 조사 수정은 Sonnet·deep 단계 없이 xhigh로 시작합니다. 신규 구현 task 등급은 그대로(planner 표시). 실패 사다리 = xhigh → Sol 원인 조사 → 새 xhigh(반박된 가설 첨부) → blocked.
 - (1.6.5) 체인의 최초 계획은 위험도와 무관하게 항상 `chain-planner-deep`(Opus xhigh). delta 수정·출시 검토 삽입 같은 이후 planner 호출은 기존 기준(되돌리기 어려우면 deep, 아니면 `chain-planner`).
-- (1.7.0) 속도 우선(giki-editor-v2 회고): 화면 마일스톤은 Sol 최종 검토 없이 build·스모크로 마감, 데이터 마일스톤은 Sol 가벼운 게이트 1회(무거운 게이트는 계획이 `gate: heavy`로 표시한 마일스톤만). breaker 기본 끔(프로파일 `breaker: on`). 일반 문제는 30분 상한 → 백로그 `[30분]`, 간헐 실패는 `[quarantine]`, 데이터·권한 문제만 그 자리에서 해결. 시각 확인 `visual-check: request`(기다리지 않는 요청, 반응 없으면 넘김) 또는 `end`. 최초 계획은 두 층(골격·가로지르는 결정·첫 두 마일스톤 task, 상한 60분)이고 이후는 마일스톤 마감마다 `chain-planner`가 M+2를 롤링 분해(상한 20분, Sol 검토 없음). worker 보고서 30줄.
+- (1.7.0) 속도 우선(giki-editor-v2 회고): 화면 마일스톤은 Sol 최종 검토 없이 build·스모크로 마감, 데이터 마일스톤은 Sol 가벼운 게이트 1회(무거운 게이트는 계획이 `gate: heavy`로 표시한 마일스톤만). breaker 기본 끔(프로파일 `breaker: on`). 일반 문제는 30분 상한 → 백로그 `[30분]`, 간헐 실패는 `[quarantine]`, 데이터·권한 문제만 그 자리에서 해결. 시각 확인 `visual-check: request`(기다리지 않는 요청, 반응 없으면 넘김) 또는 `end`. 최초 계획은 두 층(골격·가로지르는 결정·첫 두 마일스톤 task)이고 이후는 마일스톤 마감마다 `chain-planner`가 M+2를 롤링 분해(Sol 검토 없음). worker 보고서 30줄.
+- (1.7.1) 계획 시간 상한 제거. 대신 planner가 (최초 계획이면) 코드 조사 전에 계획 뼈대를 먼저 파일로 쓰고 frontmatter 바로 다음 `진행:` 줄을 절마다 갱신하며, 조사 명령을 한 호출에 묶는다(실측: 시간 대부분이 "생각 2~4분 → grep 1개" 반복, 그동안 산출물 0).
 - (1.2.0) 진행 보드와 한 줄 중간 보고를 정해진 시점에 냅니다. worker 보고서의 `- 진행:` 줄과 Sol 로그는 `Monitor`로 감시합니다.
 - (1.2.0) BLOCK을 결함 계열 원장(`defect-classes.md`)에 쌓습니다. 같은 계열이 2회 나오면 위치별 수정을 멈추고 전수 점검 task로 바꿉니다.
 - (1.3.0) 원인 위치가 특정된 BLOCK은 worker 없이 조정자가 직접 고치고(재현 회귀 + 영향 시험만), 재검토는 delta 검토(직전 BLOCK 해소 + 그 diff의 직접 회귀)로 받습니다. delta 밖 새 발견은 NOTE → 후속 task.
