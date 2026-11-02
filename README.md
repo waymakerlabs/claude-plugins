@@ -524,10 +524,10 @@ Skill(auto-chain:autonomous-chain)
 
 **Covers (`project-setup`):**
 
-- **Private GitHub repo** — if the folder is not a git repo (or has no remote), offers to create a private repo named after the folder with the active `gh` account (asks once to confirm the owner), adds a `.gitignore`, makes an initial commit after showing the file list and excluding secret-looking files, then pushes.
 - **Fixed `docs/` layout** — creates `product`, `architecture`, `design`, `plans`, `milestones`, `operations` and `archive`, plus `docs/index.md` that indexes every document under `docs/`. If `docs/` already exists, it back-fills the index and never moves existing files.
 - **Milestone ledger** — creates `docs/milestones/README.md` using milestone IDs `M{plan}-{nn}` (e.g. `M1-01`, `M1-02`). The plan number increments each time a new milestone plan is made.
 - **Project rules** — adds a marker-delimited docs/milestone rules section to the project `CLAUDE.md` (and `AGENTS.md` if present). Safe to re-run: the section is updated in place, never duplicated.
+- **Private GitHub repo (last)** — local files are prepared first; then, if the folder is not a git repo (or has no remote), it asks once (owner + commit file list) and creates a private repo named after the folder with the active `gh` account, adds a `.gitignore`, and pushes everything as a single initial commit, excluding secret-looking files.
 
 #### Install
 

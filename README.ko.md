@@ -344,10 +344,10 @@ Skill(orca-codex-delegate:orca-codex-delegate)
 
 **다루는 것 (`project-setup`):**
 
-- **비공개 GitHub 저장소** — 현재 폴더가 git 저장소가 아니거나 remote가 없으면, 활성 `gh` 계정으로 폴더 이름의 비공개 저장소를 만들지 제안합니다(소유자는 한 번만 확인). `.gitignore`를 추가하고, 파일 목록을 보여 준 뒤 비밀 정보로 보이는 파일을 제외하고 초기 커밋을 만든 다음 push합니다.
 - **고정된 `docs/` 구조** — `product`, `architecture`, `design`, `plans`, `milestones`, `operations`, `archive` 폴더와, `docs/` 아래 모든 문서를 색인하는 `docs/index.md`를 만듭니다. `docs/`가 이미 있으면 색인만 채워 넣으며 기존 파일은 옮기지 않습니다.
 - **마일스톤 대장** — `docs/milestones/README.md`를 만들고 마일스톤 ID는 `M{plan}-{nn}` 형식(예: `M1-01`, `M1-02`)을 사용합니다. plan 번호는 새 마일스톤 계획을 세울 때마다 1씩 증가합니다.
 - **프로젝트 규칙** — 프로젝트 `CLAUDE.md`(`AGENTS.md`가 있으면 함께)에 마커로 구분된 docs/마일스톤 규칙 섹션을 추가합니다. 다시 실행해도 중복되지 않고 해당 섹션만 갱신됩니다.
+- **비공개 GitHub 저장소 (마지막 단계)** — 위 로컬 작업을 먼저 끝낸 뒤, 현재 폴더가 git 저장소가 아니거나 remote가 없으면 소유자와 커밋할 파일 목록을 한 번에 확인받습니다. 활성 `gh` 계정으로 폴더 이름의 비공개 저장소를 만들고, `.gitignore`를 추가한 뒤 비밀 정보로 보이는 파일을 제외하고 전체를 하나의 초기 커밋으로 push합니다.
 
 #### 설치
 

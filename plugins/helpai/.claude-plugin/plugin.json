@@ -1,6 +1,6 @@
 {
   "name": "helpai",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Project helper skill set (helpai namespace). project-setup bootstraps a folder: private GitHub repo via gh, a fixed docs/ layout with docs/index.md as the single document index, a milestone ledger (M{plan}-{nn} IDs), and idempotent docs rules in the project CLAUDE.md.",
   "author": {
     "name": "waymakerlabs",
