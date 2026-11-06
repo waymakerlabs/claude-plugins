@@ -1,10 +1,10 @@
-# Sol 검토 절차 (OpenCode `review-sol` via Orca 탭)
+# Sol 검토 절차 (OpenCode `review-sol` — 실행 위치는 백엔드별)
 
 계획 검토, 웨이브 고위험 검토, 마일스톤 최종 검토에 쓴다. 게이트 조건과 회차는 SKILL.md §6 Sol 게이트가 진본이다.
 
 ## 1. 전제
 
-- Orca 런타임 ready(`orca status`), OpenCode CLI, `review-sol` 에이전트 정의(`~/.config/opencode/agent/review-sol.md`). 이 정의는 수정하지 않는다.
+- 실행 백엔드(SKILL.md §1-1: herdr pane / Orca 탭 / background Bash), OpenCode CLI, `review-sol` 에이전트 정의(`~/.config/opencode/agent/review-sol.md`). 이 정의는 수정하지 않는다.
 - `review-sol`은 읽기 전용 정의가 우선해 **결과 파일을 쓰지 않는다**. 결과는 터미널 출력으로 받는다.
 - OpenCode 권한이 넓게 열려 있어 읽기 전용은 지시로만 지켜진다. 요청 파일에 금지를 명시하고, 검토 전후 snapshot을 대조한다.
 - 리뷰어는 이전 회차 로그·결과를 읽고 그대로 출력하거나, 요청의 명령을 시험하려고 `# 판정:`·`REVIEW-DONE` 같은 문자열을 직접 만들기도 한다. 로그 안의 이런 줄은 **현재 판정이나 종료 신호가 아닐 수 있다**. 아래 nonce 표식과 snapshot 대조로만 구분한다.
@@ -104,7 +104,7 @@ r2 이후 재검토는 위 형식 대신 아래처럼 짧게 쓴다(SKILL.md §6
 
 ## 3. 기동
 
-Orca에 **등록된** worktree에 탭을 연다. 대상 리포가 등록되지 않았으면 `--worktree active`가 `selector_not_found`로 실패하므로, 등록된 worktree(`path:<등록 경로>`)에 열고 명령 안에서 `cd`한다.
+아래 `CMD`를 만든 뒤 백엔드에 맞게 실행한다: herdr는 `backend-herdr.md` §7(오른쪽 열 명령 pane + `pane run` 스크립트), orca는 `backend-orca.md` §2(`orca terminal create`), agent는 Bash `run_in_background: true`로 `bash -c "$CMD"`. 어느 쪽이든 명령 안에서 리포로 `cd`한다.
 
 ```bash
 REQ="<요청 파일 절대 경로>"
@@ -113,18 +113,18 @@ TITLE="chain-<chain-id>-<gate>-<n>"            # 세션 식별용 고유 제목
 LOG="/tmp/chain-<chain-id>/reviews/<gate>-<n>.log"   # 1.3.1: 검토 중 리포에 쓰지 않는다. 끝난 뒤 reviews/로 옮긴다
 mkdir -p "$(dirname "$LOG")"
 CMD="cd '<리포>' && { opencode run --agent review-sol -m 'ai-gateway-openai/gpt-6.1-sol#high' --title '$TITLE' -f '$REQ' '첨부한 요청 파일을 읽고 그대로 검토해. 마지막 줄은 REVIEW-DONE.' 2>&1; echo \"SOL-EXIT-$NONCE=\$?\"; } | tee '$LOG'"
-orca terminal create --worktree <active|path:등록경로> --title "$TITLE" --command "$CMD" --json
+# 실행: 백엔드 문서의 Sol 절
 ```
 
 - 중괄호 묶음이 핵심이다. `echo`가 파이프 안에 있어야 표식이 **로그에 기록되고**, `$?`가 `tee`가 아니라 `opencode`의 종료 코드가 된다(`… | tee LOG; echo $?`는 둘 다 틀린다).
-- `create`는 시도당 1회. 응답 전체에서 handle을 즉시 추출한다(잘라서 잃으면 `orca terminal list`로 title 기반 재확보, 재create 금지).
+- 기동은 시도당 1회. 응답에서 pane id·handle을 즉시 기록한다(잃으면 백엔드의 목록 명령으로 title 기반 재확보, 재기동 금지).
 - (1.6.1) **재검토(delta)는 새 세션으로 연다.** `-s <ses_id>` 재개를 쓰지 않는다. 재개하면 r1이 읽은 계획·diff·보고서·이미지가 회차마다 쌓여 맥락이 200k를 넘고, 큰 맥락에서 응답이 오지 않는 경우가 생긴다(gpt-6.1-sol `ai-gateway` 기록 65건 중 40%가 200k 초과, 최대 276k — 2026-10-07~15. 이후 경로는 토큰이 기록되지 않아 측정 불가). delta 요청은 그 자체로 완결되게 쓴다. 직전 결과 파일 경로, 고칠 BLOCK id와 각 한 줄 요약, 수정 커밋 sha를 요청 본문에 넣는다. 세션 ID는 회차마다 `opencode session list --format json`에서 `$TITLE`로 찾아 상태 파일에 기록한다(추적용).
 - **리뷰가 진행되는 동안 조정자는 리포에 파일을 쓰지 않는다**(SKILL.md §6 검증 예산과 같은 규칙). 로그·결과 파일은 `/tmp/chain-<chain-id>/`에 두고, 판정을 기록한 뒤 `reviews/`로 옮긴다. 읽기·다음 단계 준비(지시서 초안은 `/tmp`에)는 계속해도 된다.
 
 ## 4. 대기
 
 - 완료 신호는 ANSI 코드를 지운 로그에서 **이번 nonce의 표식 줄 전체 일치** 하나다: `^SOL-EXIT-<NONCE>=[0-9]+$`. 값이 0이 아니면 검토 실패다.
-- 로그의 `REVIEW-DONE`·`SOL-EXIT=`·`# 판정:` 단순 grep은 완료 신호로 쓰지 않는다(인용과 리뷰어 시험 문자열에 걸린다). Orca 터미널 status도 쓰지 않는다(명령이 끝나도 셸이 남아 `running`으로 보인다).
+- 로그의 `REVIEW-DONE`·`SOL-EXIT=`·`# 판정:` 단순 grep은 완료 신호로 쓰지 않는다(인용과 리뷰어 시험 문자열에 걸린다). 터미널·pane 상태도 쓰지 않는다(명령이 끝나도 셸이 남아 `running`으로 보인다).
 - `Monitor`로 기다린다(SKILL.md §10). 완료 표식이 나오면 `SOL-DONE …` 한 줄을 내고 끝나고, 그 전에는 10분마다 경과 한 줄을 낸다. 조정자는 경과 줄을 사용자에게 한 줄 보고로 옮긴다. 화면을 반복해서 읽지 않는다. `T0`는 기동 때 `date +%s`로 기록한 값을 넣는다. Monitor가 30분에 만료되면 같은 `T0`로 다시 띄워 경과 시간이 이어지게 한다.
 
   ```bash
@@ -140,7 +140,7 @@ orca terminal create --worktree <active|path:등록경로> --title "$TITLE" --co
   ```
 
 - 실측(giki-parity M3, 9회): Sol 실행 자체는 회당 1.5~6분(delta 검토 1.5분, 마일스톤 전체 검토 5~6분). 리뷰어가 탐침을 많이 돌리면 더 걸릴 수 있으니 총 경과 시간만으로 실패로 보지 않는다. 사용자에게 소요를 말할 때는 이 문구가 아니라 로그 생성 시각·mtime으로 잰 값을 말한다.
-- (1.6.1) **무응답 판정은 로그 정체로 한다.** 완료 표식 없이 로그 크기가 **15분** 동안 그대로면 무응답으로 본다(리뷰어가 일하는 동안에는 도구 호출·추론 줄이 계속 늘어난다). 위 감시 명령에 정체 검사를 더한 형태는 아래와 같다. `SOL-STALL`이 나오면 `orca terminal read --terminal <handle> --screen --json`으로 1회 화면을 보고(권한 질문·입력 대기인지 기록), 탭을 닫고 §6 "무응답 재시도"로 간다.
+- (1.6.1) **무응답 판정은 로그 정체로 한다.** 완료 표식 없이 로그 크기가 **15분** 동안 그대로면 무응답으로 본다(리뷰어가 일하는 동안에는 도구 호출·추론 줄이 계속 늘어난다). 위 감시 명령에 정체 검사를 더한 형태는 아래와 같다. `SOL-STALL`이 나오면 백엔드의 화면 읽기(herdr `pane read`, orca `terminal read --screen`)로 1회 화면을 보고(권한 질문·입력 대기인지 기록), 탭을 닫고 §6 "무응답 재시도"로 간다.
 
   ```bash
   # 위 루프 안, 완료 표식 검사 바로 뒤에 넣는다
@@ -168,7 +168,7 @@ orca terminal create --worktree <active|path:등록경로> --title "$TITLE" --co
    - `## 검증 원장`(또는 동등한 snapshot 줄)에 요청한 HEAD SHA(앞 12자 이상)와 작업 트리 식별자·대상 SHA(요청에 있던 것)가 **그대로** 있다. 다르면 이전 회차 인용이거나 리뷰어의 시험 문자열이다.
 3. 검토 전후 snapshot 대조: `HEAD`, 작업 트리 식별자(§2 명령을 같은 `META`로 재실행), 대상 파일 SHA가 요청 때와 같은지 확인한다. `git status --short`만으로는 같은 경로의 내용 변경을 알 수 없으므로 식별자로 본다. 리뷰어가 파일을 바꿨으면 그 변경을 되돌리지 말고 기록한 뒤 질문 대기열에 올린다.
 4. 상태 파일에 기록: 게이트, 회차, snapshot(HEAD·작업 트리 식별자·대상 SHA), 리뷰 세션 ID, nonce, 판정, 결과 파일 경로, BLOCK id 목록. (1.3.1) BLOCK id 옆에 계열 id를 함께 적는다(`B8:C1`). 원장에는 발생 줄 한 줄만 덧붙이고, 별도 분류 단계를 두지 않는다. 그 계열이 2회째면 SKILL.md §6-1 우선순위대로 처리한다.
-5. 탭 정리: `orca terminal close --terminal <handle> --tab --json`.
+5. pane·탭 정리: 백엔드 문서의 Sol 절(herdr `pane close`, orca `terminal close --tab`).
 
 ## 6. 장애 처리
 

@@ -2,9 +2,10 @@
 name: autonomous-chain
 description: >-
   여러 세션 분량의 큰 작업, 설계 판단이 큰 구조 변경, 또는 사용자가 "자율체인으로" 진행을 명시 요청할 때 사용.
-  milestone → wave → task로 나누고, Opus(chain-planner-deep, 최초 계획은 xhigh)가 계획, GPT-6.1 Sol(OpenCode review-sol, Orca 탭)이
-  검토, Claude worker 서브에이전트(chain-worker)가 병렬 구현한다. 마일스톤 하나를 세션 하나가 조정하고
-  Orca 탭으로 다음 마일스톤 세션을 연다. 프로젝트별 추가 절차는 `.claude/autonomous-chain.md` 프로파일이 정한다.
+  milestone → wave → task로 나누고, Opus(chain-planner-deep, 최초 계획은 xhigh)가 계획, GPT-6.1 Sol(OpenCode review-sol)이
+  검토, Claude worker가 병렬 구현한다. 마일스톤 하나를 세션 하나가 조정하고 다음 마일스톤 세션을 연다.
+  실행 백엔드는 자동 선택 — herdr pane 안이면 herdr(worker를 옆 pane의 Claude 세션으로 띄움), Orca 안이면 Orca 탭.
+  프로젝트별 추가 절차는 `.claude/autonomous-chain.md` 프로파일이 정한다.
   작은 수정, 범위가 닫힌 일반 기능, 질문, 규약 검토에는 쓰지 않는다.
 ---
 
@@ -13,20 +14,31 @@ description: >-
 > 이 문서를 열었다면 체인을 시작하거나 이어받는 중이다. 절차를 기억으로 재구성하지 말고 아래를 따른다.
 > 설계 근거: 이 플러그인 리포의 `docs/design/claude-autonomous-chain.md`.
 
-reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planning.md`, `references/task-brief.md`, `references/sol-review.md`, `references/profile.md`. 서브에이전트에게는 **절대 경로**로 넘긴다.
+reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planning.md`, `references/task-brief.md`, `references/sol-review.md`, `references/profile.md`, `references/backend-herdr.md`, `references/backend-orca.md`. worker에게는 **절대 경로**로 넘긴다.
+
+## 1-1. 실행 백엔드 선택 (2.0.0)
+
+체인을 시작하거나 이어받을 때 1회 고르고 상태 파일 frontmatter `backend:`에 적는다. 이어받은 세션도 다시 판정한다(사용자가 도구를 바꿨을 수 있다).
+
+1. 프로파일 `backend: herdr|orca|agent`가 있으면 그 값(전제가 깨지면 아래 순서로 내려간다)
+2. `test "${HERDR_ENV:-}" = 1` → **herdr** — `references/backend-herdr.md`를 읽고 따른다
+3. `orca status`가 ready → **orca** — `references/backend-orca.md`
+4. 둘 다 아니면 **agent** — 구현은 `Agent` 서브에이전트, Sol은 `run_in_background` Bash로 직접 실행(sol-review.md §3 `CMD`를 그대로 돌리고 같은 nonce 감시), 인계는 하지 않고 인계 문서만 남긴 뒤 사용자에게 다음 세션 시작 명령 한 줄을 보고한다
+
+이 문서 본문의 "worker 기동", "Sol 기동", "인계"는 고른 백엔드 문서의 같은 절로 실행한다. 판정 규칙(보고서·nonce·snapshot·게이트)은 백엔드와 무관하다.
 
 ## 1. 적용 범위와 실행 단계
 
 | 단계 | 판단 기준 | 실행 |
 |---|---|---|
 | 직접 | 결과가 뻔하고, 보고서만으로는 판정하기 어려워 어차피 코드를 봐야 하는 작은 수정 | 조정자가 직접 수정하고 영향 시험 실행 |
-| 병렬 | 파일 소유권을 나눌 수 있는 독립 단위가 2개 이상 | task를 worker 서브에이전트에 맡김 |
+| 병렬 | 파일 소유권을 나눌 수 있는 독립 단위가 2개 이상 | task를 worker에 맡김(herdr: 옆 pane, orca·agent: 서브에이전트) |
 | 체인 | 여러 세션 분량, 설계 판단이 큼, 또는 사용자가 명시 요청 | 계획 세션 → 마일스톤 세션들 |
 
 - 직접과 병렬 중 무엇을 고를지는 조정자가 판단한다. 파일 수 같은 숫자 기준은 두지 않는다. 애매하면 가벼운 쪽을 고른다.
 - **(1.3.0) BLOCK 수정의 기본은 국소 경로다.** 리뷰 결과가 원인 위치(파일:줄)와 재현 입력을 특정했으면 worker를 띄우지 않는다. 조정자가 직접 고치고 → 재현 입력 회귀 시험 1~2건을 넣고 → 바꾼 모듈의 영향 시험만 돌리고 → 커밋 → **무거운 게이트면** Sol **delta 검토**(§6)를 받고, 가벼운 게이트면 영향 시험 결과를 상태 파일 "## Sol 검토"에 `fixed-local <커밋> · <시험 명령·결과>`로 적고 재검토 없이 진행한다(1.7.0). 프로파일 `breaker: on`이고 발동 조건에 맞을 때만 delta 검토와 동시에 파괴 검토를 돌린다(1.5.0, §6 "파괴 검토 동시 실행"). worker는 원인 조사가 필요하거나 수정이 여러 모듈·계약에 걸칠 때만 쓰고, (1.6.3) 그때는 처음부터 `chain-worker-xhigh`를 쓴다(Sonnet·deep 단계를 거치지 않는다). 신규 구현 task의 등급은 planner 표시를 따른다.
   - 근거(giki-parity M3 실측): worker BLOCK 수정 1회 31~96분(대부분 판단 왕복 — 시험·명령 실행은 96분 중 16분), 같은 성격 국소 수정을 조정자가 직접 했을 때 약 10분 + delta 검토 1.5분으로 SHIP.
-- 체인 적용 중에는 전역 CLAUDE.md의 "서브에이전트·병렬 wave는 Orca+codex 기본", "Opus 초안 → codex 리뷰", "완료 시 codex 크로스체크", 인계 프로토콜 규칙 4·8의 Codex 크로스체크 대신 **이 스킬의 worker 배정과 Sol 게이트**를 따른다.
+- 체인 적용 중에는 전역 CLAUDE.md의 병렬 에이전트·모델 선택 규칙, "Opus 초안 → codex 리뷰", "완료 시 codex 크로스체크", 인계 프로토콜의 Codex 크로스체크 대신 **이 스킬의 worker 배정(백엔드별)과 Sol 게이트**를 따른다.
 
 ## 2. 역할과 모델
 
@@ -37,11 +49,13 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 | 구현 | `chain-worker` | Sonnet high | 명세가 있는 task (기본) |
 | 구현(판단) | `chain-worker-deep` | Opus high | 상태·동시성·권한 경계나 원인 조사가 핵심일 때, `chain-worker` 실패 후 재시도 |
 | 구현(수정) | `chain-worker-xhigh` | Opus xhigh | (1.6.3) 수정 작업의 기본 — 국소 경로(§1)로 끝나지 않는 BLOCK 수정·회귀 수정·원인 조사가 필요한 수정은 처음부터 이 등급. 신규 구현 task에는 처음부터 배정하지 않는다 |
-| 검토 | OpenCode `review-sol` (Orca 탭) | GPT-6.1 Sol high | 계획 검토, 웨이브 고위험 검토, 마일스톤 최종 검토 |
+| 검토 | OpenCode `review-sol` (백엔드의 명령 pane·탭) | GPT-6.1 Sol high | 계획 검토, 웨이브 고위험 검토, 마일스톤 최종 검토 |
 | 파괴 검토 | `chain-breaker` | Opus high | (1.7.0) 기본 끔. 프로파일 `breaker: on`일 때만 BLOCK 수정 뒤 Sol delta와 동시에(§6). 리포에 쓰지 않음 |
 | 조정 | 메인 세션 | 세션 모델 | 마일스톤 조정, 기록, 통합 검증 |
 
-- 모델과 effort는 에이전트 frontmatter에 고정돼 있다. `Agent` 호출 때 `model`을 넘겨 덮어쓰지 않는다. 호출할 때는 `subagent_type`에 플러그인 접두사가 붙은 이름(`auto-chain:chain-worker` 등)을 쓴다.
+- 위 표의 모델·effort는 역할별 기본값이다. 이름은 플러그인 접두사가 붙은 형태(`auto-chain:chain-worker` 등)로 쓴다.
+  - orca·agent 백엔드(서브에이전트): frontmatter에 고정된 값을 쓰고, `Agent` 호출 때 `model`을 넘겨 덮어쓰지 않는다.
+  - (2.0.0) herdr 백엔드(pane worker): 조정자가 pane마다 **sonnet high / opus high** 중에서 고른다(xhigh는 수정 사다리와 `chain-planner-deep`만). 기준과 명령은 `references/backend-herdr.md` §3. 고른 값과 이유를 "## 진행" 비고에 적는다.
 - worker 등급은 planner가 task마다 표시한 대로 따른다. "중요해 보인다"는 이유로 올리지 않는다.
 - worker는 서브에이전트를 다시 만들지 않는다(정의에서 `Agent` 도구가 빠져 있다).
 - 실제로 적용된 모델·effort를 확인하지 못하면 상태 파일에 `unverified`로 두고 통과로 추론하지 않는다.
@@ -54,7 +68,7 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 3. planner 호출: (1.6.5) 체인의 **최초 계획은 위험도와 무관하게 항상 `chain-planner-deep`**이다. 최초 계획의 분해 품질이 이후 모든 마일스톤의 회차를 좌우하기 때문이다. 계획 검토 BLOCK 뒤 delta 수정·출시 검토 마일스톤 삽입 같은 이후 호출은 설계가 되돌리기 어려우면 `chain-planner-deep`, 아니면 `chain-planner`. (1.7.0) 최초 계획은 **두 층**이다: 전체 마일스톤 골격 + 마일스톤을 가로지르는 결정 + **첫 두 마일스톤만** task 분해(`references/planning.md` §2-1). (1.7.1) 시간 상한은 두지 않는다 — 계획은 충분히 한다. 대신 planner는 뼈대를 먼저 파일로 쓰고 조사를 묶어서 한다(§2-2). 조정자는 계획 문서 frontmatter 바로 다음 `진행:` 줄로 상태를 보고하고, planner를 멈추게 하지 않는다. 지시서에는 `references/planning.md` 절대 경로, 목표, `authority`, 기존 상태 경로, 프로파일 경로, 결함 계열 원장 경로(이전 체인 것이 있으면), 계획 문서 경로(기본 `docs/chain/<chain-id>/plan.md`)만 넣는다.
 4. 계획 `review: required`면 Sol 계획 검토(§6). BLOCK은 같은 planner에 delta만 넘겨 고친다(`SendMessage`로 이어가거나, 새 호출이면 BLOCK 결과 경로와 고칠 절만 넘긴다).
 5. 상태 파일, 질문 대기열, 결함 계열 원장(§6-1)을 만든다(§8). 원장이 이미 있으면(프로파일 `defect-classes`로 체인끼리 공유) 새로 만들지 않는다. 그다음 M1 진행 방식을 고른다.
-   - 기본: 인계 문서를 쓴 뒤 M1 세션을 Orca 탭으로 연다(§9).
+   - 기본: 인계 문서를 쓴 뒤 M1 세션을 백엔드의 인계 방식으로 연다(§9).
    - 계획 세션의 맥락이 아직 충분하면 같은 세션에서 M1을 이어서 진행해도 된다(§4 절차 그대로). 이 경우 상태 파일 "## 결정"에 그렇게 했다고 남기고, 인계는 M1→M2부터 한다.
 
 ### 3-1. 롤링 분해 (1.7.0)
@@ -80,7 +94,7 @@ wave N:
            → [on-wave-integrated] → push (authority에 있을 때) → 진행 보드
 마감 (마지막 웨이브 통합과 합침):
      종료 조건 확인 → verify.full → Sol 최종 검토(§6 게이트 표의 등급별) → BLOCK 수정(기록 줄에 계열 id)
-     → [on-milestone-close] → 시각 확인(§6-2) → 롤링 분해(§3-1) → wrap-up·인계 → 진행 보드 → 다음 마일스톤 탭 기동
+     → [on-milestone-close] → 시각 확인(§6-2) → 롤링 분해(§3-1) → wrap-up·인계 → 진행 보드 → 다음 마일스톤 세션 기동
 ```
 
 - 대괄호는 프로파일 훅 절이다. 비어 있으면 공통 동작만 한다.
@@ -89,7 +103,8 @@ wave N:
 
 ### worker 기동
 
-- `Agent`(`subagent_type: auto-chain:<worker 등급>`)로 띄운다. 같은 웨이브의 독립 task는 한 메시지에서 여러 개를 동시에 띄운다(`run_in_background: true`도 가능).
+- **herdr 백엔드**: 오른쪽 열 pane에 Claude 세션으로 띄운다(`references/backend-herdr.md` §2~§5 — 배치, 모델 선택, 대화, 완료 감지, 정리). 짧은 탐색·조사만 `Agent` 서브에이전트로 한다(같은 문서 §1 표).
+- **orca·agent 백엔드**: `Agent`(`subagent_type: auto-chain:<worker 등급>`)로 띄운다. 같은 웨이브의 독립 task는 한 메시지에서 여러 개를 동시에 띄운다(`run_in_background: true`도 가능).
 - 지시서에는 다음만 넣는다. 계획 전문을 붙이지 않는다.
   - 공통 지시서 `references/task-brief.md` 절대 경로 (+ 프로파일 `task-brief`가 있으면 그 경로)
   - 리포 절대 경로, 계획 문서 경로와 task 절 위치(`M1-W1-T03`)
@@ -97,7 +112,7 @@ wave N:
   - (1.7.0) 마일스톤 `mode`(build|harden)와 task 등급(화면|데이터) — worker의 30분 상한·quarantine 적용 여부가 여기서 정해진다
   - 결함 계열 원장 경로(§6-1)와 이 task에 해당하는 계열 id(조정자가 owns·AC를 보고 고른다. 백로그에 쌓인 계열도 포함. 없으면 "해당 없음")
   - 보고서 경로: `docs/chain/<chain-id>/reports/<task-id>.md`
-- 반환값은 `<보고서 경로> — <결과> <요약>` 한 줄이다. 그 이상이 돌아와도 diff는 읽지 않는다.
+- 반환값은 `<보고서 경로> — <결과> <요약>` 한 줄이다(pane worker는 같은 내용을 완료 메시지로 보낸다). 그 이상이 돌아와도 diff는 읽지 않는다.
 - 보고서 파일은 조정자의 `Read`·`git commit -- <경로>` 입력이다. 반환된 경로에 파일이 없으면 worker 실패로 보고 §7 실패 처리를 따른다(최종 메시지 내용으로 커밋 목록을 대신하지 않는다).
 
 ## 5. 조정자 규율
@@ -234,7 +249,7 @@ BLOCK 수정이 인접 상태를 새로 깨뜨려 다음 회차에 새 BLOCK이 
 |---|---|
 | `extra-rounds:<k>` | 같은 방식으로 수정 → 재검토를 k회 더 한다(`round 4/3+2`처럼 적는다) |
 | `worker:chain-worker-deep` / `worker:chain-worker-xhigh` | 다음 BLOCK 수정 worker를 그 등급으로 올린다. 재검토 1회. §7 실패 사다리로 이미 그 등급 이상을 썼으면 건너뛴다 |
-| `worker:opencode-<agent>` | 다음 BLOCK 수정을 OpenCode `<agent>`(예: `work-sol-xhigh`)로 Orca 탭에서 구현한다. 기동·대기·결과 확인은 `references/sol-review.md` §3~§5의 nonce 배선을 그대로 쓰고, 요청 파일 대신 worker 지시서(`briefs/<task-id>.md`, 형식은 `references/task-brief.md`)를 넘긴다. 재검토 1회 |
+| `worker:opencode-<agent>` | 다음 BLOCK 수정을 OpenCode `<agent>`(예: `work-sol-xhigh`)로 백엔드의 명령 pane·탭에서 구현한다. 기동·대기·결과 확인은 `references/sol-review.md` §3~§5의 nonce 배선을 그대로 쓰고, 요청 파일 대신 worker 지시서(`briefs/<task-id>.md`, 형식은 `references/task-brief.md`)를 넘긴다. 재검토 1회 |
 | `carry-reversible` | 남은 BLOCK이 모두 **되돌릴 수 있는 제품 결함**(UI·로컬 코드, 되돌리기 = revert 몇 개)이면 멈추지 않는다. 게이트를 SHIP으로 기록하지 않고 `carried`로 기록한다. 각 finding을 질문 대기열에 "미해결 결함"으로, 다음 웨이브(마지막 마일스톤이면 후속 task)에 수정 task로 올린다. 마일스톤은 **조건부 마감**으로 닫고 마감 보고에 별도 절(아래)을 둔다. 남은 finding에 되돌리기 어려운 대상(스키마·배포/보안 설정·계약 문서·비가역 런타임 동작·외부 시스템 쓰기·main 병합)이 하나라도 걸리면 이 칸을 건너뛰고 다음 칸으로 간다 |
 | `stop` | 멈춤 조건 6 |
 
@@ -353,10 +368,9 @@ started: <체인 시작 ISO 시각>          # 진행 보드 경과 시간 기�
 
 ## 9. 인계
 
-- 마일스톤 인계와 다음 세션 기동은 전역 CLAUDE.md의 「Orca 탭 방식 후속 세션 인계 프로토콜」을 그대로 따른다(이 스킬에 다시 쓰지 않는다). 단 그 프로토콜 규칙 4·8의 Codex 크로스체크는 이 스킬의 Sol 게이트로 대체한다.
+- 다음 세션 기동과 부모 정리는 백엔드 문서를 따른다: herdr는 `references/backend-herdr.md` §8(새 탭 + `agent start`/`agent prompt`), orca는 `references/backend-orca.md` §3(전역 CLAUDE.md의 Orca 탭 인계 프로토콜). 어느 쪽이든 전역 인계 규칙의 Codex 크로스체크는 이 스킬의 Sol 게이트로 대체한다.
 - 인계 프롬프트 예: `<상태 파일 절대 경로>와 <인계 문서 절대 경로>를 읽고 auto-chain 스킬로 M<n+1>을 진행해.`
-- 대상 리포가 Orca에 등록되지 않았으면 `--worktree active`가 `selector_not_found`로 실패한다. 인계 탭도 Sol 탭과 같이 등록된 worktree(`path:<등록 경로>`)에 열고, 인계 문서에 "실행 위치"와 "git은 `git -C <리포>`"를 적는다.
-- 부모 탭 정리(child 쪽): `orca terminal close --tab` 응답의 `ok`와 `ptyKilled`를 상태 파일에 기록한다. `ok: true`인데 `ptyKilled: false`이면 `orca terminal list`에서 부모 handle이 사라졌는지 확인하고 결과를 남긴다. 부모 프로세스를 강제로 끝내지는 않는다. 목록에 남아 있으면 같은 worktree에 편집 소유자가 둘일 수 있으니 질문 대기열에 올리고, 부모가 고치던 파일은 건드리지 않는다.
+- 진행 중인 pane worker가 남아 있으면 인계하지 않는다. 회수·정리한 뒤 인계한다(맥락이 부족해 어쩔 수 없으면 아래 규칙대로 인계 문서에 pane id·agent 이름·보고서 경로와 회수 책임을 적는다).
 - 일지는 프로파일 `daily-log` 시점에 쓴다. 매 마일스톤 daily-log+handoff를 이중으로 만들지 않고 상태 파일을 재사용하며, 인계 문서에는 상태 파일에 없는 실행 맥락만 보탠다.
 - 맥락이 부족해지면 마일스톤 도중이라도 안전한 지점에서 인계하고 같은 마일스톤을 새 세션이 이어받는다. 진행 중인 worker·리뷰가 있으면 결과 회수 책임을 인계 문서에 적는다.
 
