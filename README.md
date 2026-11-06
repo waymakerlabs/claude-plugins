@@ -125,11 +125,11 @@ Based on [Awesome Statusline](https://github.com/awesomejun/awesome-claude-plugi
 |---------|-------------|
 | Daily Log | Record today's work in daily log |
 | Handoff | Generate handoff document (single file, overwrites previous) |
-| Verification Gate | Auto-detect and run the repo's own typecheck/lint/test/build before committing; defaults to `orca-codex-delegate` for the code-review gate when Orca+codex is configured |
+| Verification Gate | Auto-detect and run the repo's own typecheck/lint/test/build before committing; runs the code-review gate with the project/global cross-check setup (e.g. direct codex CLI run) when configured |
 | Doc Update | Auto-update related docs (project overview, etc.) |
 | Git Commit/Push | Commit and push code changes |
 
-> **Note**: Handoff maintains only one file. Previous handoff is deleted and a new timestamped file is created, so you can see when the last session ended. The "Next steps" section is written with each item's file scope and independence/dependency marked explicitly, so a successor session (or `orca-codex-delegate`) can tell which items are safe to dispatch to codex in parallel.
+> **Note**: Handoff maintains only one file. Previous handoff is deleted and a new timestamped file is created, so you can see when the last session ended. The "Next steps" section is written with each item's file scope and independence/dependency marked explicitly, so a successor session (or a parallel agent) can tell which items are safe to dispatch in parallel.
 
 **Execution Flow (Sequential, 10 steps):**
 
@@ -142,7 +142,7 @@ Based on [Awesome Statusline](https://github.com/awesomejun/awesome-claude-plugi
     4. Write/update daily log
     5. Write handoff doc (next steps marked independent vs. dependent)
     6. Verification gate — deterministic checks, then code review
-       (orca-codex-delegate by default when Orca+codex is available)
+       (project/global cross-check setup, e.g. codex CLI, when configured)
     7. Bump project version
     8. Update related docs
     9. Git commit & push
@@ -491,7 +491,7 @@ Skill(orca-codex-delegate:orca-codex-delegate)
 
 ## ▶ auto-chain
 
-> Milestone → wave → task autonomous execution for large multi-session work. Opus plans, GPT-6.1 Sol (OpenCode `review-sol` in an Orca tab) reviews, parallel Claude worker subagents implement, and one lean coordinator session per milestone integrates, verifies and hands off to the next milestone via an Orca tab.
+> Milestone → wave → task autonomous execution for large multi-session work. Opus plans, GPT-6.1 Sol (OpenCode `review-sol`) reviews, parallel Claude workers implement, and one lean coordinator session per milestone integrates, verifies and hands off to the next milestone. The execution backend is auto-selected (2.0.0): inside [herdr](https://herdr.dev), workers run as Claude sessions in side panes (coordinator stays large on the left, model picked per pane, two-way messaging during work); inside Orca, the 1.7.1 Orca-tab flow (tag `auto-chain-v1.7.1-orca`).
 
 **Covers:**
 

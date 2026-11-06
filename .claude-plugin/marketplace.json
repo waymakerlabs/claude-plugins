@@ -22,8 +22,8 @@
     },
     {
       "name": "wrap-up",
-      "version": "1.0.11",
-      "description": "Session wrap-up skill - Obsidian documentation + Git commit in one go. Auto-generate daily log and handoff docs with explicit parallel-delegation next-steps, with a pre-commit verification gate that defaults to orca-codex-delegate when available",
+      "version": "1.0.12",
+      "description": "Session wrap-up skill - Obsidian documentation + Git commit in one go. Auto-generate daily log and handoff docs with explicit parallel-delegation next-steps, with a pre-commit verification gate that follows the project/global cross-check setup (e.g. direct codex CLI run) when configured",
       "author": {
         "name": "waymakerlabs",
         "email": "peter@waymakerlabs.com"
@@ -113,7 +113,7 @@
     },
     {
       "name": "linear",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "description": "Linear issue management, dev cycle automation, and planning workflows",
       "author": {
         "name": "waymakerlabs",
@@ -152,8 +152,8 @@
     },
     {
       "name": "focused-analysis",
-      "version": "1.0.0",
-      "description": "Dual independent-track cross-verification for hard diagnostic questions — an Opus subagent and Orca/codex orchestration run in parallel on the same question, then Claude synthesizes agreement/disagreement into one final judgment. Triggered by '집중 분석해줘'/'상세 분석해줘'. Requires the orca-codex-delegate plugin.",
+      "version": "1.1.0",
+      "description": "Dual independent-track cross-verification for hard diagnostic questions — an Opus subagent and codex CLI run in parallel on the same question, then Claude synthesizes agreement/disagreement into one final judgment. Triggered by '집중 분석해줘'/'상세 분석해줘'. Requires the Codex CLI (installed and authenticated).",
       "author": {
         "name": "waymakerlabs",
         "email": "peter@waymakerlabs.com"
@@ -165,15 +165,15 @@
     },
     {
       "name": "auto-chain",
-      "version": "1.7.1",
-      "description": "Milestone → wave → task autonomous execution for large multi-session work. Opus plans, GPT-6.1 Sol (OpenCode review-sol via Orca) reviews, parallel Claude worker subagents implement, and a lean coordinator session per milestone integrates, verifies and hands off to the next milestone via an Orca tab. Per-project hooks via .claude/autonomous-chain.md. Requires Orca, OpenCode CLI and the review-sol agent.",
+      "version": "2.0.0",
+      "description": "Milestone → wave → task autonomous execution for large multi-session work. Opus plans, GPT-6.1 Sol (OpenCode review-sol) reviews, Claude workers implement in parallel, and a lean coordinator session per milestone integrates, verifies and hands off to the next milestone. Execution backend is auto-selected: inside herdr, workers run as Claude sessions in side panes (model chosen per pane, live two-way messaging); inside Orca, the 1.7.1 Orca-tab flow. Per-project hooks via .claude/autonomous-chain.md. Requires herdr or Orca, OpenCode CLI and the review-sol agent.",
       "author": {
         "name": "waymakerlabs",
         "email": "peter@waymakerlabs.com"
       },
       "source": "./plugins/auto-chain",
       "category": "workflow",
-      "keywords": ["autonomous", "chain", "milestone", "wave", "subagent", "orca", "opencode", "sol", "opus", "자율체인", "claude-code"],
+      "keywords": ["autonomous", "chain", "milestone", "wave", "subagent", "opencode", "sol", "opus", "자율체인", "claude-code", "herdr", "orca"],
       "homepage": "https://github.com/waymakerlabs/claude-plugins"
     },
     {
