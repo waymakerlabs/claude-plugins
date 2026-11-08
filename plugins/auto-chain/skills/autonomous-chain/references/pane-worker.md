@@ -43,7 +43,7 @@ ROLE=chain-worker "$S" "$NAME" <sonnet|opus> <low|medium|high|xhigh> "<지시서
 - 환경 변수: `ROLE`(기본 `chain-worker`), `PERM_FLAGS`(비우면 조정자 claude 프로세스 — `argv[0]` 이름이 정확히 `claude`인 조상 — 의 실제 argv 원소에 `--dangerously-skip-permissions`가 있을 때만 붙인다. `ps args` 문자열은 인자 경계를 잃어 쓰지 않는다), `TAB_LABEL`(넘침 탭 이름, 기본 `[WO] 자율체인 작업`), `PANE_LABEL`(기본 `[WO] 작업자 <name>` — 역할 접두어 + 한글), `AGENT_ORCHESTRATOR`(진입점 경로).
   - `ROLE` 해석: `none` → `--agent` 없음 / `:` 포함(`auto-chain:chain-worker-deep`) → 그대로 / `$PWD/.claude/agents/<ROLE>.md`가 있으면 프로젝트 정의 이름 / 그 밖 → `auto-chain:<ROLE>`.
   - `--agent` 적용 여부는 화면 표시로 입증되지 않는다. 역할 규칙(도구 제한·금지 사항)은 지시서에도 함께 적는다.
-- **이름 규칙**: 탭·pane 이름은 역할 접두어 + 한글 — `[OC]` 오케스트레이터·조정자, `[WO]` worker, `[RV]` 리뷰어, 단계는 이름 본문에(예: `[OC] 헬프AI M1-12`, `[WO] 작업 넘침`). 조정자는 착수 때 `"$AO" self-name "[OC] <한글>" "[OC] <한글>"`을 한 번 실행한다(비었거나 숫자만인 herdr 기본 이름은 그대로 바꾸고, 이미 `[XX]` 접두어가 있으면 유지하며, 사용자가 붙인 이름은 본문을 두고 접두어만 붙인다. 주제가 바뀌어 이 세션이 붙인 이름을 바꿀 때만 `self-name --force`. 현재 이름 확인은 `"$AO" whoami --field tab-label|pane-label`). 에이전트 이름은 `[a-z][a-z0-9_-]{0,31}`.
+- **이름 규칙**: 탭·pane 이름은 역할 접두어 + 한글 — `[OC]` 오케스트레이터·조정자, `[WO]` worker, `[RV]` 리뷰어, 단계는 이름 본문에(예: `[OC] 헬프AI M1-12`, `[WO] 작업 넘침`). 조정자는 착수 때 `"$AO" self-name "[OC] <한글>" "[OC] <한글>"`을 한 번 실행한다(비었거나 숫자만인 툴 기본 번호는 그대로 바꾸고, 이미 `[XX]` 접두어가 있으면 유지하며, 사용자가 붙인 이름은 본문을 두고 접두어만 붙인다. 주제가 바뀌어 이 세션이 붙인 이름을 바꿀 때만 `self-name --force`(사용자가 붙인 대상은 `-`로 건너뜀). 현재 이름 확인은 `"$AO" whoami --field tab-label|pane-label`). 에이전트 이름은 `[a-z][a-z0-9_-]{0,31}`.
 - `--cwd`는 조정자의 `$PWD`(신뢰된 폴더)다. 대상 리포가 다르면 지시서에 리포 절대 경로를 적고 worker가 `git -C <리포>`·절대 경로로 일한다.
 
 ## 3. 모델·effort
