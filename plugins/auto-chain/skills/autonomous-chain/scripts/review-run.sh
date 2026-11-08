@@ -13,6 +13,8 @@
 #                     '#high'는 거부된 실측이 있어 붙이지 않는다)
 #   REVIEW_LOG        기본 <done-file>.log
 #   REVIEW_AGENT_FILE opencode-build가 첨부할 리뷰 정의(기본 ~/.config/opencode/agent/review-sol.md)
+#   REVIEW_OPENCODE_BIN opencode 실행 파일(기본 ~/.opencode/bin/opencode → PATH의 opencode).
+#                     게이트웨이 키(AIGW_OPENCODE_KEY 등)가 필요하면 호출 전에 export한다(값은 기록하지 않음)
 #   REVIEW_KILL_GRACE TERM·INT·HUP을 받았을 때 리뷰어에 TERM 뒤 KILL까지 기다릴 초(기본 10)
 #
 # 하는 일 (references/backend-herdr.md §7, interface §1):
@@ -55,9 +57,16 @@ esac
 case "$EFFORT" in low|medium|high|xhigh) ;; *) die "REVIEW_EFFORT는 low|medium|high|xhigh: $EFFORT" ;; esac
 [ -f "$REQ" ] || die "요청 파일 없음: $REQ"
 git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "git 작업 트리 아님: $REPO"
+OC=""
 case "$REVIEWER" in
   codex-cli) command -v codex >/dev/null 2>&1 || die "codex 없음" ;;
-  *) command -v opencode >/dev/null 2>&1 || die "opencode 없음" ;;
+  *)
+    # (2.2.1) 셸 래퍼(예: ~/.local/bin/opencode — 게이트웨이 키를 스스로 갱신하는 zsh 스크립트)는
+    # 비대화형 실행에서 provider 초기화에 실패했다(office 2026-11-08 실측). 실제 바이너리를 우선한다.
+    if [ -n "${REVIEW_OPENCODE_BIN:-}" ]; then OC=$REVIEW_OPENCODE_BIN
+    elif [ -x "$HOME/.opencode/bin/opencode" ]; then OC="$HOME/.opencode/bin/opencode"
+    else OC=$(command -v opencode 2>/dev/null || true); fi
+    { [ -n "$OC" ] && [ -x "$OC" ]; } || die "opencode 없음 (REVIEW_OPENCODE_BIN으로 지정)" ;;
 esac
 if [ "$REVIEWER" = opencode-build ]; then
   [ -f "$AGENT_FILE" ] || die "리뷰 정의 파일 없음: $AGENT_FILE (REVIEW_AGENT_FILE)"
@@ -200,11 +209,13 @@ case "$REVIEWER" in
     command codex exec -m "$MODEL" -c "model_reasoning_effort=\"$EFFORT\"" -c 'sandbox_mode="read-only"' \
       -s read-only --ephemeral -C "$REPO" -o "$RESULT" - < "$REQ" > "$LOG" 2>&1 &
     ;;
+  # opencode의 -f는 배열 옵션이라 뒤의 위치 인자(메시지)까지 파일로 먹는다(office 실측:
+  # "File not found: <메시지>"). 메시지를 -f보다 앞에 둔다.
   opencode-sol)
-    ( cd "$REPO" && exec opencode run --agent review-sol -m "$MODEL" -f "$REQ" "$MSG_SOL" ) < /dev/null > "$LOG" 2>&1 &
+    ( cd "$REPO" && exec "$OC" run "$MSG_SOL" --agent review-sol -m "$MODEL" -f "$REQ" ) < /dev/null > "$LOG" 2>&1 &
     ;;
   opencode-build)
-    ( cd "$REPO" && exec opencode run --agent build -m "$MODEL" -f "$AGENT_FILE" -f "$REQ" "$MSG_BUILD" ) < /dev/null > "$LOG" 2>&1 &
+    ( cd "$REPO" && exec "$OC" run "$MSG_BUILD" --agent build -m "$MODEL" -f "$AGENT_FILE" -f "$REQ" ) < /dev/null > "$LOG" 2>&1 &
     ;;
 esac
 CHILD=$!

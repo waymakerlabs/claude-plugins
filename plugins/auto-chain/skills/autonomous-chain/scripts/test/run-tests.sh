@@ -68,6 +68,17 @@ SH
 # ───────── 가짜 opencode: 판정 블록 인용(닫히지 않음) 뒤 진짜 블록
 cat > "$FAKE/opencode" <<'SH'
 #!/usr/bin/env bash
+# 실제 opencode(yargs)처럼 -f/--file은 배열: 다음 플래그 전까지 오는 값을 모두 파일로 받는다.
+# 파일로 받은 값이 없는 경로면 실제와 같이 "File not found"로 끝난다(office 실측).
+shift  # run
+infile=0
+for a in "$@"; do
+  case "$a" in
+    -f|--file) infile=1 ;;
+    -*) infile=0 ;;
+    *) if [ $infile = 1 ] && [ ! -e "$a" ]; then printf 'Error: File not found: %s\n' "$a"; exit 1; fi ;;
+  esac
+done
 if [ "${FAKE_MODE:-}" = unclosed ]; then
   # 닫힌 SHIP 블록 뒤 마지막 BLOCK 블록이 REVIEW-DONE 없이 끝남(중단)
   printf '# 판정: SHIP\n\n## 검증 원장\n- ok\nREVIEW-DONE\n'
@@ -118,6 +129,8 @@ fi
 exec "$REAL_GIT" "$@"
 SH
 chmod +x "$FAKE/codex" "$FAKE/opencode" "$FAKE/herdr" "$FAKE/git"
+# 2.2.1: 실행기는 ~/.opencode/bin/opencode를 우선하므로 시험은 가짜를 명시한다
+export REVIEW_OPENCODE_BIN="$FAKE/opencode"
 
 # ───────── 시험용 git 리포
 R="$T/repo"; mkdir -p "$R"
@@ -174,6 +187,10 @@ else bad rr-opencode-block "BLOCK 블록만" "$(tr '\n' '|' < "$O/r7.md")"; fi
 [ $rc = 2 ] && [ ! -f "$O/d8" ] && ok rr-badarg "rc=2, done 없음" || bad rr-badarg "rc=2 done 없음" "rc=$rc"
 
 # F1: 마지막으로 시작된 판정 블록이 닫히지 않았으면 이전 닫힌 블록을 쓰지 않는다
+# 2.2.1: opencode-build — 메시지가 -f 뒤에 있으면 실제 opencode는 메시지를 파일로 읽어 실패한다
+printf 'agent def\n' > "$O/review-sol.md"
+REVIEW_AGENT_FILE="$O/review-sol.md" "$RR" opencode-build "$REQ" "$O/r8b.md" "$O/d8b" "$R" > /dev/null
+expect_keys rr-opencode-build "$O/d8b" exit=0 verdict=BLOCK ro=same sandbox=n/a
 FAKE_MODE=unclosed "$RR" opencode-sol "$REQ" "$O/r9.md" "$O/d9" "$R" > /dev/null
 expect_keys rr-opencode-unclosed "$O/d9" exit=0 verdict=none result_bytes=0
 
