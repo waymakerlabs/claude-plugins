@@ -160,13 +160,13 @@
       },
       "source": "./plugins/focused-analysis",
       "category": "workflow",
-      "keywords": ["analysis", "cross-verification", "orca", "codex", "opus", "dual-track", "집중분석", "상세분석", "claude-code"],
+      "keywords": ["analysis", "cross-verification", "codex", "opus", "dual-track", "집중분석", "상세분석", "claude-code"],
       "homepage": "https://github.com/waymakerlabs/claude-plugins"
     },
     {
       "name": "auto-chain",
-      "version": "2.1.0",
-      "description": "Milestone → wave → task autonomous execution for large multi-session work. Opus plans, GPT-6.1 Sol (OpenCode review-sol) reviews, Claude workers implement in parallel, and a lean coordinator session per milestone integrates, verifies and hands off to the next milestone. Execution backend is auto-selected: inside herdr, workers run as Claude sessions in side panes (model chosen per pane, live two-way messaging); inside Orca, the 1.7.1 Orca-tab flow. Per-project hooks via .claude/autonomous-chain.md. Requires herdr or Orca, OpenCode CLI and the review-sol agent.",
+      "version": "2.2.0",
+      "description": "Milestone → wave → task autonomous execution for large multi-session work. Opus plans, GPT-6.1 Sol reviews (OpenCode review-sol or codex CLI via a common review runner), Claude workers implement in parallel, and a lean coordinator session per milestone integrates, verifies and hands off to the next milestone. Execution backend is auto-selected: inside herdr, workers run as Claude sessions in side panes (model chosen per pane, live two-way messaging); inside Orca, the 1.7.1 Orca-tab flow. Per-project hooks via .claude/autonomous-chain.md. Requires herdr or Orca, and OpenCode CLI with the review-sol agent or the Codex CLI.",
       "author": {
         "name": "waymakerlabs",
         "email": "peter@waymakerlabs.com"

@@ -23,10 +23,10 @@ Orca에 **등록된** worktree에 탭을 연다. 대상 리포가 등록되지 �
 orca terminal create --worktree <active|path:등록경로> --title "$TITLE" --command "$CMD" --json
 ```
 
-- `CMD`는 sol-review.md §3의 중괄호·`tee`·nonce 묶음.
+- `CMD`는 sol-review.md §3에서 인자마다 `printf '%q '`로 만든 실행기 호출(`scripts/review-run.sh …`)을 그대로 쓴다 — 경로를 따옴표로 감싸 문자열에 끼우지 않는다. (2.2.0) RUN 기록은 실행기가 직접 쓰는 `<done>.run` 한 줄(`RUN <RUN_ID> pid=<pid> start=<시작 시각>`)뿐이고, 완료는 done 파일 하나로만 판단한다(sol-review.md §4 `review-wait.sh`).
 - `create`는 시도당 1회. 응답 전체에서 handle을 즉시 추출한다(잘라서 잃으면 `orca terminal list`로 title 기반 재확보, 재create 금지).
 - Orca 터미널 status는 완료 신호로 쓰지 않는다(명령이 끝나도 셸이 남아 `running`으로 보인다).
-- 무응답(`SOL-STALL`) 때 화면 확인: `orca terminal read --terminal <handle> --screen --json`.
+- 무응답(`review-wait.sh` 종료 4가 거듭될 때) 화면 확인: `orca terminal read --terminal <handle> --screen --json`.
 - 정리: `orca terminal close --terminal <handle> --tab --json`.
 
 ## 3. 마일스톤 인계

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# herdr-spawn-worker.sh — auto-chain pane worker 기동 (2.1.0)
+# herdr-spawn-worker.sh — auto-chain pane worker 기동 (2.1.0, 2.2.0 갱신)
 #
 # 사용: herdr-spawn-worker.sh <name> <model> <effort> <brief-path> [main-pane]
 #   name       agent 이름 [a-z][a-z0-9_-]{0,31}, 살아 있는 agent 사이에서 고유
 #   model      sonnet | opus
-#   effort     high | xhigh   (xhigh는 수정 사다리·chain-planner-deep만 — SKILL.md §2)
+#   effort     low | medium | high | xhigh   (2.2.0 medium·low 허용 — 명세가 명확한 작은 구현은
+#              sonnet medium. xhigh는 수정 사다리·chain-planner-deep만 — SKILL.md §2)
 #   brief-path 지시서 절대 경로
 #   main-pane  조정자 pane id (기본 $HERDR_PANE_ID)
 # 환경 변수(선택):
@@ -23,12 +24,14 @@
 #      항상 --no-focus, --cwd "$PWD"(조정자의 신뢰된 폴더. 처음 보는 폴더면
 #      Claude Code가 신뢰 확인 화면에서 멈춘다 — agent_not_ready 실측)
 #   3. agent start → agent prompt(지시서 경로 포인터 한 줄, --wait --until working)
-#   4. agent_status working 확인, 같은 이름이 1개인지 재확인
+#   4. agent_status 확인: working → OK, done·idle → OK(빠른 완료 — 2.2.0), 그 밖(blocked·unknown) → 6.
+#      같은 이름이 1개인지 재확인
 # 출력: 성공하면 stdout 한 줄
-#   OK name=<n> pane=<id> model=<m> effort=<e> status=working jsonl=<transcript 경로>
-#   (jsonl은 정지 감시 입력 — backend-herdr.md §6)
+#   OK name=<n> pane=<id> model=<m> effort=<요청값> status=<working|done|idle> jsonl=<transcript 경로>
+#   (jsonl은 정지 감시 입력 — backend-herdr.md §6-1. effort는 요청값 그대로 — 실제 적용은
+#    조정자가 화면 표시로 1회 확인한다. status=done|idle이면 보고서를 바로 회수한다)
 # 실패: 비0 종료, stderr에 사유. 2=인자·전제 3=이름 중복 4=배치 5=agent start
-#   6=첫 지시·working 확인. 4 이후 실패면 만든 pane id를 함께 출력한다(닫지 않음 —
+#   6=첫 지시 실패·첫 지시 뒤 blocked/unknown·이중 기동. 4 이후 실패면 만든 pane id를 함께 출력한다(닫지 않음 —
 #   조정자가 화면 1회 확인 뒤 판단).
 # bash 3.2 호환. JSON 해석은 python3.
 
@@ -47,7 +50,7 @@ MAX_RIGHT=5
 # python 식에는 값을 문자열로 끼우지 않고 환경 변수로 넘긴다(따옴표·주입 방지)
 export AC_NAME="$NAME" AC_TAB_LABEL="$TAB_LABEL"
 case "$MODEL" in sonnet|opus) ;; *) die 2 "model은 sonnet|opus: $MODEL" ;; esac
-case "$EFFORT" in high|xhigh) ;; *) die 2 "effort는 high|xhigh: $EFFORT" ;; esac
+case "$EFFORT" in low|medium|high|xhigh) ;; *) die 2 "effort는 low|medium|high|xhigh: $EFFORT" ;; esac
 # ROLE은 pane을 만들기 전에 검사한다(잘못된 ROLE로 빈 pane이 남지 않게)
 [[ $ROLE =~ ^[A-Za-z0-9_.:-]{1,64}$ ]] || die 2 "ROLE 형식 오류: $ROLE"
 case "$BRIEF" in /*) ;; *) die 2 "지시서는 절대 경로: $BRIEF" ;; esac
@@ -206,13 +209,18 @@ fi
 
 # 첫 지시: 지시서는 파일, 프롬프트는 포인터 한 줄. --timeout은 --wait와 함께만 쓴다
 out=$(herdr agent prompt "$NAME" "$BRIEF 를 읽고 그대로 진행해. 내 이름: $NAME. 조정자 pane: $MAIN" \
-  --wait --until working --timeout 60000 2>&1) \
+  --wait --until working --until "done" --timeout 60000 2>&1) \
   || die 6 "첫 지시 실패 pane=$P $(printf '%s' "$out" | head -c 200)"
 
-# 4. working 확인 + 중복 재확인
+# 4. 상태 확인 + 중복 재확인
+# working = 진행 중. done·idle = 첫 지시 뒤 이미 끝남(빠른 완료 — 실패가 아니다, 2.2.0).
+# blocked(권한·질문 대화상자)·그 밖·응답 없음만 실패 6
 info=$(herdr agent get "$NAME" 2>/dev/null)
 st=$(printf '%s' "$info" | grep -o '"agent_status":"[a-z]*"' | head -1 | cut -d'"' -f4)
-[ "$st" = working ] || die 6 "첫 지시 뒤 상태가 working 아님: ${st:-없음} pane=$P"
+case "$st" in
+  working|done|idle) ;;
+  *) die 6 "첫 지시 뒤 상태가 ${st:-없음} (working|done|idle 아님) pane=$P — herdr agent read $NAME --source visible --lines 30 로 1회 확인" ;;
+esac
 n=$(name_count)
 [ "$n" = 1 ] || die 6 "기동 뒤 이름 $NAME 가 ${n:-?}개 — 이중 기동 의심 pane=$P"
 
@@ -222,4 +230,4 @@ enc=$(printf '%s' "${acwd:-$PWD}" | sed 's/[^A-Za-z0-9]/-/g')
 J="$HOME/.claude/projects/$enc/$uuid.jsonl"
 [ -n "$uuid" ] || J="unverified"
 
-echo "OK name=$NAME pane=$P model=$MODEL effort=$EFFORT status=working jsonl=$J"
+echo "OK name=$NAME pane=$P model=$MODEL effort=$EFFORT status=$st jsonl=$J"

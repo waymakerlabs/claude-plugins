@@ -14,7 +14,7 @@ description: >-
 > 이 문서를 열었다면 체인을 시작하거나 이어받는 중이다. 절차를 기억으로 재구성하지 말고 아래를 따른다.
 > 설계 근거: 이 플러그인 리포의 `docs/design/claude-autonomous-chain.md`.
 
-reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planning.md`, `references/task-brief.md`, `references/sol-review.md`, `references/profile.md`, `references/backend-herdr.md`, `references/backend-orca.md`, (2.1.0) `scripts/herdr-spawn-worker.sh`(herdr pane worker 기동). worker에게는 **절대 경로**로 넘긴다.
+reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planning.md`, `references/task-brief.md`, `references/sol-review.md`, `references/profile.md`, `references/backend-herdr.md`, `references/backend-orca.md`, (2.1.0) `scripts/herdr-spawn-worker.sh`(herdr pane worker 기동), (2.2.0) `scripts/review-run.sh`·`scripts/review-wait.sh`(리뷰 실행·대기), `scripts/herdr-stall-watch.sh`(pane worker 정지 감시). worker에게는 **절대 경로**로 넘긴다.
 
 ## 1-1. 실행 백엔드 선택 (2.0.0)
 
@@ -23,9 +23,9 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 1. 프로파일 `backend: herdr|orca|agent`가 있으면 그 값(전제가 깨지면 아래 순서로 내려간다)
 2. `test "${HERDR_ENV:-}" = 1` → **herdr** — `references/backend-herdr.md`를 읽고 따른다
 3. `orca status`가 ready → **orca** — `references/backend-orca.md`
-4. 둘 다 아니면 **agent** — 구현은 `Agent` 서브에이전트, Sol은 `run_in_background` Bash로 직접 실행(sol-review.md §3 `CMD`를 그대로 돌리고 같은 nonce 감시), 인계는 하지 않고 인계 문서만 남긴 뒤 사용자에게 다음 세션 시작 명령 한 줄을 보고한다
+4. 둘 다 아니면 **agent** — 구현은 `Agent` 서브에이전트, 리뷰는 `run_in_background` Bash로 직접 실행(sol-review.md §3 실행기 + §4 done 파일 대기), 인계는 하지 않고 인계 문서만 남긴 뒤 사용자에게 다음 세션 시작 명령 한 줄을 보고한다
 
-이 문서 본문의 "worker 기동", "Sol 기동", "인계"는 고른 백엔드 문서의 같은 절로 실행한다. 판정 규칙(보고서·nonce·snapshot·게이트)은 백엔드와 무관하다. herdr `agent_status`는 화면과 다를 수 있으니 완료 판정은 보고서·worker 메시지로만 한다(§4·§5).
+이 문서 본문의 "worker 기동", "Sol 기동", "인계"는 고른 백엔드 문서의 같은 절로 실행한다. 판정 규칙(보고서·done 파일·snapshot·게이트)은 백엔드와 무관하다. herdr `agent_status`는 화면과 다를 수 있으니 완료 판정은 보고서·worker 메시지로만 한다(§4·§5).
 
 - **(2.1.0) 프로젝트 가이드 충돌 검사**: 착수 때 프로파일뿐 아니라 프로젝트 자체 체인 가이드(예: `docs/**/chain-guide.md`, 리포 `CLAUDE.md`의 체인 절)도 읽는다. 가이드가 실행 수단을 이 스킬과 다르게 정하면(예: herdr 백엔드인데 worker를 `Agent` 서브에이전트로) 그 충돌을 상태 파일 `## 결정`에 한 줄로 적고 **백엔드 문서 §1 표를 우선한다**. 가이드가 명시적으로 `backend: agent`라고 할 때만 가이드를 따른다. 근거: helpai 체인에서 가이드가 worker를 `Agent`로 지정해 pane worker 이점(조정자 맥락 절약·작업 중 대화)을 잃었다.
 - 프로젝트 가이드로 도는 체인도 착수 때 이 스킬을 `Skill`로 로드한다(가이드는 프로젝트 차이만 적고 절차는 이 문서가 진본이다).
@@ -41,6 +41,7 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 - 직접과 병렬 중 무엇을 고를지는 조정자가 판단한다. 파일 수 같은 숫자 기준은 두지 않는다. 애매하면 가벼운 쪽을 고른다.
 - **(1.3.0) BLOCK 수정의 기본은 국소 경로다.** 리뷰 결과가 원인 위치(파일:줄)와 재현 입력을 특정했으면 worker를 띄우지 않는다. 조정자가 직접 고치고 → 재현 입력 회귀 시험 1~2건을 넣고 → 바꾼 모듈의 영향 시험만 돌리고 → 커밋 → **무거운 게이트면** Sol **delta 검토**(§6)를 받고, 가벼운 게이트면 영향 시험 결과를 상태 파일 "## Sol 검토"에 `fixed-local <커밋> · <시험 명령·결과>`로 적고 재검토 없이 진행한다(1.7.0). 프로파일 `breaker: on`이고 발동 조건에 맞을 때만 delta 검토와 동시에 파괴 검토를 돌린다(1.5.0, §6 "파괴 검토 동시 실행"). worker는 원인 조사가 필요하거나 수정이 여러 모듈·계약에 걸칠 때만 쓰고, (1.6.3) 그때는 처음부터 `chain-worker-xhigh`를 쓴다(Sonnet·deep 단계를 거치지 않는다). 신규 구현 task의 등급은 planner 표시를 따른다.
   - 근거(giki-parity M3 실측): worker BLOCK 수정 1회 31~96분(대부분 판단 왕복 — 시험·명령 실행은 96분 중 16분), 같은 성격 국소 수정을 조정자가 직접 했을 때 약 10분 + delta 검토 1.5분으로 SHIP.
+  - (2.2.0) **원인과 위치가 명확한 작은 수정은 worker를 띄우지 않는 것이 기본이다** — BLOCK 수정뿐 아니라 웨이브 통합 실패·작은 후속 task도 같다. pane 기동·지시서·회수 비용이 수정 자체보다 크다. helpai 43.6h에서 FIX 구간이 약 775분으로 사람 대기 다음이었다.
 - 체인 적용 중에는 전역 CLAUDE.md의 병렬 에이전트·모델 선택 규칙, "Opus 초안 → codex 리뷰", "완료 시 codex 크로스체크", 인계 프로토콜의 Codex 크로스체크 대신 **이 스킬의 worker 배정(백엔드별)과 Sol 게이트**를 따른다.
 
 ## 2. 역할과 모델
@@ -49,16 +50,17 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 |---|---|---|---|
 | 계획 | `chain-planner` | Opus high | (1.7.0) 롤링 분해(§3-1), 계획 delta 수정·출시 검토 삽입 등 최초 계획 뒤의 planner 호출(되돌리기 쉬운 설계) |
 | 계획(깊이) | `chain-planner-deep` | Opus xhigh | (1.6.5) 체인의 최초 계획은 항상. 이후 호출은 스키마, 외부 계약, 동시성, 보안처럼 되돌리기 어려운 설계일 때 |
+| 구현(작음) | `chain-worker` | Sonnet medium | (2.2.0) 문서·명세가 명확한 작은 구현(파일 몇 개, 판단 거의 없음). herdr pane worker에서만 effort를 낮춘다(`herdr-spawn-worker.sh`가 medium 허용) |
 | 구현 | `chain-worker` | Sonnet high | 명세가 있는 task (기본) |
 | 구현(판단) | `chain-worker-deep` | Opus high | 상태·동시성·권한 경계나 원인 조사가 핵심일 때, `chain-worker` 실패 후 재시도 |
 | 구현(수정) | `chain-worker-xhigh` | Opus xhigh | (1.6.3) 수정 작업의 기본 — 국소 경로(§1)로 끝나지 않는 BLOCK 수정·회귀 수정·원인 조사가 필요한 수정은 처음부터 이 등급. 신규 구현 task에는 처음부터 배정하지 않는다 |
-| 검토 | OpenCode `review-sol` (백엔드의 명령 pane·탭) | GPT-6.1 Sol high | 계획 검토, 웨이브 고위험 검토, 마일스톤 최종 검토 |
+| 검토 | 프로파일 `reviewer`(기본 OpenCode `review-sol`, 또는 `opencode-build`·`codex-cli`) — 실행기 `scripts/review-run.sh` | GPT-6.1 Sol high | 계획 검토, 웨이브 고위험 검토, 마일스톤 최종 검토 |
 | 파괴 검토 | `chain-breaker` | Opus high | (1.7.0) 기본 끔. 프로파일 `breaker: on`일 때만 BLOCK 수정 뒤 Sol delta와 동시에(§6). 리포에 쓰지 않음 |
 | 조정 | 메인 세션 | 세션 모델 | 마일스톤 조정, 기록, 통합 검증 |
 
 - 위 표의 모델·effort는 역할별 기본값이다. 이름은 플러그인 접두사가 붙은 형태(`auto-chain:chain-worker` 등)로 쓴다.
   - orca·agent 백엔드(서브에이전트): frontmatter에 고정된 값을 쓰고, `Agent` 호출 때 `model`을 넘겨 덮어쓰지 않는다.
-  - (2.0.0) herdr 백엔드(pane worker): 조정자가 pane마다 **sonnet high / opus high** 중에서 고른다(xhigh는 수정 사다리와 `chain-planner-deep`만). 기준과 명령은 `references/backend-herdr.md` §3. 고른 값과 이유를 "## 진행" 비고에 적는다.
+  - (2.0.0) herdr 백엔드(pane worker): 조정자가 pane마다 **sonnet medium / sonnet high / opus high** 중에서 고른다(medium은 2.2.0, 위 "구현(작음)" 행만. xhigh는 수정 사다리와 `chain-planner-deep`만). 기동 스크립트 성공 줄의 `effort=`가 요청값이고, 실제 적용값은 화면에서 확인해 "## 모델 적용 확인"에 적는다(확인 못 하면 `unverified`). 기준과 명령은 `references/backend-herdr.md` §3. 고른 값과 이유를 "## 진행" 비고에 적는다.
 - worker 등급은 planner가 task마다 표시한 대로 따른다. "중요해 보인다"는 이유로 올리지 않는다.
 - worker는 서브에이전트를 다시 만들지 않는다(정의에서 `Agent` 도구가 빠져 있다).
 - 실제로 적용된 모델·effort를 확인하지 못하면 상태 파일에 `unverified`로 두고 통과로 추론하지 않는다.
@@ -92,7 +94,7 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 ## 4. 마일스톤 세션 (조정자)
 
 ```text
-착수: 인계·상태 확인 → [on-milestone-start] → 진행 보드
+착수: 인계·상태 확인 → [on-milestone-start] → 사람 필요 항목 일괄 알림(아래) → 진행 보드
 wave N:
   task 병렬 기동 (상한 parallel-max, 소유 파일 겹치면 순차) → 진행 감시 기동(§10)
   task 완료 → 보고서 확인 → (authority에 커밋이 있으면) 조정자가 task 파일만 경로 지정 커밋
@@ -106,7 +108,9 @@ wave N:
      → 마감 체크(아래) → wrap-up·인계 → 진행 보드 → 다음 마일스톤 세션 기동
 ```
 
-- (2.1.0) **마감 체크**(인계 커밋 전): ① 상태 파일 "## 미해결"에서 해결된 항목을 지운다(결정·근거는 "## 결정"에 남아 있다) ② 상태 파일 frontmatter `updated:`(갱신 줄)를 이번 마감 시각으로 고친다 ③ "## 확인 대기"의 `막힘` 항목 사유가 풀렸는지 본다(§6-2).
+- (2.1.0) **마감 체크**(인계 커밋 전): ① 상태 파일 "## 미해결"에서 해결된 항목을 지운다(결정·근거는 "## 결정"에 남아 있다) ② 상태 파일 frontmatter `updated:`(갱신 줄)를 이번 마감 시각으로 고친다 ③ "## 확인 대기"의 `막힘` 항목 사유가 풀렸는지 본다(§6-2) ④ (2.2.0) "## 시간"에 이번 마일스톤 한 줄을 쓰고 frontmatter `skill:`이 지금 쓰는 버전인지 본다(§8).
+- **(2.2.0) 사람 필요 항목 일괄 알림**: 체인 착수(계획 세션)와 마일스톤 착수 때, 계획의 task를 훑어 사람이 해야 하는 항목(로그인, 자격증명·토큰, 승인(push·외부 쓰기·새 비용), 시각 확인, 기기 조작)을 **한 목록으로** 묶는다. 질문 대기열에 `Q<n> [사람]`으로 올리고 `PushNotification`을 **1회** 보낸다(예: `helpai M3 착수: 사람 필요 3건 — 로그인 1·승인 1·시각 1, questions.md Q31~33`). 그 항목에 의존하는 task는 웨이브 뒤쪽으로 배치하고 의존하지 않는 task부터 돌린다. 항목이 하나씩 생길 때마다 따로 알리지 않는다(새로 생긴 항목은 다음 웨이브 착수 때 묶는다. 멈춤 조건이면 §7 멈춤 알림이 따로 간다). 근거: helpai 43.6h 중 사람 대기가 약 1,250분으로 가장 컸다.
+  - 사람 대기가 시작되면(그 항목 때문에 진행할 작업이 없어진 시각) 상태 파일 "## 미해결"의 해당 줄에 `대기 시작 <ISO>`를, 풀리면 `대기 끝 <ISO>`를 적는다. "## 시간"의 사람 대기 분은 이 값으로 계산한다.
 
 - 대괄호는 프로파일 훅 절이다. 비어 있으면 공통 동작만 한다.
 - 마지막 웨이브의 통합은 마일스톤 마감과 합쳐 검증·일지·push·wrap-up을 한 번만 한다.
@@ -192,6 +196,7 @@ wave N:
 |---|---|---|
 | task 완료 | worker가 영향 시험 | 조정자의 재실행 |
 | 웨이브 통합 | `verify.static`(있으면) → `verify.full` 1회. 실패하면 원인 task에 수정 worker 1회, 실패 항목과 영향 시험만 다시 | 통과한 항목 재실행 |
+| BLOCK 수정 반복 | (2.2.0) 영향 시험 + 재현 회귀 시험만. `verify.full`은 게이트를 닫기 전 1회(§6 "게이트 수렴 규칙" 3) | 회차마다 전체 시험 |
 | 마일스톤 마감 | `verify.full` 1회. 같은 snapshot에서 웨이브 통합 결과가 유효하면 재사용 | 증거 시험 처음부터 재실행 |
 
 - 수집 0건, skip, 미실행은 통과가 아니다. 총계를 함께 기록한다.
@@ -233,7 +238,7 @@ BLOCK 수정이 인접 상태를 새로 깨뜨려 다음 회차에 새 BLOCK이 
 
 ### Sol 게이트
 
-실행 절차·요청 형식·결과 추출·장애 처리는 `references/sol-review.md`를 따른다.
+실행 절차·요청 형식·리뷰어 선택·결과 판정·장애 처리는 `references/sol-review.md`를 따른다. 리뷰어(프로파일 `reviewer`)가 무엇이든 이 절의 게이트·회차·수렴 규칙은 같다. 이 문서의 "Sol 검토"는 고정한 리뷰어의 검토를 뜻한다.
 
 | 게이트 | 대상 | 조건 | 무게 | 회차 |
 |---|---|---|---|---|
@@ -248,10 +253,19 @@ BLOCK 수정이 인접 상태를 새로 깨뜨려 다음 회차에 새 BLOCK이 
 - **가벼운 게이트**: 리뷰 1회 → BLOCK 수정 → 영향 시험으로 조정자가 확인 → 재검토 없이 진행. 수정 항목은 마일스톤 최종 검토 범위에 넣는다. 동의하지 않는 BLOCK은 반박 근거와 함께 질문 대기열에 남기고 진행한다. (1.7.0) 단 데이터 등급 finding(조용한 데이터 손실·변환·저장·이관·권한)은 반박으로 넘기지 않는다 — 고치거나, 재현으로 결함이 아님을 보이거나(근거를 상태 파일에 남김), 그 task를 `blocked`로 두고 마일스톤을 완료로 기록하지 않는다. 가벼운 게이트 수정 기록은 `fixed-local <커밋> · <영향 시험 명령·결과>`로 "## Sol 검토"에 적는다.
 - BLOCK은 구체적 오동작, 요구 누락, 중대한 회귀, 권한·데이터 오류, 핵심 검증 누락으로 한정한다. 취향·문서 형식은 완료를 막지 않는다. **구현 모드(§6-0)에서는 BLOCK 범위가 §6-0의 6개 항목으로 더 좁아지고, 그 밖은 `NOTE [backlog]`다.** 요청 파일에 `모드: build|harden`을 적는다.
 - 리뷰가 진행되는 동안 대상 문서·코드를 고치지 않는다.
-- 판정은 출력의 **마지막** `# 판정:` 블록과 그 안의 snapshot이 요청 snapshot과 같은지로 한다. `REVIEW-DONE`만으로는 통과가 아니다.
+- 판정은 실행기 done 파일(유효 조건)과 결과 파일의 `# 판정:` 블록·snapshot이 요청과 같은지로 한다(`references/sol-review.md` §5). `REVIEW-DONE`·로그 문자열만으로는 완료도 통과도 아니다.
 - 검토 증거(snapshot, 리뷰 세션 ID, 회차, 판정)를 상태 파일에 기록한다. 검토 뒤에 대상이 바뀌면 바뀐 범위만 delta 검토한다 — 무거운 게이트만(1.7.0). 가벼운 게이트는 `fixed-local` 기록으로 끝낸다.
-- **(1.3.0) 재검토는 delta 검토가 기본이다.** 첫 최종 검토(r1)만 마일스톤 전체를 넓게 본다. r2부터 요청 범위는 ① 직전 BLOCK 해소 ② **그 수정 diff가 직접 만든 회귀**뿐이다. 그 밖에서 새로 찾은 결함은 BLOCK이 아니라 NOTE로 받고, 조정자가 후속 task(또는 다음 마일스톤)로 넘긴다. 요청 형식은 `references/sol-review.md` §2 "delta 요청". 근거: 재검토마다 "범위 안의 새 결함"을 열어 두면 리뷰어가 직전 수정의 인접 분기에서 새 BLOCK을 계속 찾아 수렴하지 않는다(giki-parity M3 최종 검토 8회 BLOCK — Sol 실행 자체는 회당 1.5~6분이었고 시간은 수정 주기에 쓰였다).
-  - 예외: delta 밖이라도 조용한 데이터 손실·권한 우회를 **재현으로 확인**했다면 리뷰어는 BLOCK으로 올릴 수 있다. 조정자는 그것도 원인이 특정됐으면 국소 경로(§1)로 처리한다.
+- **(1.3.0) 재검토는 delta 검토가 기본이다.** 첫 최종 검토(r1)만 마일스톤 전체를 넓게 본다. r2부터의 범위·수렴은 아래 "게이트 수렴 규칙"을 따른다. 요청 형식은 `references/sol-review.md` §2 "delta 요청". 근거: giki-parity M3 최종 검토 8회 BLOCK — 리뷰 실행은 회당 1.5~6분이었고 시간은 수정 주기에 쓰였다.
+- 가벼운 게이트의 재검토는 프로파일 `light-gate-rereview`(기본 `none` = `fixed-local` 기록으로 끝)를 따른다. `delta`면 무거운 게이트와 같은 delta 요청을 1회만 받는다.
+
+### 게이트 수렴 규칙 (2.2.0)
+
+근거: 시간을 늘린 것은 리뷰 1회 비용(helpai 43.6h 중 리뷰 실행 ≈240분, 9%)이 아니라 **BLOCK → FIX → 재검토 회차 수**였다. helpai M1-02 r2~r11 MAJOR 15건 중 범위 밖 새 반례 6건, 앞 수정의 "부분 해소" 후속 9건이 회차를 늘렸다. gira는 delta 범위를 고정해 무거운 게이트 r2가 모두 SHIP이었다.
+
+1. **재검토 범위 = 직전 finding의 해소 여부 + 이번 수정이 만든 회귀.** 범위 밖에서 새로 찾은 finding은 심각도와 관계없이 `NOTE [backlog]`로만 받는다. 마감을 막지 않고 회차·사다리를 쓰지 않으며, 조정자가 백로그·후속 task로 넘긴다. **안전 예외**(범위에 따라 조건이 다르다): 범위 **안** finding은 데이터 손실·권한 우회·비가역 변경 위험이면(리뷰어 태그 `[안전]`) 심각도가 MAJOR여도 강등하지 않고 차단한다. 범위 **밖** finding은 같은 위험을 **재현으로 확인**한 경우(`[범위 밖·재현]`, 재현 입력 필수)만 차단하고, 재현 없는 범위 밖 `[안전]`은 `NOTE [backlog]`로 받되 다음 게이트의 확인 항목에 넣는다(원인이 특정되면 국소 경로 §1). `block-on` 매핑의 같은 예외는 `references/sol-review.md` §5-4가 이 규칙을 참조한다.
+2. **부분 해소 두 번이면 계열 수정으로 전환한다.** 같은 finding이 `부분 해소`로 두 번 나오면(또는 같은 결함 계열의 BLOCK이 두 번째 나오면 — 위치·증상이 달라도 §6-1 계열이 같으면 센다) 남은 반례를 하나씩 고치지 않는다. 결함 계열(§6-1)의 "패턴·올바른 모양"을 정하고 관련 호출부의 **공통 원인**을 고치는 수정 하나로 바꾼다(국소로 안 끝나면 `chain-worker-xhigh`). 다음 delta 요청에는 "계열 C<n> 공통 원인 수정 — 이전 반례 B<n>…가 모두 닫혔는지"를 확인 항목으로 쓴다. 구현 모드에서도 이 수정은 그 계열의 BLOCK에 대한 것이므로 §6-0 "전수 점검을 하지 않는다"와 충돌하지 않는다(탐지 표 작성 없이 공통 원인만 고친다).
+3. **FIX 반복 중 재검증은 영향 시험만.** 수정 → 재검토 사이에는 바꾼 모듈과 직접 호출자의 시험, 재현 회귀 시험만 돌린다. `verify.full`은 그 게이트를 닫기 전(마지막 SHIP 직후 또는 사다리로 넘기기 직전)에 **1회** 돌린다. 실패하면 그 항목만 고치고 영향 시험으로 확인한다.
+4. 판정 매핑(`block-on`: MAJOR를 차단으로 볼지)은 `references/sol-review.md` §5-4. 상태 파일에는 원 판정과 실효 판정을 함께 적는다.
 - Sol 장애(1회 재시도 후): 웨이브 고위험 검토는 Opus 보조 검토로 진행하고 `sol-pending`을 남겨 최종 검토에 넣는다. 계획 검토·마일스톤 최종 검토는 대체하지 않고 `unverified` + 멈춤 조건 5.
 
 ### 상한 초과 사다리 (`authority.escalation`)
@@ -262,7 +276,7 @@ BLOCK 수정이 인접 상태를 새로 깨뜨려 다음 회차에 새 BLOCK이 
 |---|---|
 | `extra-rounds:<k>` | 같은 방식으로 수정 → 재검토를 k회 더 한다(`round 4/3+2`처럼 적는다) |
 | `worker:chain-worker-deep` / `worker:chain-worker-xhigh` | 다음 BLOCK 수정 worker를 그 등급으로 올린다. 재검토 1회. §7 실패 사다리로 이미 그 등급 이상을 썼으면 건너뛴다 |
-| `worker:opencode-<agent>` | 다음 BLOCK 수정을 OpenCode `<agent>`(예: `work-sol-xhigh`)로 백엔드의 명령 pane·탭에서 구현한다. 기동·대기·결과 확인은 `references/sol-review.md` §3~§5의 nonce 배선을 그대로 쓰고, 요청 파일 대신 worker 지시서(`briefs/<task-id>.md`, 형식은 `references/task-brief.md`)를 넘긴다. 재검토 1회 |
+| `worker:opencode-<agent>` | 다음 BLOCK 수정을 OpenCode `<agent>`(예: `work-sol-xhigh`)로 백엔드의 명령 pane·탭에서 구현한다. 명령 `opencode run --agent <agent> -f <worker 지시서(briefs/<task-id>.md, 형식 references/task-brief.md)>`를 파이프 없이 로그로 리다이렉트하고 실제 종료 코드를 남긴다(2.2.0 — `review-run.sh`는 리뷰 전용이라 쓰지 않는다). 완료 판정은 보고서 파일과 diff(§5). 재검토 1회 |
 | `carry-reversible` | 남은 BLOCK이 모두 **되돌릴 수 있는 제품 결함**(UI·로컬 코드, 되돌리기 = revert 몇 개)이면 멈추지 않는다. 게이트를 SHIP으로 기록하지 않고 `carried`로 기록한다. 각 finding을 질문 대기열에 "미해결 결함"으로, 다음 웨이브(마지막 마일스톤이면 후속 task)에 수정 task로 올린다. 마일스톤은 **조건부 마감**으로 닫고 마감 보고에 별도 절(아래)을 둔다. 남은 finding에 되돌리기 어려운 대상(스키마·배포/보안 설정·계약 문서·비가역 런타임 동작·외부 시스템 쓰기·main 병합)이 하나라도 걸리면 이 칸을 건너뛰고 다음 칸으로 간다 |
 | `stop` | 멈춤 조건 6 |
 
@@ -290,7 +304,7 @@ BLOCK 수정이 인접 상태를 새로 깨뜨려 다음 회차에 새 BLOCK이 
 - (1.3.0) 전수 점검은 BLOCK 수정 지시서에 묶지 않는다. 원인 위치가 특정된 BLOCK은 국소 경로(§1)로 먼저 닫고, 전수 점검은 아래 조건일 때 별도 task로 연다.
 - (1.3.1) **우선순위**: 같은 계열 2회째 BLOCK이라도 원인 위치가 특정됐으면 그 BLOCK은 국소 경로로 바로 닫는다. 전수 점검 task는 그와 함께 열되 **현재 게이트·마감을 막지 않는 후속 task**다(다음 웨이브 또는 다음 마일스톤 첫 웨이브). 원인 위치가 특정되지 않았을 때만 전수 점검을 먼저 한다.
 - (1.6.0) 아래 전수 점검은 **출시 검토(`mode: harden`)에서만** 연다. 구현 모드에서는 계열을 원장에 쌓고 지시서 예방만 한다(§6-0).
-- **전수 점검 조건**: 한 계열의 발생이 2회가 되면(게이트·마일스톤이 달라도) 위치별 수정만으로 끝내지 않는다. 전수 점검 task(`<M>-SWEEP-C<n>`, `chain-worker-deep`, 고위험)를 연다. 이 task는 ① 탐지 명령으로 후보 위치를 **모두** 뽑아 보고서에 표로 남기고 ② 위치마다 "올바른 모양" 충족 여부와 근거(파일:줄)를 적고 ③ 위반을 모두 고친 뒤 ④ 계열을 직접 겨누는 시험을 넣는다. 재검토 요청에는 이 표를 실행 증거로 넣는다. 전수 점검 뒤에도 같은 계열이 다시 나오면 §7 실패 사다리를 따른다(Sol 원인 조사 → 그 안으로도 실패하면 `chain-worker-xhigh`).
+- **전수 점검 조건**: 한 계열의 발생이 2회가 되면(게이트·마일스톤이 달라도) 위치별 수정만으로 끝내지 않는다. 전수 점검 task(`<M>-SWEEP-C<n>`, `chain-worker-deep`, 고위험)를 연다. 이 task는 ① 탐지 명령으로 후보 위치를 **모두** 뽑아 보고서에 표로 남기고 ② 위치마다 "올바른 모양" 충족 여부와 근거(파일:줄)를 적고 ③ 위반을 모두 고친 뒤 ④ 계열을 직접 겨누는 시험을 넣는다. 재검토 요청에는 이 표를 실행 증거로 넣는다. 전수 점검 뒤에도 같은 계열이 다시 나오면 §7 실패 사다리를 따른다(새 `chain-worker-xhigh`가 조사+수정, 그래도 실패하면 blocked).
 - 탐지 명령을 만들 수 없는 계열이면 전수 점검 task가 먼저 탐지 방법(정적 목록 도구나 시험)을 만든다.
 - 원장은 worker 지시서(§4)와 Sol 검토 요청(`references/sol-review.md` §2)에 들어간다. 마일스톤 착수 때 이전 마일스톤의 계열을 다음 웨이브 task의 해당 계열로 미리 고른다.
 
@@ -330,15 +344,16 @@ BLOCK 수정이 인접 상태를 새로 깨뜨려 다음 회차에 새 BLOCK이 
 ### 실패 처리
 
 - (1.7.0) 구현 모드에서는 이 사다리를 **데이터 등급 문제**(§6-0 "30분 상한" 예외 목록)에만 적용하고, 일반 문제는 30분 상한으로 백로그에 넘긴다. 출시 검토(`harden`)에서는 모든 문제에 적용한다.
-- **(1.6.2) 실패 사다리 — 등급 상향보다 시각 전환을 먼저 한다.** 전역 CLAUDE.md 「원인 모를 실패는 1번이면 Sol」과 같은 사다리다.
-  1. **원인 모를 실패 1번** → 두 번째 직접 시도를 하지 않는다. **Sol 원인 조사**(`references/sol-review.md` §7, 읽기 전용, 새 세션). 진행 중인 worker가 있으면 멈춘다. 그 worker의 미커밋 변경은 **그 worker 보고서(또는 지시서 owns)에 적힌 파일만** 대상으로, Sol 안과 다르면 `git restore -- <그 경로들>`로 걷어낸다. 목록 밖 파일·다른 세션의 변경은 건드리지 않는다(§5).
-  2. Sol 안으로 수정한다. 원인 위치가 특정되면 조정자 국소 경로(§1), 여러 모듈에 걸치면 `chain-worker-xhigh`. Sol이 준 최소 관찰과 원래 시험으로 확인한다.
-  3. **Sol 안대로 정확히 고쳤는데 실패** → **새** `chain-worker-xhigh`(이전 worker를 이어 쓰지 않는다)가 조사와 수정을 함께 한다. 지시서에 **반박된 가설 전부**(첫 시도의 가설·Sol 안)와 각 시도의 보고서·결과 경로를 넣는다. (1.6.3) 첫 시도가 이미 xhigh였어도 같다 — 같은 등급이지만 반박된 가설을 들고 새 맥락에서 출발하므로 같은 시도의 반복이 아니다.
-  4. **그래도 실패** → 그 task를 `blocked`로 두고, 의존하지 않는 작업은 계속하며, 질문 대기열에 반박된 가설 3개와 추천안을 올린다(멈춤 조건 2).
-- 여기서 "원인 모를 실패"는 ① worker가 PARTIAL·BLOCKED로 끝나거나 보고서가 없음(원인이 보고서에 특정되지 않은 경우) ② 고쳤는데 같은 증상이 남음(BLOCK 수정 뒤 재검토·웨이브 통합 검증에서 **같은 계열**이 다시 나옴 포함 — task가 달라도 계열이 같으면 이어서 센다) ③ 원인 가설이 빗나감. 세지 않는 것: 오류가 다른 원인을 분명히 가리키는 실패(오타·빠진 import·경로), flaky 의심(1회 재실행), 환경 문제(`index.lock`·포트·오래된 빌드 산출물), **Sol 안을 잘못 구현한 실패**(진단은 맞았으니 구현만 고친다).
-- Sol 원인 조사는 게이트가 아니다. 회차·사다리에 넣지 않고 판정에 쓰지 않는다. 같은 수정의 게이트 검토는 별도 세션으로 받고, 요청에 "이 수정은 Sol 원인 조사 `<결과 경로>` 안을 따름"을 적는다. 1.5.0 파괴 검토(breaker)는 수정 뒤 회귀 탐색이라 이 사다리와 별개이며 "동시 조사 금지"에 해당하지 않는다.
-- Sol을 못 쓰면(기동 실패, 무응답 재시도 뒤에도 응답 없음) 3단계(`chain-worker-xhigh`)로 바로 가고 상태 파일에 그 사실을 남긴다.
-- xhigh 등급과 Sol 원인 조사는 `authority` 승인이 따로 필요 없다(읽기 전용 조사 + 같은 Claude 서브에이전트). OpenCode worker로 구현을 맡기는 것은 `escalation` 사다리에 있을 때만 한다. 이미 xhigh를 썼으면 사다리의 `worker:chain-worker-*` 칸은 건너뛴다. (1.6.3) 수정 worker는 처음부터 xhigh이므로 이 칸은 사실상 신규 구현 task가 BLOCK의 원인일 때만 쓰인다.
+- **(2.2.0) 실패 사다리 — 원인 모를 실패 1번이면 바로 xhigh에 조사+수정을 함께 맡긴다.** 전역 CLAUDE.md 「원인 모를 실패는 1번이면 바로 Opus xhigh」와 같은 사다리다.
+  1. **원인 모를 실패 1번** → 조정자는 두 번째 직접 시도·추가 탐침을 하지 않는다. **새** `chain-worker-xhigh`(pane worker면 opus xhigh) 1개에 **조사와 근본 수정을 함께** 맡긴다(조사만 받고 조정자가 다시 고치는 왕복 없음). 진행 중인 worker가 있으면 멈추고, 그 worker의 미커밋 변경은 **그 worker 보고서(또는 지시서 owns)에 적힌 파일만** 대상으로 필요하면 `git restore -- <그 경로들>`로 걷어낸다. 목록 밖 파일·다른 세션의 변경은 건드리지 않는다(§5).
+     - 지시서: 리포·HEAD·건드리면 안 되는 파일 / 재현 명령 / 통과·실패 커밋 / **확인된 사실**(실측값) / **의심 지점**(검증 대상으로 표시) / **반박된 가설 전부**와 각 시도의 보고서 경로 / 금지(증상만 맞추는 수정 — 대기 늘리기·시험 완화·시험 파일 수정·우회) / 확인할 시험 명령 / 보고 형식(원인 파일:줄·메커니즘·확신도·수정 요지·시험 결과·남은 위험).
+     - 맡긴 동안 조정자는 같은 문제를 중복 조사하지 않는다(독립 작업은 계속). 돌아오면 바뀐 파일·시험 재실행 1회로 대조하고 "## 결정"에 원인과 채택 근거를 적는다.
+  2. **xhigh도 실패** → 그 task를 `blocked`로 두고, 의존하지 않는 작업은 계속하며, 질문 대기열에 반박된 가설 전부와 추천안을 올린다(멈춤 조건 2). 같은 방식으로 다시 돌리지 않는다.
+  - 프로파일 `root-cause: sol`이면 1단계 앞에 **Sol 원인 조사**(`references/sol-review.md` §7, 읽기 전용)를 한 번 넣고, 그 안을 들고 xhigh가 수정한다(1.6.2 방식). Sol을 못 쓰면 바로 1단계로 간다. 원인 조사는 게이트가 아니며 회차·판정에 넣지 않는다.
+  - 이력: 1.6.2는 "Sol 원인 조사 → 수정 → 새 xhigh → blocked", 1.6.3은 "수정 worker는 처음부터 xhigh"였다. 2.2.0은 전역 규칙에 맞춰 Sol 단계를 선택(`root-cause: sol`)으로 내렸다.
+- 여기서 "원인 모를 실패"는 ① worker가 PARTIAL·BLOCKED로 끝나거나 보고서가 없음(원인이 보고서에 특정되지 않은 경우) ② 고쳤는데 같은 증상이 남음(BLOCK 수정 뒤 재검토·웨이브 통합 검증에서 **같은 계열**이 다시 나옴 포함 — task가 달라도 계열이 같으면 이어서 센다) ③ 원인 가설이 빗나감. 세지 않는 것: 오류가 다른 원인을 분명히 가리키는 실패(오타·빠진 import·경로), flaky 의심(1회 재실행), 환경 문제(`index.lock`·포트·오래된 빌드 산출물·API 재시도 반복 — §10 감시), 진단은 맞았는데 구현을 잘못한 실패(구현만 고친다).
+- 1.5.0 파괴 검토(breaker)는 수정 뒤 회귀 탐색이라 이 사다리와 별개다.
+- xhigh 등급과 Sol 원인 조사는 `authority` 승인이 따로 필요 없다(같은 Claude 서브에이전트 + 읽기 전용 조사). OpenCode worker로 구현을 맡기는 것은 `escalation` 사다리에 있을 때만 한다. 이미 xhigh를 썼으면 사다리의 `worker:chain-worker-*` 칸은 건너뛴다(수정 worker는 처음부터 xhigh이므로 이 칸은 사실상 신규 구현 task가 BLOCK의 원인일 때만 쓰인다).
 - 같은 task에서 지시·보고 왕복이 2회를 넘으면 그 task만 조정자가 직접 마무리한다. 두 task 연속이면 질문 대기열에 방식 전환을 제안한다.
 - 조정자 커밋 중 `index.lock` 경합(IDE, hook 등)은 구현 실패가 아니다. 잠시 기다려 다시 커밋하고 실패 횟수에 넣지 않는다.
 - 반복 실패에 새 가설이 없으면 그 task를 `blocked`로 기록하고, 의존하지 않는 task는 계속한다.
@@ -361,6 +376,8 @@ defect-classes: docs/chain/<id>/defect-classes.md
 backlog: docs/chain/<id>/backlog.md
 started: <체인 시작 ISO 시각>          # 진행 보드 경과 시간 기준
 updated: <마지막 갱신 ISO 시각>        # (2.1.0) 마감 체크(§4)에서 반드시 고친다
+skill: auto-chain <버전>               # (2.2.0) 이 상태 파일을 쓴 스킬 버전. 이어받은 세션이 다르면 고치고 "## 결정"에 한 줄
+reviewer: <고정한 리뷰어>              # (2.2.0) sol-review.md §1 착수 드라이런 결과
 ---
 
 ## 마일스톤
@@ -373,15 +390,21 @@ updated: <마지막 갱신 ISO 시각>        # (2.1.0) 마감 체크(§4)에서
 | 시점 | snapshot(HEAD) | 명령 | 결과(수집·skip) |
 
 ## Sol 검토
-| 게이트 | 회차 | snapshot | 세션 ID | 판정 | 결과 파일 |
+| 게이트 | 회차 | reviewer·RUN_ID | snapshot | 원→실효 판정 | 결과 파일 |
 # (1.7.0) 화면 마감은 `none — build·스모크 <결과>`, 가벼운 게이트 수정은 `fixed-local <커밋> · <시험>`, 이월 확인은 `carried-check`
 
 ## 확인 대기         # (1.7.0) §6-2 — M · 화면 · URL/진입 경로 · 바뀐 점 · 상태(대기|막힘(<사유>)|넘김|확인됨|지적) — 막힘은 2.1.0
 
 ## 결정
-## 미해결            # (2.1.0) 열린 항목만 — 해결된 항목은 마감 체크(§4)에서 지운다
+## 미해결            # (2.1.0) 열린 항목만 — 해결된 항목은 마감 체크(§4)에서 지운다. 사람 대기 항목은 `대기 시작/끝 <ISO>`(2.2.0, §4)
 ## 모델 적용 확인        # 실제 적용 모델·effort 또는 unverified
+## 시간               # (2.2.0) 마일스톤 마감마다 한 줄(아래)
 ```
+
+- **(2.2.0) "## 시간"**: 마일스톤 마감 때 한 줄을 쓴다. 분 단위, 실측이 아니면 값 뒤에 `U`.
+  `M<n> · 계획 <분> · 구현 <분> · 리뷰 실행 <분> · 회수 대기 <분> · 수정 <분> · 재검증 <분> · 사람 대기 <분> · 죽은 시간 <분> · 합계 <분> · skill auto-chain <버전>`
+  - 리뷰 실행 = done 파일 `started`~`ended` 합. 회수 대기 = `ended` ~ 조정자가 판정을 기록한 시각. 사람 대기 = "## 미해결"의 대기 시작~끝. 죽은 시간 = 아무 작업도 돌지 않은 구간(정지 worker·응답 대기 등). 나머지는 상태 파일·보고서 시각에서 추정(`U`).
+  - 근거: 2.1.0 검토에서 리뷰 실행·회수 대기·수정을 나누지 않아 모델·절차 변경 효과를 잴 수 없었다(helpai M1-10 리뷰 4분 · 회수 대기 약 2h59m).
 
 ## 9. 인계
 
@@ -421,7 +444,7 @@ W2: T03 ✔ DONE · T04 ▶ 2/4 AC 시험 중 · T05 · 대기(deps T04)
 
 - task 기동(어떤 worker 등급으로 몇 개)과 task 완료(결과·커밋)
 - worker 진행 줄 변경(아래 감시가 알려줌): `[giki-parity M2/W2] T04 3/4 AC · 시험 중 (18분)`
-- Sol 검토 기동과 10분마다의 경과: `[giki-parity M2] final-M2 r2 검토 중 20분 · 로그 412줄`
+- Sol 검토 기동(reviewer·RUN_ID)과 10분마다의 경과: `[giki-parity M2] final-M2 r2 검토 중 20분 · 로그 41KB`
 - verify.full 시작·결과(수집·skip 총계 포함)
 
 ### 감시 기동
@@ -444,36 +467,20 @@ while :; do
 done
 ```
 
-Sol 검토 감시는 `references/sol-review.md` §4의 감시 명령을 쓴다. 이 감시는 완료 신호 대기도 함께 한다.
+Sol 검토는 `references/sol-review.md` §4대로 `scripts/review-wait.sh`를 `run_in_background`로 기다린다(완료 알림이 오면 그 턴에서 바로 판정한다). 경과 줄이 필요하면 같은 절의 Monitor를 함께 띄운다.
 
-- 감시 출력은 진행 알림일 뿐이다. task 완료 판정은 worker 반환과 보고서, Sol 판정은 nonce 표식과 결과 추출로만 한다.
+- 감시 출력은 진행 알림일 뿐이다. task 완료 판정은 worker 반환과 보고서, Sol 판정은 done 파일과 결과 판정(sol-review.md §5)으로만 한다.
 - 웨이브의 worker가 모두 반환했는데 감시가 남아 있으면(worker가 `- 진행: 완료`를 못 쓰고 끝난 경우) `TaskStop`으로 끝낸다.
 - 진행 이벤트가 30분 넘게 없으면 그 사실을 한 줄로 보고한다(멈춤은 아니다).
 
-pane worker 정지 감시(2.1.0, herdr 백엔드 — 판정 절차는 `references/backend-herdr.md` §6-1). 위 진행 감시와 별개로 웨이브마다 1개. 보고서 진행 줄·화면 스피너·리포 mtime이 아니라 **transcript(jsonl) mtime**과 `agent_status`만 본다. `J`는 `herdr-spawn-worker.sh` 성공 줄의 `jsonl=` 값.
+pane worker 정지 감시(herdr 백엔드). 위 진행 감시와 별개로 웨이브마다 1개를 `Monitor`로 띄운다. (2.2.0) jsonl mtime이 아니라 transcript **내용**(마지막 진척 시각·그 뒤 API 재시도 수)과 `agent_status`로 판정하는 스크립트를 쓴다. 근거: API 오류 재시도도 jsonl을 갱신해 helpai M1-09 T5가 99분 동안 코드 0개로 돌았고, mtime 감시는 `blocked`를 알리지 않았다.
 
 ```bash
-W=$(mktemp); S=$(mktemp -d)
-# 한 줄에 하나: <task><TAB><agent 이름><TAB><jsonl 경로> — 경로의 공백·@를 그대로 둔다
+W=$(mktemp)
+# 한 줄에 하나: <task><TAB><agent 이름><TAB><jsonl 경로>(herdr-spawn-worker.sh 성공 줄의 jsonl=) — 경로의 공백·@를 그대로 둔다
 printf '%s\t%s\t%s\n' T03 gp-m2w2t03 "/Users/…/<uuid>.jsonl" T04 gp-m2w2t04 "/Users/…/<uuid>.jsonl" > "$W"
-while :; do
-  while IFS="$(printf '\t')" read -r id N J; do
-    st=$(herdr agent get "$N" 2>/dev/null | grep -o '"agent_status":"[a-z]*"' | cut -d'"' -f4)
-    case "$(uname)" in Darwin) m=$(stat -f %m "$J" 2>/dev/null) ;; *) m=$(stat -c %Y "$J" 2>/dev/null) ;; esac
-    case "$m" in ''|*[!0-9]*) m="" ;; esac   # 숫자가 아니면 읽기 실패로 본다
-    if [ -z "$m" ]; then   # jsonl을 못 읽으면 정지로 세지 않는다
-      key="unverified"
-      [ "$key" != "$(cat "$S/$id" 2>/dev/null)" ] && { printf '%s' "$key" > "$S/$id"; echo "$id 감시 불가 · jsonl 읽기 실패 $J (UNVERIFIED)"; }
-      continue
-    fi
-    age=$(( ( $(date +%s) - m ) / 60 ))
-    key="$st-$((age / 10))"
-    if [ "$st" = working ] && [ "$age" -ge 10 ] && [ "$key" != "$(cat "$S/$id" 2>/dev/null)" ]; then
-      printf '%s' "$key" > "$S/$id"; echo "$id 정지 후보 · jsonl ${age}분 무변화 · $st (실측)"
-    fi
-  done < "$W"
-  sleep 60
-done
+bash "<SKILL.md 디렉터리>/scripts/herdr-stall-watch.sh" "$W"
 ```
 
-- 이벤트는 후보일 뿐이다. 받으면 backend-herdr.md §6-1의 2단계(화면 1회)로 간다. 10분 단위로 한 번만 알린다.
+- 출력 종류: `정지 후보`(working, 진척 10분 이상) · `API 재시도 반복` · `권한·입력 대기`(blocked) · `끝남`(done|idle — 보고 메시지가 없을 때 회수 계기) · `감시 불가`(UNVERIFIED — mtime으로 대신 추정하지 않는다). 상태별 10분 단위로 한 번씩만 나온다.
+- 이벤트는 후보일 뿐이다. 받은 뒤의 절차(화면 1회 → 재지시 → 재기동, API 재시도는 환경 문제로 실패 횟수에 넣지 않음)는 `references/backend-herdr.md` §6-1 「worker 정지 판정」을 따른다.
