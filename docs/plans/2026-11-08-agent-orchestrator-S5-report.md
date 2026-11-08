@@ -60,3 +60,25 @@
 
 - 로컬 커밋 1개(이 보고와 초안). 해시는 `git log -1 -- docs/plans/2026-11-08-agent-orchestrator-S5-report.md`로 확인하고 부모 보고에도 적는다. push 안 함.
 - 원본 무변경 확인: 이 맥 대상 6파일의 sha256이 착수 때와 같다(커밋 직전 재측정).
+
+## 6. 1회차 크로스체크 반영
+
+- 리뷰어 codex Sol high, 판정 **BLOCK** — BLOCK 3 · NOTE 4(`/tmp/xc-result-20261108-182002.md`). 지시서 `docs/plans/2026-11-08-agent-orchestrator-S5-fix-brief.md`대로 모두 반영했다.
+- **BLOCK 1·2 + NOTE 1 (이름 계약)** — `tools/**` 변경(문서 변경과 독립):
+  - `adapters/herdr.sh`: ASCII 기본값 판정(`AO_ASCII_RE`)을 없앴다. `self-name`은 대상마다 현재 label로 판정한다 — 빈 값·숫자만이면 인자 그대로, 이미 `[XX] ` 접두어면 유지(stderr 경고), 그 밖(사용자 이름, 영문·한글 무관)은 본문을 두고 인자의 접두어만 앞에 붙인다(인자에 접두어가 없으면 유지). `--force`는 판정 없이 바꾼다. `whoami --field tab-label|pane-label`은 현재 label을 한 줄로 읽는다(없으면 빈 출력).
+  - `bin/agent-orchestrator`: `self-name [--force]`와 `--field tab-label|pane-label`의 인자 검사, 머리 주석을 고쳤다. 종료 코드는 기존 0·2·3·4 안에서 쓴다.
+  - `docs/herdr.md` 「이름」, `adapters/README.md`를 새 계약으로 고쳤다.
+  - 시험: `self-name`·`self-name-calls`·`self-name-keep`의 이름은 그대로 두고 기대값만 바꿨다. 새 케이스는 `self-name-numeric`·`-user-en`(`Peter review`)·`-user-ko`(`헬프AI`)·`-noprefix-arg`·`-force`, `arg-self-name-force-only`·`-bad-opt`, `whoami-tab-label`·`-pane-label-empty`·`-tab-label-missing`이다. 가드 제거 시 실패 증명 `neg-self-name-user-guard`: `GUARD:user-name` 줄을 지운 사본은 `Peter review` → `[OC] 새 작업`으로 본문을 바꾼다. 이 조건이면 `self-name-user-en`이 FAIL한다. `EXPECT` 123 → 134, 결과는 134/134 PASS다.
+  - `manifests/herdr.manifest`: §4-4의 allow 8줄을 반영했다(`/tmp/s5/herdr-allow.manifest`와 `diff` 0).
+- **초안 반영**:
+  - BLOCK 1·2: `claude-43` (아), `codex-bullets`, `home-claude-3`의 이름 문안을 새 `self-name`·`--force`(현재 이름을 이 세션이 붙였을 때만)·`whoami --field tab-label|pane-label` 계약으로 바꿨다. "사용자 이름은 본문 두고 접두어만" 문장은 그대로 두었다. §5 대조표의 차이 칸도 새 계약에 맞췄다.
+  - NOTE 1: 이름 확인을 탭·pane 둘 다 `whoami --field tab-label`/`pane-label`로 한다.
+  - BLOCK 3: `mem-helpai-crp-21`의 첫 단계에서 같은 셸에 `AO=${AGENT_ORCHESTRATOR:-$HOME/.local/bin/agent-orchestrator}`를 정의하고, 이후 3·5단계는 `"$AO"`를 쓴다. 전수 확인 결과 `"$AO"`를 쓰는 블록은 모두 같은 블록(또는 같은 파일의 바로 앞 bullet) 안에 `AO=` 정의가 있다. 대상은 `claude-43`·`claude-94`·`codex-bullets`·`home-claude-3`·`mem-helpai-crp-21`/`-26`이고, 7-1의 22줄 치환은 21줄 정의 다음에 온다.
+  - NOTE 2: `codex-bullets`에 ③→① 폴백 시 "인계 전 완료·회수"를 넣었다(SKILL.md §1-1과 같다).
+  - NOTE 3: HISTORY 문안의 "세 머신 같게"를 실제 범위로 고쳤다(이 맥·office는 전체, 홈 CLAUDE.md는 이름 규칙만, AGENTS.md는 세 머신, office gira 메모리는 **주인님 결정 대기**).
+  - NOTE 4: `/tmp/s5/sim.py`를 고쳤다. 울타리 내용을 그대로 보존하고 마지막 개행 하나만 떼어, `codex-office-home-head`의 빈 줄을 유지한다. 다시 돌린 실측 줄 수는 CLAUDE.md 이 맥·office 115, 홈 5 / AGENTS.md 이 맥 9, office **28**, 홈 **12**다. §9의 줄 수를 이 값으로 바꿨으므로, 이 보고 §3의 "office 27, 홈 11"은 이 값으로 대체한다.
+- 시뮬레이션 재실행: 6파일의 herdr 문자열은 모두 0이다(새 문안의 "herdr 기본 번호"는 "툴 기본 번호"로 고쳤다). 리포의 manifest(allow 8줄 포함)로 `lib/manifest.py check`를 돌리면 세 머신 모두 `rule 잔존 0건(allow 제외)`이다.
+- 실제 herdr 읽기 확인: 아래 「실측」 줄에 적는다.
+- 실측(이 herdr pane, 읽기만 — rename·pane 생성 없음): `whoami --field tab-label` → `[OC] 논의`, `--field pane-label` → `[OC] 논의 메인`(둘 다 rc 0).
+- 확인: `tools/agent-orchestrator/test/run-tests.sh` 134/134 PASS(총계 = EXPECT), auto-chain `scripts/test/run-tests.sh` 90/90 PASS. auto-chain 스크립트는 `self-name`을 부르지 않는다(scripts grep 0건). shellcheck 0건.
+- 남은 문제: auto-chain `references/pane-worker.md:46`의 `self-name` 설명이 옛 계약("번호·영문 기본값일 때만")으로 남아 있다. `plugins/**`는 이번 수정 범위 밖이라 고치지 않았다.
