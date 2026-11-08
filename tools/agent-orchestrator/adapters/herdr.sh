@@ -79,6 +79,14 @@ agent_field() {  # $1 대상, $2 python 식(a = agent 객체) → 값
 op_whoami() {
   local v=""
   case "$1" in
+    tab-label|pane-label)   # 현재 label 한 줄(없으면 빈 출력)
+      local k=${1%-label} id
+      if [ "$k" = tab ]; then id=${HERDR_TAB_ID:-}; else id=${HERDR_PANE_ID:-}; fi
+      [ -n "$id" ] || ao_die 3 "자기 $k id 없음 (HERDR_$(echo "$k" | tr '[:lower:]' '[:upper:]')_ID)"
+      hd_must "$k" get "$id"
+      v=$(hj "d['result']['$k'].get('label')") || exit $?
+      [ -z "$v" ] || printf '%s\n' "$v"
+      return 0 ;;
     pane) v=${HERDR_PANE_ID:-} ;;
     tab) v=${HERDR_TAB_ID:-} ;;
     workspace) v=${HERDR_WORKSPACE_ID:-} ;;
@@ -188,30 +196,50 @@ op_pane_open() {
   echo "$p"
 }
 
-# 번호·영문 기본값(빈 값 또는 ASCII만)인가
-AO_ASCII_RE='^[ -~]*$'
-is_default_label() { [ -z "$1" ] || [[ $1 =~ $AO_ASCII_RE ]]; }
+# 이름 판정(S5 1회차 크로스체크 반영 — ASCII 기본값 판정 폐지)
+#   herdr 기본 이름 = 빈 값 또는 숫자만. 역할 접두어 = 대문자 2자 `[XX] `
+AO_NUM_RE='^[0-9]+$'
+AO_PREFIX_RE='^(\[[A-Z][A-Z]\]) '
 
-# ───────── self-name <탭> [<pane>]
-op_self_name() {
-  local cur
-  [ -n "${HERDR_TAB_ID:-}" ] || ao_die 3 "HERDR_TAB_ID 없음"
-  hd_must tab get "$HERDR_TAB_ID"
-  cur=$(hj "d['result']['tab'].get('label')") || exit $?
-  if is_default_label "$cur"; then
-    hd_must tab rename "$HERDR_TAB_ID" "$1"
-  else
-    ao_warn "탭 이름 유지: $cur"
+# label_plan <현재> <인자>  → stdout 새 label(빈 출력 = 유지)
+#   빈 값·숫자만 → 인자 그대로 / 이미 접두어 있음 → 유지
+#   그 밖(사용자 이름) → 본문은 두고 인자의 접두어만 앞에 붙임. 인자에 접두어가 없으면 유지
+label_plan() {
+  local cur=$1 arg=$2
+  if [ -z "$cur" ] || [[ $cur =~ $AO_NUM_RE ]]; then echo "$arg"; return 0; fi
+  [[ $cur =~ $AO_PREFIX_RE ]] && return 0
+  # 아래 한 줄이 사용자 이름 보존 가드다(지우면 다음 줄로 내려가 본문을 갈아 끼운다 — 시험 neg-self-name-user-guard)
+  { [[ $arg =~ $AO_PREFIX_RE ]] && echo "${BASH_REMATCH[1]} $cur"; return 0; }  # GUARD:user-name
+  # shellcheck disable=SC2317  # 가드가 있으면 닿지 않는 줄(가드 제거 음성 대조용)
+  echo "$arg"
+}
+
+# name_one <tab|pane> <id> <인자> <force 0|1>
+name_one() {
+  local kind=$1 id=$2 arg=$3 force=$4 cur new
+  if [ "$force" = 1 ]; then
+    hd_must "$kind" rename "$id" "$arg"
+    return 0
   fi
+  hd_must "$kind" get "$id"
+  cur=$(hj "d['result']['$kind'].get('label')") || exit $?
+  new=$(label_plan "$cur" "$arg")
+  if [ -z "$new" ] || [ "$new" = "$cur" ]; then
+    ao_warn "$kind 이름 유지: $cur"
+  else
+    hd_must "$kind" rename "$id" "$new"
+  fi
+}
+
+# ───────── self-name <force 0|1> <탭> [<pane>]
+op_self_name() {
+  local force=$1
+  shift
+  [ -n "${HERDR_TAB_ID:-}" ] || ao_die 3 "HERDR_TAB_ID 없음"
+  name_one tab "$HERDR_TAB_ID" "$1" "$force"
   if [ $# -ge 2 ]; then
     [ -n "${HERDR_PANE_ID:-}" ] || ao_die 3 "HERDR_PANE_ID 없음"
-    hd_must pane get "$HERDR_PANE_ID"
-    cur=$(hj "d['result']['pane'].get('label')") || exit $?
-    if is_default_label "$cur"; then
-      hd_must pane rename "$HERDR_PANE_ID" "$2"
-    else
-      ao_warn "pane 이름 유지: $cur"
-    fi
+    name_one pane "$HERDR_PANE_ID" "$2" "$force"
   fi
 }
 

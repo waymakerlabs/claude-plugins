@@ -14,17 +14,17 @@
 | 종료 코드 | 2 인자 · 3 대상 없음/충돌 · 4 백엔드 실패/해석 실패 · 5 준비 안 됨 · 6 blocked · 7 timeout · 10 · 11 · 12. 툴의 오류 코드를 이 값으로 옮기는 일은 어댑터가 합니다 |
 | 서브셸 | `$(…)` 안에서 `ao_die`를 부르면 서브셸만 끝납니다. 값을 받는 줄에는 `|| exit $?`를 붙입니다 |
 | JSON | `lib/common.sh`의 `ao_json`(식)이나 `ao_jsonx`(문장, 결과는 `R`)를 씁니다. 외부 값은 환경 변수로 넘깁니다(`AO_X=… ao_json "E['AO_X']"`) |
-| 이름 | 탭·pane label은 호출자가 넘긴 한글을 그대로 씁니다. 에이전트 이름은 `[a-z][a-z0-9_-]{0,31}` |
+| 이름 | `tab-open`·`pane-open`은 호출자가 넘긴 이름을 그대로 씁니다. `self-name`은 대상마다 현재 label로 판정합니다 — 빈 값·숫자만이면 인자 그대로, 이미 `[XX] ` 접두어면 유지(경고), 그 밖(사용자 이름)은 본문을 두고 인자의 접두어만 앞에 붙입니다(인자에 접두어가 없으면 유지). force가 1이면 판정 없이 바꿉니다. 에이전트 이름은 `[a-z][a-z0-9_-]{0,31}` |
 | 포커스 | 탭이나 pane을 열어도 사용자 포커스를 옮기지 않습니다 |
 
 ## 함수 인자(진입점이 넘기는 순서)
 
 | 함수 | 인자 |
 |---|---|
-| `op_whoami` | `pane\|tab\|workspace` |
+| `op_whoami` | `pane\|tab\|workspace\|tab-label\|pane-label` (`*-label` = 현재 이름, 없으면 빈 출력) |
 | `op_tab_open` | `<이름> <절대 cwd>` |
 | `op_pane_open` | `<이름> <parent 또는 빈 값> <절대 cwd>` |
-| `op_self_name` | `<탭 이름> [<pane 이름>]` |
+| `op_self_name` | `<force 0\|1> <탭 이름> [<pane 이름>]` |
 | `op_agent_start` | `<에이전트 이름> <pane id> <kind> [CLI 인자…]` |
 | `op_agent_send` | `<대상> <한 줄> <confirm 0\|1>` |
 | `op_agent_wait` | `<대상> <초>` |

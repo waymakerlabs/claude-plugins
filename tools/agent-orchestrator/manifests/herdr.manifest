@@ -13,3 +13,11 @@ existing	-	~/.claude/projects/-Users-peter-Dev-herdr-ios/memory/	-	개발 프로
 existing	rex	~/.claude/settings.json	hooks.SessionStart[command~=rex __internal]	건드리지 않음
 existing	rex	~/.codex/hooks.json	hooks.SessionStart[command~=rex __internal]	건드리지 않음
 allow	-	~/.claude/projects/-Users-peter-Dev-gchat-g-on/memory/office-macmini-session-contact.md	grep:herdr --machine	D7 알려진 예외(잔존 허용)
+allow	-	plugins/auto-chain/skills/autonomous-chain/scripts/test/run-tests.sh	grep:herdr	가짜 바이너리 이름(시험 하니스)
+allow	-	plugins/auto-chain/skills/autonomous-chain/scripts/herdr-spawn-worker.sh	grep:herdr	2.3.x 호환 래퍼
+allow	-	plugins/auto-chain/skills/autonomous-chain/scripts/herdr-stall-watch.sh	grep:herdr	2.3.x 호환 래퍼
+allow	-	plugins/auto-chain/skills/autonomous-chain/references/backend-herdr.md	grep:herdr	2.3.x 옛 경로 포인터
+allow	-	plugins/auto-chain/skills/autonomous-chain/references/pane-worker.md	grep:backend-herdr.md	옛 문서 이름 안내
+allow	-	plugins/auto-chain/skills/autonomous-chain/SKILL.md	grep:herdr-spawn-worker.sh	옛 스크립트 이름 호환 안내
+allow	-	plugins/auto-chain/skills/autonomous-chain/scripts/spawn-pane-worker.sh	grep:herdr-spawn-worker.sh	옛 이름 주석
+allow	-	plugins/auto-chain/skills/autonomous-chain/scripts/agent-stall-watch.sh	grep:herdr-stall-watch.sh	옛 이름 주석

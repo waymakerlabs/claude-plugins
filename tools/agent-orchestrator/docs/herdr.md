@@ -23,7 +23,9 @@ herdr 관련 툴 특이사항은 이 문서 한 곳에만 둔다. 규칙 문서(
 ## 동작별 주의
 
 - **포커스**: `tab create`·`pane split`에 항상 `--no-focus`. 사용자가 보던 pane을 빼앗지 않는다.
-- **이름**: `pane split`에는 이름 옵션이 없다 → split 직후 `pane rename <id> "<한글>"`. 이름 붙이기 실패는 경고만 하고 계속한다. 탭은 `tab create --label`. 탭·pane 이름은 한글, 에이전트 이름은 `[a-z][a-z0-9_-]{0,31}`(herdr 정규식).
+- **이름**: `pane split`에는 이름 옵션이 없다 → split 직후 `pane rename <id> "<한글>"`. 이름 붙이기 실패는 경고만 하고 계속한다. 탭은 `tab create --label`. 탭·pane 이름은 역할 접두어(`[OC]`/`[WO]`/`[RV]`) + 한글, 에이전트 이름은 `[a-z][a-z0-9_-]{0,31}`(herdr 정규식).
+  - **자기 이름 `self-name [--force] <탭> [<pane>]`**: 대상마다 `tab get`/`pane get`의 현재 `label`로 판정한다. 빈 값·숫자만(herdr 기본 번호) → 인자 그대로 `tab rename`/`pane rename`. 이미 `[XX] `(대문자 2자) 접두어 → 유지(stderr "이름 유지"). 그 밖(사용자가 붙인 이름 — 영문·한글 무관) → 본문은 두고 인자의 접두어만 앞에 붙인다(`Peter review` → `[OC] Peter review`, 인자에 접두어가 없으면 유지). `--force`는 판정·조회 없이 바로 rename — 주제가 바뀌었고 **현재 이름을 이 세션이 붙였을 때만** 쓴다.
+  - **이름 읽기**: `whoami --field tab-label` / `--field pane-label` = `tab get`/`pane get`의 `label` 한 줄(없으면 빈 출력). 붙인 뒤 확인은 이것으로 한다(`list --panes`는 pane label만 보인다).
 - **배치**: 오른쪽 열이 비면 기준 pane을 `--direction right`, 있으면 오른쪽 열에서 가장 높은 pane을 `--direction down --ratio 0.5`(2개 반반, 4개 4등분). 최대 5개, 넘치면 넘침 탭(기본 `[WO] 작업 넘침` — 역할 접두어, `AGENT_ORCHESTRATOR_OVERFLOW_TAB`)을 재사용하거나 만든다. 넘침 탭 첫 pane이 빈 셸이면 그대로 쓴다.
 - **cwd**: `--cwd`는 호출자의 신뢰된 폴더. 처음 보는 폴더는 Claude Code 폴더 신뢰 화면에서 멈춰 `agent start`가 `agent_not_ready`(→5)가 된다. 신뢰를 대신 승인하지 않는다 — `agent-read`로 화면 확인 → `agent-keys <이름> Escape` → 신뢰된 cwd로 다시 연다.
 - **agent start**: `--timeout 90000`. 이름 중복은 herdr가 막지 않을 수 있어 어댑터가 `agent list`로 먼저 검사한다(중복 3).
