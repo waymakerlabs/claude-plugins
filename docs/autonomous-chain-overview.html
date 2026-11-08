@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>자율체인 개요</title>
+<style>
+:root {
+  --bg: #fbfbf9;
+  --surface: #ffffff;
+  --surface-2: #f2f2ee;
+  --text: #1d1d1b;
+  --muted: #55554f;
+  --border: #d8d8d0;
+  --accent: #1f5fa8;
+  --accent-soft: #e3edf8;
+  --ok: #2b6e3f;
+  --ok-soft: #e2f1e6;
+  --warn: #8a5a00;
+  --warn-soft: #f8edd6;
+  --stop: #a3302a;
+  --stop-soft: #f8e1df;
+  --code-bg: #f0f0eb;
+  --radius: 8px;
+  --font: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161615;
+    --surface: #1f1f1d;
+    --surface-2: #2a2a27;
+    --text: #ececE6;
+    --muted: #b0b0a6;
+    --border: #3d3d38;
+    --accent: #7fb0ea;
+    --accent-soft: #1d2d42;
+    --ok: #7fc493;
+    --ok-soft: #1c3324;
+    --warn: #e2b866;
+    --warn-soft: #3a2e14;
+    --stop: #f0928b;
+    --stop-soft: #3d1f1d;
+    --code-bg: #2a2a27;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161615; --surface: #1f1f1d; --surface-2: #2a2a27; --text: #ececE6; --muted: #b0b0a6;
+  --border: #3d3d38; --accent: #7fb0ea; --accent-soft: #1d2d42; --ok: #7fc493; --ok-soft: #1c3324;
+  --warn: #e2b866; --warn-soft: #3a2e14; --stop: #f0928b; --stop-soft: #3d1f1d; --code-bg: #2a2a27;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: var(--font); font-size: 16px; line-height: 1.7;
+}
+main { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 1.9rem; line-height: 1.3; margin: 0 0 12px; }
+h2 { font-size: 1.45rem; margin: 56px 0 12px; padding-top: 12px; border-top: 2px solid var(--border); }
+h3 { font-size: 1.15rem; margin: 32px 0 8px; }
+h4 { font-size: 1rem; margin: 20px 0 6px; }
+p, li { overflow-wrap: anywhere; }
+a { color: var(--accent); }
+code { font-family: var(--mono); font-size: 0.88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+pre {
+  font-family: var(--mono); font-size: 0.84rem; line-height: 1.55;
+  background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 14px; overflow-x: auto; white-space: pre;
+}
+pre code { background: none; padding: 0; }
+.lead { font-size: 1.05rem; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: var(--radius); padding: 14px 18px; }
+.meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
+nav.toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 18px; margin: 24px 0; }
+nav.toc h2 { border: 0; margin: 0 0 4px; padding: 0; font-size: 1rem; }
+nav.toc ol { margin: 0; padding-left: 20px; }
+nav.toc ol ol { padding-left: 18px; font-size: 0.95rem; }
+.table-wrap { overflow-x: auto; margin: 12px 0 20px; border: 1px solid var(--border); border-radius: var(--radius); }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; background: var(--surface); }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+th { background: var(--surface-2); font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+figure { margin: 20px 0 28px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+figcaption { color: var(--muted); font-size: 0.88rem; margin-top: 8px; }
+svg { width: 100%; height: auto; display: block; }
+svg text { font-family: var(--font); fill: var(--text); }
+svg .box { fill: var(--surface-2); stroke: var(--border); stroke-width: 1.5; }
+svg .box-accent { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+svg .box-ok { fill: var(--ok-soft); stroke: var(--ok); stroke-width: 1.5; }
+svg .box-warn { fill: var(--warn-soft); stroke: var(--warn); stroke-width: 1.5; }
+svg .box-stop { fill: var(--stop-soft); stroke: var(--stop); stroke-width: 1.5; }
+svg .line { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+svg .line-dash { stroke: var(--muted); stroke-width: 1.4; fill: none; stroke-dasharray: 5 4; }
+svg .arrowhead { fill: var(--muted); }
+svg .small { font-size: 12px; fill: var(--muted); }
+svg .label { font-size: 14px; font-weight: 600; }
+svg .hook { font-size: 12px; fill: var(--warn); font-weight: 600; }
+.tiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.tier { background: var(--surface-2); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 12px; }
+.tier h4 { margin: 0 0 4px; }
+.tier .tag { display: inline-block; font-size: 0.78rem; font-weight: 600; padding: 1px 8px; border-radius: 999px; margin-bottom: 6px; }
+.tier.t1 { border-color: var(--ok); } .tier.t1 .tag { background: var(--ok-soft); color: var(--ok); }
+.tier.t2 { border-color: var(--accent); } .tier.t2 .tag { background: var(--accent-soft); color: var(--accent); }
+.tier.t3 { border-color: var(--warn); } .tier.t3 .tag { background: var(--warn-soft); color: var(--warn); }
+.tier ul { margin: 6px 0 0; padding-left: 18px; font-size: 0.9rem; }
+.tier p { margin: 4px 0; font-size: 0.9rem; }
+.fallback { margin-top: 10px; font-size: 0.9rem; color: var(--muted); }
+.callout { border-radius: var(--radius); padding: 12px 16px; margin: 16px 0; border: 1px solid var(--border); background: var(--surface); }
+.callout.note { border-left: 4px solid var(--accent); }
+.callout.warn { border-left: 4px solid var(--warn); }
+.ladder { list-style: none; padding: 0; margin: 12px 0; counter-reset: step; }
+.ladder li { position: relative; padding: 8px 12px 8px 44px; margin-bottom: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.ladder li::before { counter-increment: step; content: counter(step); position: absolute; left: 10px; top: 8px; width: 24px; height: 24px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; text-align: center; line-height: 24px; font-size: 0.85rem; }
+dl.glossary { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; }
+dl.glossary dt { font-weight: 600; }
+dl.glossary dd { margin: 0; }
+footer { margin-top: 48px; color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--border); padding-top: 12px; }
+@media (max-width: 640px) {
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.25rem; }
+  .tiers { grid-template-columns: 1fr; }
+  dl.glossary { grid-template-columns: 1fr; gap: 2px; }
+  dl.glossary dd { margin-bottom: 8px; }
+}
+@media print {
+  :root { --bg: #fff; --surface: #fff; --surface-2: #f3f3f3; --text: #000; --muted: #333; --border: #999; --code-bg: #f3f3f3; }
+  body { font-size: 11pt; }
+  main { max-width: none; padding: 0; }
+  nav.toc { break-after: page; }
+  figure, .table-wrap, pre, .tier, .ladder li { break-inside: avoid; }
+  h2 { break-after: avoid; }
+  pre { white-space: pre-wrap; }
+  a { color: #000; text-decoration: none; }
+}
+</style>
+</head>
+<body>
+<main>
+
+<h1>자율체인(auto-chain) 개요</h1>
+<p class="meta">대상: 이 환경을 처음 보는 개발자 · 기준: auto-chain 2.3.0 스킬 문서와 agent-orchestrator 계약 문서</p>
+
+<p class="lead">자율체인은 여러 세션 분량의 큰 작업을 Claude Code가 사람 개입을 최소로 하며 끝까지 진행하게 하는 스킬이다. 작업을 <strong>마일스톤 → 웨이브 → task</strong>로 나누고, 마일스톤 하나를 조정자 세션 하나가 맡는다. 계획은 Opus 계획 에이전트가 쓰고, 검토는 다른 계열 모델(GPT-6.1 Sol)이 맡으며, 구현은 Claude worker가 병렬로 한다. 마일스톤이 끝나면 조정자는 상태 파일과 인계 문서를 남기고 새 세션을 열어 다음 마일스톤을 넘긴다. 모든 프로젝트에 공통인 절차는 스킬이 정하고, 프로젝트마다 다른 검증 명령·권한·추가 절차는 프로젝트 프로파일 파일이 정한다.</p>
+
+<nav class="toc" aria-labelledby="toc-title">
+  <h2 id="toc-title">목차</h2>
+  <ol>
+    <li><a href="#structure">구조 — 무엇으로 이뤄지는가</a>
+      <ol>
+        <li><a href="#units">작업 단위: 마일스톤·웨이브·task</a></li>
+        <li><a href="#roles">역할과 모델 등급</a></li>
+        <li><a href="#files">상태 파일·질문 대기열·보고서</a></li>
+        <li><a href="#review">리뷰 게이트(Sol)</a></li>
+        <li><a href="#profile-intro">프로젝트 프로파일</a></li>
+        <li><a href="#orchestrator">agent-orchestrator와 어댑터</a></li>
+      </ol>
+    </li>
+    <li><a href="#logic">로직 — 한 마일스톤이 도는 흐름</a>
+      <ol>
+        <li><a href="#flow">전체 흐름</a></li>
+        <li><a href="#tiers">worker 실행 3단계</a></li>
+        <li><a href="#gates">게이트 회차와 조건부 마감</a></li>
+        <li><a href="#failure">실패 처리 사다리와 30분 상한</a></li>
+        <li><a href="#stop">멈춤 조건</a></li>
+        <li><a href="#stall">정지 감시</a></li>
+        <li><a href="#handoff">세션 인계</a></li>
+      </ol>
+    </li>
+    <li><a href="#extend">프로젝트 설정으로 단계에 작업 덧붙이기 — gira 사례</a>
+      <ol>
+        <li><a href="#layers">스킬은 뼈대, 프로파일은 살</a></li>
+        <li><a href="#hooks">훅 지점</a></li>
+        <li><a href="#gira">gira 프로파일 해부</a></li>
+      </ol>
+    </li>
+    <li><a href="#glossary">용어집</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<h2 id="structure">1. 구조 — 무엇으로 이뤄지는가</h2>
+
+<p>자율체인은 Claude Code 플러그인(<code>auto-chain</code>) 하나로 배포된다. 플러그인 안에는 절차를 담은 스킬 <code>autonomous-chain</code>, 역할별 에이전트 정의 6개, 참고 문서(계획 지침·worker 공통 지시서·리뷰 절차·프로파일 형식·pane worker 절차), 실행 스크립트가 들어 있다. 여기에 플러그인 밖 공용 도구 <code>agent-orchestrator</code>가 터미널 오케스트레이션 툴을 감춘다.</p>
+
+<h3 id="units">1-1. 작업 단위: 마일스톤·웨이브·task</h3>
+
+<ul>
+  <li><strong>체인</strong>: 하나의 큰 목표. 계획 세션 1개와 마일스톤 세션 여러 개로 진행된다. 체인마다 <code>chain-id</code>가 있고 산출물은 <code>docs/chain/&lt;chain-id&gt;/</code>에 모인다.</li>
+  <li><strong>마일스톤</strong>: 세션 하나가 조정하는 단위. 종료 조건, 모드(<code>build</code> 구현 모드 / <code>harden</code> 출시 검토), 등급(화면 / 데이터), 마감 게이트 무게(<code>light</code> / <code>heavy</code>)를 가진다.</li>
+  <li><strong>웨이브</strong>: 마일스톤 안에서 동시에 돌릴 수 있는 task 묶음. 소유 파일이 겹치지 않는 task만 같은 웨이브에서 병렬로 돈다(상한 <code>parallel-max</code>, 기본 3). 웨이브가 끝나면 통합 검증을 한 번 한다.</li>
+  <li><strong>task</strong>: worker 하나가 구현하는 단위. 계획에 worker 등급·고위험 여부·소유 파일·인수 기준(AC)·검증 명령이 표시된다. id는 <code>M1-W2-T05</code> 형태다.</li>
+</ul>
+
+<p>최초 계획은 <strong>두 층</strong>이다. 전체 마일스톤 골격과 마일스톤을 가로지르는 결정, 그리고 첫 두 마일스톤의 task 분해만 쓴다. 이후에는 M<sub>n</sub>의 마지막 웨이브를 띄운 직후 M<sub>n+2</sub>를 분해하는 <strong>롤링 분해</strong>로 계획이 늘 한 마일스톤 앞서 있게 한다.</p>
+
+<h3 id="roles">1-2. 역할과 모델 등급</h3>
+
+<p>역할마다 기본 모델과 effort가 정해져 있다. worker 등급은 planner가 task마다 표시한 대로 따르고, "중요해 보인다"는 이유로 올리지 않는다. worker는 서브에이전트를 다시 만들 수 없다(정의에서 <code>Agent</code> 도구가 빠져 있다).</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>역할</th><th>에이전트</th><th>모델 · effort</th><th>쓰는 경우</th></tr></thead>
+  <tbody>
+    <tr><td>조정자</td><td>메인 세션</td><td>세션 모델</td><td>마일스톤 조정, 커밋, 기록, 통합 검증</td></tr>
+    <tr><td>계획(깊이)</td><td><code>chain-planner-deep</code></td><td>Opus · xhigh</td><td>체인의 최초 계획은 항상. 이후 스키마·외부 계약·동시성·보안처럼 되돌리기 어려운 설계</td></tr>
+    <tr><td>계획</td><td><code>chain-planner</code></td><td>Opus · high</td><td>롤링 분해, 계획 delta 수정, 출시 검토 마일스톤 삽입</td></tr>
+    <tr><td>구현(작음)</td><td><code>chain-worker</code></td><td>Sonnet · medium</td><td>명세가 명확하고 판단이 거의 없는 작은 구현</td></tr>
+    <tr><td>구현</td><td><code>chain-worker</code></td><td>Sonnet · high</td><td>명세가 있는 task(기본)</td></tr>
+    <tr><td>구현(판단)</td><td><code>chain-worker-deep</code></td><td>Opus · high</td><td>상태·동시성·권한 경계, 원인 조사가 핵심인 task</td></tr>
+    <tr><td>구현(수정)</td><td><code>chain-worker-xhigh</code></td><td>Opus · xhigh</td><td>국소 수정으로 끝나지 않는 BLOCK·회귀 수정, 원인 모를 실패의 조사+수정</td></tr>
+    <tr><td>검토</td><td>리뷰어(기본 OpenCode <code>review-sol</code>, 또는 Codex CLI)</td><td>GPT-6.1 Sol · high</td><td>계획 검토, 웨이브 고위험 검토, 마일스톤 최종 검토</td></tr>
+    <tr><td>파괴 검토</td><td><code>chain-breaker</code></td><td>Opus · high</td><td>기본 끔. 켜면 BLOCK 수정 뒤 리뷰와 동시에 "방금 수정이 깨뜨린 곳"을 재현으로 찾는다. 리포에 쓰지 않는다</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>조정자의 규율은 단순하다. worker 보고서와 <strong>실제 diff</strong>, 그리고 보고서가 가리킨 위험 지점만 본다. diff 밖의 worker 코드는 읽지 않고, worker가 통과시킨 시험을 task마다 다시 돌리지 않는다. git index에 쓰는 작업(add·commit)은 조정자만 한다. worker 여럿이 커밋하면 <code>index.lock</code>이 충돌하기 때문이다.</p>
+
+<h3 id="files">1-3. 상태 파일·질문 대기열·보고서</h3>
+
+<p>체인은 세션을 여러 번 바꿔 가며 진행되므로, 기억은 파일에만 둔다.</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>파일</th><th>쓰는 사람</th><th>담는 것</th></tr></thead>
+  <tbody>
+    <tr><td><code>plan.md</code></td><td>planner</td><td>목표·범위·핵심 결정, 마일스톤·웨이브·task 절(AC·소유 파일·등급·고위험 표시)</td></tr>
+    <tr><td><code>state.md</code></td><td>조정자만</td><td>frontmatter(현재 위치, <code>authority</code>, 검증 명령, 리뷰어, 백엔드, 스킬 버전) + 마일스톤 표, 진행 표, 검증 기록, 리뷰 기록, 결정, 미해결, 모델 적용 확인, 시간</td></tr>
+    <tr><td><code>questions.md</code></td><td>조정자만</td><td>질문 대기열. 질문, 추천안, 실제 택한 선택(또는 "대기"), 되돌리는 비용</td></tr>
+    <tr><td><code>reports/&lt;task-id&gt;.md</code></td><td>worker</td><td>결과, 변경 파일 목록, 실행한 시험, 후속·주의, <code>- 진행:</code> 줄(감시용)</td></tr>
+    <tr><td><code>defect-classes.md</code></td><td>조정자만</td><td>결함 계열 원장. BLOCK을 근본 원인 패턴별로 묶어 "올바른 모양"을 다음 worker 지시서와 리뷰 요청에 넣는다</td></tr>
+    <tr><td><code>backlog.md</code></td><td>조정자만</td><td>구현 모드에서 미룬 경계 조건 결함, <code>[30분]</code>·<code>[quarantine]</code> 항목</td></tr>
+    <tr><td><code>reviews/</code></td><td>조정자</td><td>리뷰 판정 결과 파일(리뷰 중에는 <code>/tmp</code>에 두고 판정 뒤 옮긴다)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>상태 파일의 "## 시간" 절에는 마일스톤 마감마다 계획·구현·리뷰 실행·회수 대기·수정·재검증·사람 대기·죽은 시간을 분 단위로 한 줄 남긴다. 실측이 아닌 값에는 <code>U</code>를 붙인다. 절차 변경의 효과를 재기 위한 장치다.</p>
+
+<h3 id="review">1-4. 리뷰 게이트(Sol)</h3>
+
+<p>리뷰는 구현과 다른 계열 모델이 맡는다. 실행은 공통 실행기 <code>review-run.sh</code>가 하고, 리뷰어 종류(<code>opencode-sol</code> · <code>opencode-build</code> · <code>codex-cli</code>)는 프로파일 값 하나로 고른다. 리뷰어가 무엇이든 요청 파일 형식·판정 규칙·회차 규칙은 같다.</p>
+
+<ul>
+  <li><strong>완료 근거는 done 파일 하나</strong>다. 실행기가 실제 종료 코드, RUN_ID, 리뷰 전후 snapshot(HEAD·작업 트리 식별자), 읽기 전용 여부를 기록한다. 로그 문자열이나 결과 파일 존재만으로는 완료도 통과도 아니다.</li>
+  <li>결과 파일 첫 판정 줄은 <code># 판정: SHIP | BLOCK</code>이고, 결과의 "검증 원장"에 요청한 HEAD가 그대로 있어야 한다. 다르면 이전 회차 인용으로 보고 <code>unverified</code>.</li>
+  <li>조정자는 리뷰어의 원 판정과 별개로 <strong>실효 판정</strong>을 정한다(프로파일 <code>block-on</code>). 기본은 BLOCK만 막고 MAJOR는 백로그·후속 task로 회수한다. 데이터 손실·권한 우회·비가역 위험(<code>[안전]</code> 태그)은 강등하지 않는다.</li>
+  <li>리뷰가 도는 동안 조정자는 리포에 파일을 쓰지 않는다. snapshot이 흔들리기 때문이다.</li>
+</ul>
+
+<h3 id="profile-intro">1-5. 프로젝트 프로파일</h3>
+
+<p>프로젝트 루트의 <code>.claude/autonomous-chain.md</code>. frontmatter는 값(검증 명령, 병렬 상한, 커밋·push 정책, 리뷰어, 사다리 등), 본문 절은 훅 지점에 덧붙일 절차다. 없으면 기본값으로 동작한다. 자세한 사용법은 <a href="#extend">3절</a>.</p>
+
+<h3 id="orchestrator">1-6. agent-orchestrator와 어댑터</h3>
+
+<p>worker를 터미널의 옆 pane으로 띄우거나 다음 세션을 새 탭에 여는 일은 터미널 오케스트레이션 툴(현재 herdr)에 의존한다. 스킬이 툴 명령을 직접 부르면 툴이 바뀔 때마다 규칙 문서를 고쳐야 하므로, 2.3.0부터 모든 호출을 <code>agent-orchestrator &lt;동작&gt;</code> 하나로 감췄다.</p>
+
+<ul>
+  <li><strong>동작</strong>: <code>backend</code>, <code>whoami</code>, <code>tab-open</code>, <code>pane-open</code>, <code>self-name</code>, <code>agent-start</code>, <code>agent-send</code>, <code>agent-wait</code>, <code>agent-status</code>, <code>agent-session-id</code>, <code>agent-transcript</code>, <code>agent-read</code>, <code>agent-keys</code>, <code>pane-run</code>, <code>close</code>, <code>list</code>. stdout은 값 한 줄, 사유·경고는 stderr, JSON 출력 없음.</li>
+  <li><strong>어댑터</strong>: 진입점이 인자를 검사한 뒤 <code>adapters/&lt;백엔드&gt;.sh</code>를 불러 <code>op_&lt;동작&gt;</code> 함수를 호출한다. 지원하지 않는 동작은 함수를 정의하지 않으면 된다(진입점이 10을 반환). 툴 특이사항은 <code>docs/&lt;backend&gt;.md</code> 한 곳에만 적는다. 새 툴을 붙일 때는 어댑터 파일·자동 판정 한 줄·설치물 목록·가짜 바이너리 시험을 추가한다.</li>
+  <li><strong>종료 코드</strong>가 스킬과의 계약이다. 특히 아래 세 값이 "옆 pane을 못 쓰면 내장 서브에이전트로 내려간다"를 가능하게 한다.</li>
+</ul>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>코드</th><th>뜻</th><th>호출자 행동</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>성공</td><td>출력 값 사용</td></tr>
+    <tr><td>2 · 3 · 4</td><td>인자 오류 · 대상 없음/충돌 · 백엔드 실행 실패</td><td>호출 수정 / 동작별 처리 / 1회 재시도 후 아래 단계</td></tr>
+    <tr><td>5 · 6</td><td>에이전트 준비 안 됨(신뢰 확인 화면 등) · 대상이 사용자 입력 대기</td><td>화면 1회 확인 후 아래 단계 / 사용자에게 알리고 대신 승인하지 않음</td></tr>
+    <tr><td>7</td><td>timeout</td><td>실패 아님. 같은 명령으로 다시 대기</td></tr>
+    <tr><td>10 · 11</td><td>unsupported · no backend(툴 밖)</td><td>정상 내려감. 실패 횟수에 넣지 않음</td></tr>
+    <tr><td>12</td><td>adapter error(설치 결함)</td><td>내려가되 사용자에게 한 줄 알림</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="logic">2. 로직 — 한 마일스톤이 도는 흐름</h2>
+
+<h3 id="flow">2-1. 전체 흐름</h3>
+
+<p>체인은 계획 세션에서 시작한다. 계획 세션은 목표와 기존 상태를 확인하고, 권한(로컬 커밋, push, 외부 시스템 쓰기, 새 비용, 상한 초과 사다리)을 <strong>한 번만</strong> 묻고 상태 파일 <code>authority</code>에 적는다. 이 스킬의 기본값, 리뷰 SHIP, 추천안 선택은 승인을 새로 만들지 않는다. 그다음 <code>chain-planner-deep</code>이 최초 계획을 쓰고, 리뷰 게이트가 계획을 검토한다. 이후 마일스톤 세션마다 아래 흐름이 반복된다.</p>
+
+<figure>
+<svg viewBox="0 0 760 640" role="img" aria-labelledby="flow-title flow-desc">
+  <title id="flow-title">마일스톤 세션 흐름</title>
+  <desc id="flow-desc">착수, 웨이브 반복(task 병렬 기동, 회수와 커밋, 통합 검증, 고위험 검토), 마지막 웨이브 기동 직후 롤링 분해 병렬, 마감(전체 검증, 최종 검토, 시각 확인, 마감 체크), 인계와 다음 세션 기동 순서. 각 단계 옆에 프로파일 훅 지점이 표시된다.</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker>
+  </defs>
+  <!-- start -->
+  <rect x="40" y="16" width="440" height="58" rx="8" class="box-accent"/>
+  <text x="56" y="40" class="label">착수</text>
+  <text x="56" y="61" class="small">인계·상태 확인 → 사람 필요 항목 일괄 알림(1회) → 진행 보드</text>
+  <text x="500" y="49" class="hook">[on-milestone-start]</text>
+  <line x1="260" y1="74" x2="260" y2="100" class="line" marker-end="url(#arr)"/>
+  <!-- wave loop -->
+  <rect x="24" y="104" width="712" height="300" rx="10" class="line-dash"/>
+  <text x="40" y="126" class="small">웨이브 N (웨이브마다 반복)</text>
+  <rect x="40" y="136" width="440" height="52" rx="8" class="box"/>
+  <text x="56" y="158" class="label">task 병렬 기동</text>
+  <text x="56" y="178" class="small">상한 parallel-max · 소유 파일 겹치면 순차 · 진행 감시 기동</text>
+  <line x1="260" y1="188" x2="260" y2="208" class="line" marker-end="url(#arr)"/>
+  <rect x="40" y="212" width="440" height="58" rx="8" class="box"/>
+  <text x="56" y="234" class="label">task 회수 (완료마다)</text>
+  <text x="56" y="256" class="small">보고서 + 실제 diff 확인 → 조정자가 경로 지정 커밋 → 상태 갱신</text>
+  <text x="500" y="245" class="hook">[on-task-done]</text>
+  <line x1="260" y1="270" x2="260" y2="290" class="line" marker-end="url(#arr)"/>
+  <rect x="40" y="294" width="440" height="58" rx="8" class="box"/>
+  <text x="56" y="316" class="label">웨이브 통합</text>
+  <text x="56" y="338" class="small">verify.static → verify.full 1회 → 고위험 task 리뷰(가벼운 게이트)</text>
+  <text x="500" y="327" class="hook">[on-wave-integrated]</text>
+  <text x="500" y="345" class="small">→ push (authority에 있을 때)</text>
+  <line x1="260" y1="352" x2="260" y2="372" class="line" marker-end="url(#arr)"/>
+  <text x="56" y="390" class="small">다음 웨이브가 있으면 위로 반복</text>
+  <path d="M40,384 C10,384 10,162 40,162" class="line-dash" marker-end="url(#arr)"/>
+  <!-- rolling -->
+  <rect x="500" y="136" width="220" height="74" rx="8" class="box-warn"/>
+  <text x="512" y="158" class="label">롤링 분해 (병렬)</text>
+  <text x="512" y="178" class="small">마지막 웨이브 기동 직후</text>
+  <text x="512" y="196" class="small">planner가 M+2 분해 시작</text>
+  <!-- close -->
+  <line x1="260" y1="404" x2="260" y2="428" class="line" marker-end="url(#arr)"/>
+  <rect x="40" y="432" width="440" height="78" rx="8" class="box-ok"/>
+  <text x="56" y="454" class="label">마감 (마지막 웨이브 통합과 합침)</text>
+  <text x="56" y="476" class="small">종료 조건 확인 → verify.full → 최종 리뷰(등급별) → BLOCK 수정</text>
+  <text x="56" y="496" class="small">→ 시각 확인 요청 → 롤링 분해 회수 → 마감 체크</text>
+  <text x="500" y="474" class="hook">[on-milestone-close]</text>
+  <text x="500" y="492" class="small">최종 리뷰 통과 후, 인계 전</text>
+  <line x1="260" y1="510" x2="260" y2="534" class="line" marker-end="url(#arr)"/>
+  <rect x="40" y="538" width="440" height="58" rx="8" class="box-accent"/>
+  <text x="56" y="560" class="label">인계</text>
+  <text x="56" y="582" class="small">wrap-up · 진행 보드 → 새 탭에 다음 마일스톤 조정자 기동</text>
+  <line x1="480" y1="567" x2="560" y2="567" class="line" marker-end="url(#arr)"/>
+  <rect x="566" y="538" width="160" height="58" rx="8" class="box"/>
+  <text x="580" y="562" class="label">M+1 세션</text>
+  <text x="580" y="582" class="small">첫 응답 = 진행 보드</text>
+  <text x="40" y="626" class="small">주황 글씨 = 프로젝트 프로파일 훅 절. 비어 있으면 공통 동작만 한다.</text>
+</svg>
+<figcaption>그림 1. 마일스톤 세션 한 번의 흐름. 새 마일스톤 세션은 계획과 계획 검토를 다시 하지 않는다(롤링 분해만 예외).</figcaption>
+</figure>
+
+<p>중요한 운영 원칙 몇 가지:</p>
+<ul>
+  <li><strong>원인과 위치가 명확한 작은 수정은 worker를 띄우지 않는다.</strong> 리뷰가 원인 위치(파일:줄)와 재현 입력을 특정했으면 조정자가 직접 고치고, 재현 회귀 시험 1~2건과 바꾼 모듈의 영향 시험만 돌린다. 운영 실측에서 worker BLOCK 수정 1회가 31~96분이었고, 같은 성격의 국소 수정을 조정자가 했을 때 약 10분이었다.</li>
+  <li><strong>검증 예산</strong>: task 완료 때는 worker가 영향 시험만, 웨이브 통합 때 전체 검증 1회, 마감 때 전체 검증 1회. 수집 0건·skip·미실행은 통과가 아니며 총계를 함께 기록한다.</li>
+  <li><strong>사람 필요 항목은 묶어서 한 번만 알린다.</strong> 착수 때 로그인·자격증명·승인·시각 확인·기기 조작이 필요한 task를 한 목록으로 질문 대기열에 올리고 푸시 알림을 1회 보낸다. 그 항목에 의존하는 task는 웨이브 뒤쪽으로 보낸다. 운영 분석에서 사람 대기가 가장 큰 시간 항목이었기 때문이다.</li>
+  <li><strong>멈춤 조건이 아닌 선택지는 기다리지 않는다.</strong> 보고에 "추천안 x로 진행 중, 바꾸려면 말씀해 주세요"라고 쓰고 바로 진행한다.</li>
+</ul>
+
+<h3 id="tiers">2-2. worker 실행 3단계</h3>
+
+<p>2.3.0에서 worker·planner·리뷰를 어떤 수단으로 돌릴지 3단계 기준을 정했다. 판정 규칙(보고서·done 파일·snapshot·게이트)은 단계와 무관하다.</p>
+
+<figure role="group" aria-labelledby="tiers-cap">
+<div class="tiers">
+  <div class="tier t1">
+    <span class="tag">① 기본</span>
+    <h4>내장 서브에이전트</h4>
+    <p>Claude <code>Agent</code>, 백그라운드 실행. 같은 웨이브의 독립 task는 한 메시지에서 동시에 띄운다.</p>
+    <ul>
+      <li>웨이브 구현 task</li>
+      <li>BLOCK 수정 worker</li>
+      <li>짧은 탐색·조사, 파괴 검토</li>
+    </ul>
+    <p>결과는 보고서 파일, 반환은 한 줄. 완료 알림이 바로 와서 정지 감시가 필요 없다.</p>
+  </div>
+  <div class="tier t2">
+    <span class="tag">② headless</span>
+    <h4>다른 CLI 일회성 실행</h4>
+    <p>백그라운드 Bash로 한 번 실행하고 <strong>done 파일</strong>로 완료를 판정한다.</p>
+    <ul>
+      <li>Sol 리뷰(기본 <code>review_view: headless</code>)</li>
+      <li>원인 조사(선택)</li>
+      <li>다른 CLI 에이전트로 구현(사다리 칸에 있을 때만)</li>
+    </ul>
+  </div>
+  <div class="tier t3">
+    <span class="tag">③ pane</span>
+    <h4>옆 pane worker</h4>
+    <p>터미널 오케스트레이션 툴 안에서만. 세 경우에 한정한다.</p>
+    <ul>
+      <li>사용자가 지켜보며 끼어들 작업</li>
+      <li>작업 도중 조정자와 대화가 필요한 작업</li>
+      <li>메인보다 오래 살아야 하는 작업(최초 계획, 인계를 넘기는 planner, 마일스톤 인계)</li>
+    </ul>
+  </div>
+</div>
+<p class="fallback">③에서 종료 코드 10·11·12를 받으면 ①·②로 내려간다. 단 ①로 내려간 작업은 <strong>현재 세션 안에서 회수해야 한다</strong>. 내장 서브에이전트는 다음 세션이 승계할 수 없기 때문이다.</p>
+<figcaption id="tiers-cap">그림 2. 실행 3단계. ③을 기본으로 두지 않는 이유는 pane 회수 지연(한 리뷰의 회수에 179분이 걸린 사례), 조사 중 정지 오판, 처음 보는 폴더의 신뢰 확인 화면에서 멈추는 문제다. 전환 당일 1회 관측에서 ① worker 2개는 기동부터 회수 커밋까지 25분이었다.</figcaption>
+</figure>
+
+<h3 id="gates">2-3. 게이트 회차와 조건부 마감</h3>
+
+<p>리뷰 게이트는 무게에 따라 회차가 다르다.</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>게이트</th><th>대상</th><th>무게</th><th>회차</th></tr></thead>
+  <tbody>
+    <tr><td>계획</td><td>전체 계획</td><td>마일스톤 2개 이상이면 무거움, 1개면 가벼움</td><td>3회 / 1회</td></tr>
+    <tr><td>웨이브 통합</td><td>그 웨이브의 고위험 task 변경 묶음(push 전)</td><td>가벼움</td><td>1회</td></tr>
+    <tr><td>마감(화면)</td><td>화면만 바뀐 마일스톤</td><td>리뷰 없음</td><td>build · 스모크</td></tr>
+    <tr><td>마감(데이터)</td><td>데이터·권한·스키마·이관이 들어간 마일스톤</td><td>가벼움</td><td>1회</td></tr>
+    <tr><td>마감(heavy)</td><td>저장 스키마·이관 계약을 처음 확정하는 마일스톤, 출시 검토 마일스톤</td><td>무거움</td><td>3회</td></tr>
+  </tbody>
+</table>
+</div>
+
+<ul>
+  <li><strong>가벼운 게이트</strong>: 리뷰 1회 → BLOCK 수정 → 영향 시험으로 조정자가 확인 → 재검토 없이 진행. 기록은 <code>fixed-local &lt;커밋&gt; · &lt;시험&gt;</code>.</li>
+  <li><strong>무거운 게이트</strong>: 최초 + 재검토 2회. 재검토는 <strong>delta 검토</strong>가 기본이고, 범위는 "직전 finding의 해소 여부 + 이번 수정이 만든 회귀"로 고정한다. 범위 밖 새 finding은 백로그로 받는다(재현된 안전 위험만 예외).</li>
+  <li><strong>부분 해소가 두 번</strong> 나오거나 같은 결함 계열이 두 번째 나오면, 반례를 하나씩 고치지 않고 계열의 공통 원인을 고치는 수정 하나로 바꾼다.</li>
+  <li><strong>상한 초과 사다리</strong>: 무거운 게이트가 3회 뒤에도 BLOCK이면 사용자에게 묻지 않고 기본 사다리 <code>[extra-rounds:1, carry-reversible, stop]</code>를 밟는다. ① 수정·재검토 1회 더 ② 남은 BLOCK이 모두 되돌릴 수 있는 제품 결함(UI·로컬 코드)이면 SHIP으로 기록하지 않고 <code>carried</code>로 다음 웨이브 task에 넘긴 뒤 <strong>조건부 마감</strong> ③ 되돌리기 어려운 대상이 걸려 있으면 멈춤.</li>
+</ul>
+
+<div class="callout note">
+  <p><strong>조건부 마감</strong>은 사용자 확인 없이 넘어갔다는 사실을 숨기지 않기 위한 장치다. 마감 보고와 인계 문서에 별도 절을 두고 한도에 닿은 게이트와 회차, 반영한 수정 커밋, 남은 finding, 되돌리는 비용, 이월한 task id를 적는다. 남은 finding은 다음 상위 게이트의 검토 범위에 들어간다.</p>
+</div>
+
+<h4>구현 모드와 출시 검토</h4>
+<p>마일스톤은 기본적으로 <strong>구현 모드</strong>(<code>build</code>)로 돈다. 마감을 막는 BLOCK은 6가지로 좁힌다: 주 흐름 미동작, 기존 기능 회귀, 데이터 손실·권한·보안 오류, 크래시·빌드 실패, 되돌리기 어려운 대상, 사용자가 시각 확인에서 지적한 것. 그 밖의 경계 조건(화면 폭, 긴·빈 데이터, 접근성 세부, 시각 다듬기)은 백로그로 미룬다. 출시 품질 검사는 사용자가 "출시 검토해줘"처럼 명시 요청할 때만 <code>harden</code> 마일스톤을 넣어 한 번에 한다.</p>
+
+<h3 id="failure">2-4. 실패 처리 사다리와 30분 상한</h3>
+
+<p>"원인 모를 실패"는 worker가 부분 완료·막힘으로 끝나거나 보고서가 없음, 고쳤는데 같은 증상이 남음, 원인 가설이 빗나감을 말한다. 오타·빠진 import 같은 명백한 실패, flaky 의심(1회 재실행), 환경 문제(<code>index.lock</code>·포트·오래된 빌드 산출물·API 재시도)는 세지 않는다.</p>
+
+<ol class="ladder">
+  <li><strong>원인 모를 실패 1번</strong> → 조정자는 두 번째 직접 시도를 하지 않는다. 새 <code>chain-worker-xhigh</code>(Opus xhigh) 1개에 <strong>조사와 근본 수정을 함께</strong> 맡긴다. 지시서에는 재현 명령, 확인된 사실, 의심 지점(검증 대상으로 표시), 반박된 가설 전부, 금지(대기 늘리기·시험 완화·우회 같은 증상만 맞추는 수정)를 넣는다.</li>
+  <li><strong>xhigh도 실패</strong> → 그 task만 <code>blocked</code>로 두고, 의존하지 않는 작업은 계속한다. 질문 대기열에 반박된 가설과 추천안을 올린다. 같은 방식으로 다시 돌리지 않는다.</li>
+</ol>
+
+<p>프로파일 <code>root-cause: sol</code>이면 1단계 앞에 리뷰 모델의 읽기 전용 원인 조사 1회를 넣는다.</p>
+
+<p><strong>30분 상한</strong>(구현 모드만): 화면·배치·시험 하니스·간헐 실패·도구 같은 일반 문제는 한 문제에 30분이 넘으면 멈추고 백로그에 <code>[30분]</code>으로 적은 뒤 다음 task로 간다. 단독 재실행에서 통과하는 간헐 실패는 <code>[quarantine]</code>으로 올린다. 변환기·직렬화·저장 스키마·이관·권한 같은 <strong>데이터 등급</strong> 문제는 상한 없이 그 자리에서 해결한다.</p>
+
+<h3 id="stop">2-5. 멈춤 조건</h3>
+
+<p>체인은 아래 경우에만 멈추고 보고한다. 시간 경과·침묵·timeout만으로는 멈추지 않으며, timeout이나 빈 응답은 성공도 실패도 아닌 <code>unverified</code>로 기록한다. 멈출 때는 진행 보드와 결정이 필요한 질문 id·추천안을 쓰고 푸시 알림을 1회 보낸다.</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>#</th><th>멈춤 조건</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>남은 작업이 모두 권한 대기나 사용자 결정 대기에 걸려 진행할 독립 작업이 없음</td></tr>
+    <tr><td>2</td><td>같은 task가 재시도와 조정자의 직접 마무리 뒤에도 실패</td></tr>
+    <tr><td>3</td><td>다음 마일스톤의 목표를 계획과 상태에서 찾을 수 없음</td></tr>
+    <tr><td>4</td><td>프로파일 <code>stop-conditions</code>에 해당</td></tr>
+    <tr><td>5</td><td>필수 리뷰 게이트(계획 검토, 마일스톤 최종 검토)를 재시도 뒤에도 실행할 수 없음</td></tr>
+    <tr><td>6</td><td>무거운 게이트가 3회 뒤에도 BLOCK이고 사다리가 <code>stop</code>에 닿음 — 기본 사다리에서는 <strong>되돌리기 어려운 대상</strong>(스키마·배포/보안 설정·계약 문서·비가역 런타임 동작·외부 시스템 쓰기·main 병합)이 걸린 BLOCK일 때만</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>권한 밖 작업(정책 충돌, 새 비용, 외부 쓰기)은 체인 전체를 멈추지 않는다. 추천안을 대기열에 적고 <strong>그 작업만</strong> 실행하지 않는다.</p>
+
+<h3 id="stall">2-6. 정지 감시</h3>
+
+<p>① 내장 서브에이전트는 완료 알림이 오므로 정지 감시가 필요 없다. ③ pane worker가 있는 웨이브에만 감시 스크립트를 띄운다. 2.2.0부터 판정 기준은 파일 수정 시각(mtime)이 아니라 <strong>transcript 내용</strong>(마지막 진척 시각, 그 뒤의 API 재시도 수)과 <code>agent-status</code>다. API 오류 재시도도 transcript를 갱신해서, mtime만 보던 시절 한 worker가 99분 동안 코드 변경 없이 돌았는데도 감지되지 않았다.</p>
+
+<ul>
+  <li>출력 종류: <code>정지 후보</code>(working인데 진척 10분 이상) · <code>API 재시도 반복</code> · <code>권한·입력 대기</code> · <code>끝남</code> · <code>감시 불가</code>(UNVERIFIED — mtime으로 대신 추정하지 않는다).</li>
+  <li>이벤트는 후보일 뿐이다. 받으면 화면을 1회 보고, 재지시, 그래도 안 되면 재기동 순서로 처리한다. API 재시도는 환경 문제로 실패 횟수에 넣지 않는다.</li>
+  <li>별도로 worker 보고서의 <code>- 진행:</code> 줄을 20초 간격으로 읽어 진행이 바뀔 때마다 한 줄 보고한다. 진행 이벤트가 30분 넘게 없으면 그 사실을 보고한다(멈춤은 아니다).</li>
+</ul>
+
+<h3 id="handoff">2-7. 세션 인계</h3>
+
+<p>비용은 컨텍스트 크기 × 남은 턴이라 세션이 길어질수록 커지고, 운영 실측에서 컨텍스트가 큰 조정자 세션에 실수가 몰렸다(인과는 확인되지 않음). 그래서 마일스톤마다 세션을 바꾼다. 조정자 컨텍스트가 150K 토큰을 넘으면(예시 수치) 마일스톤 도중이라도 안전한 지점에서 인계한다. 체인이 끝난 세션에서 새 체인을 시작하지 않는다.</p>
+
+<pre><code>ROOT=$(agent-orchestrator tab-open "[OC] &lt;짧은 이름&gt; M&lt;n+1&gt;")   # 새 탭, 포커스 이동 없음
+agent-orchestrator agent-start &lt;next&gt; "$ROOT" --kind claude -- &lt;현재 조정자와 같은 플래그&gt;
+agent-orchestrator agent-send &lt;next&gt; "&lt;상태 파일&gt;과 &lt;인계 문서&gt;를 읽고 auto-chain 스킬로 M&lt;n+1&gt;을 진행해. 부모 조정자 pane: &lt;id&gt;" --confirm
+# stdout이 working 또는 done이면 인계 증거</code></pre>
+
+<ul>
+  <li>프롬프트는 줄바꿈 없는 한 줄이다(줄바꿈은 중간 제출로 해석된다). 문서가 진본이고 프롬프트는 포인터다.</li>
+  <li>기동은 인계 시도당 1회. 응답을 잃으면 에이전트 목록에서 이름을 찾아 있으면 메시지만 다시 보낸다.</li>
+  <li><strong>부모 정리는 child가 한다.</strong> 이어받은 세션이 상태를 읽은 직후 부모 pane을 닫는다. 부모가 스스로 닫으면 실행 중인 명령이 끊길 수 있기 때문이다.</li>
+  <li>진행 중인 worker가 남아 있으면 인계하지 않는다. 예외는 ③ pane으로 띄운 롤링 분해 planner뿐이며, 인계 문서에 pane·보고서 경로를 적고 child가 회수한다.</li>
+  <li>오케스트레이션 툴 밖이면 자동 기동하지 않고 인계 문서와 다음 세션 시작 명령 한 줄을 사용자에게 준다.</li>
+  <li>이어받은 세션의 첫 응답은 항상 진행 보드다.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="extend">3. 프로젝트 설정으로 단계에 작업 덧붙이기 — gira 사례</h2>
+
+<h3 id="layers">3-1. 스킬은 뼈대, 프로파일은 살</h3>
+
+<p>스킬은 어떤 프로젝트에서나 같은 절차(분해·병렬 실행·회수·검증·리뷰·마감·인계)를 정한다. 프로젝트마다 다른 것 — 검증 명령, 무엇이 고위험인지, 진행 원장 갱신, 사내 시스템 반영, 커밋 전 감사 — 은 스킬을 고치지 않고 프로파일에 쓴다. 프로파일 훅 절은 공통 동작 <strong>다음에</strong> 실행되고, 훅이 <code>authority</code>에 없는 작업(외부 쓰기 등)을 요구하면 실행하지 않고 질문 대기열에 올린다. 즉 프로파일은 승인을 새로 만들 수 없다.</p>
+
+<figure>
+<svg viewBox="0 0 760 380" role="img" aria-labelledby="layer-title layer-desc">
+  <title id="layer-title">스킬과 프로파일의 계층</title>
+  <desc id="layer-desc">아래층은 auto-chain 스킬의 공통 뼈대, 가운데는 프로젝트 프로파일의 값과 훅 절, 위층은 프로젝트 고유 절차 문서와 도구다. 훅 지점 네 곳에서 프로파일이 공통 동작 뒤에 끼어든다. authority는 모든 층을 제한한다.</desc>
+  <defs>
+    <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker>
+  </defs>
+  <!-- top layer -->
+  <rect x="20" y="16" width="620" height="88" rx="10" class="box-warn"/>
+  <text x="36" y="40" class="label">프로젝트 절차 문서 · 도구</text>
+  <text x="36" y="62" class="small">시스템별 절차 문서(_profile/&lt;시스템&gt;.md) · 진행 원장 도구 · 사내 시스템 반영 도구</text>
+  <text x="36" y="82" class="small">커밋 위생 감사 · 프로젝트 스킬(예: 진행 관리 스킬) · worker 덧붙임 지시서</text>
+  <!-- middle layer -->
+  <rect x="20" y="128" width="620" height="88" rx="10" class="box-accent"/>
+  <text x="36" y="152" class="label">프로젝트 프로파일  .claude/autonomous-chain.md</text>
+  <text x="36" y="174" class="small">frontmatter: verify.full/static · parallel-max · commit · push · daily-log · task-brief · reviewer …</text>
+  <text x="36" y="194" class="small">본문: 시스템 판별 · on-* 훅 절 · high-risk · stop-conditions · 조정자 커밋 규칙</text>
+  <!-- bottom layer -->
+  <rect x="20" y="240" width="620" height="88" rx="10" class="box"/>
+  <text x="36" y="264" class="label">auto-chain 스킬 (공통 뼈대)</text>
+  <text x="36" y="286" class="small">마일스톤·웨이브·task · 실행 3단계 · 검증 예산 · 리뷰 게이트·회차 · 실패 사다리</text>
+  <text x="36" y="306" class="small">멈춤 조건 1~6 · 상태 파일 형식 · 인계 · 진행 보드</text>
+  <!-- arrows -->
+  <line x1="200" y1="240" x2="200" y2="218" class="line" marker-end="url(#arr2)"/>
+  <text x="208" y="232" class="small">훅 지점에서 호출</text>
+  <line x1="420" y1="128" x2="420" y2="106" class="line" marker-end="url(#arr2)"/>
+  <text x="428" y="120" class="small">절차 문서를 가리킴</text>
+  <!-- authority bar -->
+  <rect x="660" y="16" width="80" height="312" rx="10" class="box-stop"/>
+  <text x="700" y="150" class="label" text-anchor="middle">autho-</text>
+  <text x="700" y="170" class="label" text-anchor="middle">rity</text>
+  <text x="700" y="196" class="small" text-anchor="middle">모든 층</text>
+  <text x="700" y="212" class="small" text-anchor="middle">제한</text>
+  <text x="20" y="356" class="small">위로 갈수록 프로젝트 고유. 아래층은 프로젝트를 모르고, 위층은 승인을 새로 만들 수 없다.</text>
+</svg>
+<figcaption>그림 3. 스킬·프로파일·프로젝트 절차의 계층. authority(계획 세션에서 한 번 받은 권한)가 세 층 모두를 제한한다.</figcaption>
+</figure>
+
+<h3 id="hooks">3-2. 훅 지점</h3>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>절</th><th>실행 시점</th></tr></thead>
+  <tbody>
+    <tr><td><code>on-milestone-start</code></td><td>마일스톤 세션 착수, 인계·상태 확인 직후</td></tr>
+    <tr><td><code>on-task-done</code></td><td>task 보고서 확인·조정자 커밋·상태 갱신 직후</td></tr>
+    <tr><td><code>on-wave-integrated</code></td><td>웨이브 통합 검증·고위험 검토 통과 후, push 전</td></tr>
+    <tr><td><code>on-milestone-close</code></td><td>마감 검증·최종 리뷰 통과 후, wrap-up·인계 전</td></tr>
+    <tr><td><code>high-risk</code></td><td>고위험 판정 기준 추가(기본: 인증·권한, 데이터 원자성, 외부 시스템 쓰기, 스키마·외부 계약)</td></tr>
+    <tr><td><code>stop-conditions</code></td><td>공통 멈춤 조건에 더할 프로젝트 조건</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>가장 작은 프로파일은 이 정도다.</p>
+<pre><code>---
+chain-profile: 1
+verify:
+  full: "npm test &amp;&amp; npm run typecheck"
+commit: task
+push: none
+---
+
+## high-risk
+- `migrations/**` 변경</code></pre>
+
+<h3 id="gira">3-3. gira 프로파일 해부</h3>
+
+<p>gira는 사내 업무 시스템을 다시 만드는 프로젝트로, <strong>한 리포 안에 두 시스템</strong>(업무 관리 시스템과 위키)이 있다. 두 시스템은 각자의 작업 트리(본 트리와 worktree)에서 진행되지만 프로파일 파일 하나를 공유한다. 이 프로파일이 공통 뼈대 위에 무엇을 얹는지 순서대로 본다. 아래 인용은 구조를 보이기 위해 짧게 줄이고 값을 일반화한 것이다.</p>
+
+<h4>① frontmatter — 값</h4>
+<pre><code>---
+chain-profile: 1
+verify:
+  full: "&lt;프로젝트 CLI&gt; test &lt; /dev/null"
+  static: "&lt;프로젝트 CLI&gt; verify static &lt; /dev/null"
+parallel-max: 2
+commit: task        # task마다 조정자 커밋
+push: wave          # 웨이브 통합 때 push
+daily-log: wave
+task-brief: docs/chain/_profile/task-brief.md   # worker 덧붙임 지시서
+---</code></pre>
+<p><code>commit</code>·<code>push</code>에는 스킬 기본값이 없다. 프로파일에 있으면 사용자가 그 프로젝트에 미리 둔 상시 정책으로 보고 계획 세션에서 다시 묻지 않는다. 값마다 근거(예: "겹치지 않으면 2개까지")를 본문에 한 줄씩 적어 둔다.</p>
+
+<h4>② 시스템 판별 — 모든 훅보다 먼저</h4>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>조건</th><th>시스템</th><th>절차 문서</th><th>체인 id 접두사</th></tr></thead>
+  <tbody>
+    <tr><td>작업 트리가 위키 worktree이거나 브랜치가 위키 브랜치</td><td>위키</td><td><code>docs/chain/_profile/giki.md</code></td><td><code>giki-</code></td></tr>
+    <tr><td>그 밖(본 트리, main)</td><td>업무 시스템</td><td><code>docs/chain/_profile/gira.md</code></td><td><code>gira-</code></td></tr>
+  </tbody>
+</table>
+</div>
+<p>판별 결과는 상태 파일 "## 결정"에 남기고, 상태 파일의 체인 id 접두사와 판별이 다르면 멈춘다. 한 체인은 한 시스템만 다룬다. 이렇게 하면 훅 절 본문은 "판별한 시스템의 절차 문서에서 같은 이름의 절을 수행한다" 한 줄로 끝나고, 시스템별 분기는 프로파일 본문에 늘어나지 않는다.</p>
+
+<h4>③ 권한 — authority와 외부 쓰기 범위</h4>
+<p>계획 세션은 권한을 한 번 묻는다. gira 프로파일은 외부 쓰기를 물을 때 쓸 <strong>정확한 문구</strong>를 체인 종류별로 미리 적어 둔다.</p>
+<ul>
+  <li>업무 시스템 재구축 마일스톤 체인: "사내 이슈 트래커의 착수·task 완료·마감 반영과 완료 전환, 허용된 범위만"</li>
+  <li>그 밖의 phase(로컬 검토 등): <code>no</code> — 회사 반영 대상이 아님</li>
+  <li>위키 체인: "위키 동기화 도구 apply — 허용된 이슈 칸과 허용된 위키 페이지 2개의 허용 칸만"</li>
+</ul>
+<p>훅 절차 안의 <code>[외부쓰기]</code> 단계는 상태 파일 <code>authority.external-write</code>에 이 범위가 있을 때만 실행된다. 실제 진행 중인 체인의 상태 파일 frontmatter는 이런 모양이다.</p>
+<pre><code>authority: { local-commit: yes, push: wave, external-write: no, new-cost: no,
+             escalation: [extra-rounds:1, carry-reversible, stop] }
+verify-full: "&lt;프로젝트 CLI&gt; test &lt; /dev/null"
+skill: auto-chain 2.3.0
+reviewer: opencode-sol
+backend: herdr &lt;조정자 pane&gt;</code></pre>
+
+<h4>④ 조정자 커밋 규칙 — 스킬 커밋 절차에 덧붙임</h4>
+<ol>
+  <li>보고서의 변경 파일과 보고서 파일만 경로 지정 스테이징</li>
+  <li>스테이징된 이름 목록이 그 목록과 같은지 확인. 다르면 커밋하지 않음</li>
+  <li>커밋 위생 감사 도구 실행. 적발이 1건 이상이면 커밋하지 않고 원인 task에 수정 worker를 보냄</li>
+  <li>경로 지정 커밋. 메시지 형식은 시스템별(<code>feat(&lt;영역&gt;): &lt;요약&gt;(&lt;task-id&gt;)</code> 등)</li>
+</ol>
+<p>여기에 "원장·대시보드·회사 반영 기록 커밋은 구현 커밋과 따로 한다"는 규칙이 붙는다. 자기 커밋 해시를 원장에 다시 쓰는 순환을 막기 위해서다. 작업 트리에 원래 있던 미커밋 파일은 건드리지 않는다.</p>
+
+<h4>⑤ 훅 절 → 시스템별 절차 문서</h4>
+<p>업무 시스템 절차 문서는 진행 관리 프로젝트 스킬을 진본으로 두고, auto-chain의 각 시점에 어떤 명령을 어떤 순서로 돌릴지만 정한다.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>훅</th><th>gira가 덧붙이는 일(요약)</th></tr></thead>
+  <tbody>
+    <tr><td><code>on-milestone-start</code></td><td>진행 원장 점검(읽기 전용) → 다른 세션이 같은 마일스톤을 진행 중인지 확인(원장 미커밋 변경이면 멈춤) → 사내 시스템 상태 읽기 대조 → 첫 task 착수를 원장에 기록하고 원장만 커밋 → <code>[외부쓰기]</code> 이슈 시작일이 비어 있을 때만 착수 반영</td></tr>
+    <tr><td><code>on-task-done</code></td><td>task 커밋 해시와 보고서의 "실행한 시험"을 증거로 원장 갱신(시험 증거는 다시 실행 가능한 단일 명령이어야 함) → 원장만 따로 커밋 → <code>[외부쓰기]</code> task 완료 반영(실패는 "회사 반영 미완료"로 기록하고 제품 done은 되돌리지 않음) → 결정 제안을 결정 기록에 추가</td></tr>
+    <tr><td><code>on-wave-integrated</code></td><td>공통 verify 뒤 라우트·생성 계약을 바꾼 웨이브면 offline 검증 추가 → 검증 중 원장 커밋 금지 → 밀린 반영 따라잡기 → 일지 누적</td></tr>
+    <tr><td><code>on-milestone-close</code></td><td>종료 조건마다 원장에 충족 기록 → 마감 전체 게이트(두 Python 버전 시험, offline 검증, 저장소를 바꿨으면 DB 통합 시험) 백그라운드 실행 → 마감 확인서 생성·유효성 확인(이후 원장 변경 금지) → <code>[외부쓰기]</code> 최종 진척률·완료일 반영과 완료 전환 → 인계 문서는 지우지 않고 새로 작성</td></tr>
+  </tbody>
+</table>
+</div>
+<p>위키 쪽 절차 문서(<code>giki.md</code>)는 같은 훅 이름으로 위키 고유의 시험·동기화 단계를 정한다. 오래 걸리는 명령은 모두 백그라운드로 실행하고 완료 알림을 받는다는 공통 규칙도 프로파일이 적는다.</p>
+
+<h4>⑥ high-risk와 stop-conditions</h4>
+<p><strong>high-risk</strong>는 공통 기본에 경로 단위로 더한다. 예: 인증·세션·권한 모듈, 저장소 원자성·발번·SQL·트랜잭션 어댑터, 회사 동기화·진행 도구, 위키 권한·가시성, 저장 경합·DDL, 외부 파일 파싱(zip·XML·JSON) 이관 코드, 데이터 삭제 경로. 이 경로를 건드리는 task는 웨이브 통합 때 리뷰 게이트 대상이 된다. 반대로 여러 task가 함께 고치는 공유 결선 파일(라우트 정책·도구 카탈로그 등)은 고위험이 아니라 <strong>조정자 소유</strong>로 두고 조정자가 한 커밋으로 묶는다.</p>
+
+<p><strong>stop-conditions</strong>는 공통 6개에 9개를 더한다. 요지는 "회사 시스템과 사람 판단이 걸린 것은 멈춘다"이다.</p>
+<ul>
+  <li>시스템 판별과 체인 id 접두사가 다름</li>
+  <li>같은 시스템을 다른 세션이 진행 중인 징후(원장·회사 반영 owner는 하나)</li>
+  <li>운영 반영·데이터 삭제·컷오버·배포가 필요함</li>
+  <li>승인 범위 밖 회사 쓰기(상태 역전환, 부모 이슈, 진척률 감소, 기존 다른 날짜 수정, 허용 페이지 밖 쓰기 등)</li>
+  <li>회사 반영이 실패했거나 전송 상태가 확정되지 않음 — 다시 보내거나 새 실행으로 우회하지 않음</li>
+  <li>회사 시스템 인증이 없거나 401·403 — 토큰을 채팅에 요구하거나 출력하지 않음</li>
+  <li>회사 원문·PII·비공개 원자료를 커밋·일지·콘솔에 남겨야 하는 상황</li>
+  <li>사람 판단이 필요한 충돌 해소 명령 — 그 task·단계만 보류하고 독립 작업은 계속</li>
+  <li>철회된 쓰기 허가의 재발급이 필요함</li>
+</ul>
+
+<div class="callout warn">
+  <p><strong>정리하면</strong>: 스킬은 "task가 끝나면 보고서를 확인하고 커밋한 뒤 상태를 갱신한다"까지만 안다. 그 다음에 진행 원장을 갱신하고, 원장을 따로 커밋하고, 권한이 있을 때만 사내 이슈 트래커에 반영하고, 실패하면 무엇을 하지 말아야 하는지는 gira 프로파일과 절차 문서가 정한다. 같은 스킬이 다른 프로젝트에서는 <code>verify.full</code> 한 줄짜리 프로파일로도 그대로 돈다.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="glossary">4. 용어집</h2>
+
+<dl class="glossary">
+  <dt>조정자</dt><dd>마일스톤 하나를 맡는 메인 세션(오케스트레이터). worker 기동·회수, 커밋, 상태 파일·질문 대기열 기록, 통합 검증을 한다. git index 쓰기는 조정자만 한다.</dd>
+  <dt>마일스톤</dt><dd>세션 하나가 조정하는 작업 단위. 모드(build/harden), 등급(화면/데이터), 마감 게이트 무게를 가진다.</dd>
+  <dt>웨이브</dt><dd>소유 파일이 겹치지 않아 동시에 돌릴 수 있는 task 묶음. 끝나면 통합 검증을 1회 한다.</dd>
+  <dt>task</dt><dd>worker 하나가 구현하는 단위. 인수 기준·소유 파일·등급·고위험 여부가 계획에 표시된다.</dd>
+  <dt>worker</dt><dd>task를 구현하는 Claude 에이전트. stage·commit·push를 하지 않고 보고서를 쓴 뒤 한 줄을 반환한다.</dd>
+  <dt>게이트</dt><dd>리뷰 모델(Sol)이 판정하는 검토 지점. 계획·웨이브 고위험·마일스톤 마감. 무거운 게이트 3회, 가벼운 게이트 1회.</dd>
+  <dt>delta 검토</dt><dd>재검토 방식. 직전 finding의 해소 여부와 이번 수정이 만든 회귀만 본다.</dd>
+  <dt>실효 판정</dt><dd>리뷰어의 원 판정에서 심각도 매핑(<code>block-on</code>)과 범위 규칙을 적용해 조정자가 정한 최종 판정.</dd>
+  <dt>사다리</dt><dd>상한 초과 사다리(<code>escalation</code>). 무거운 게이트가 3회 뒤에도 BLOCK일 때 밟는 칸 목록. 기본 <code>[extra-rounds:1, carry-reversible, stop]</code>.</dd>
+  <dt>조건부 마감</dt><dd>되돌릴 수 있는 결함을 다음 웨이브로 넘기고 닫은 마일스톤. SHIP으로 기록하지 않고 별도 절로 보고한다.</dd>
+  <dt>결함 계열</dt><dd>근본 원인 패턴이 같은 BLOCK 묶음. "올바른 모양"을 이후 worker 지시서와 리뷰 요청에 넣어 재발을 줄인다.</dd>
+  <dt>백로그</dt><dd>구현 모드에서 마감을 막지 않고 미룬 경계 조건 결함, <code>[30분]</code>·<code>[quarantine]</code> 항목의 원장.</dd>
+  <dt>프로파일</dt><dd>프로젝트 루트 <code>.claude/autonomous-chain.md</code>. 값(frontmatter)과 훅 절(본문)로 스킬 위에 프로젝트 절차를 얹는다.</dd>
+  <dt>훅 절</dt><dd>프로파일의 <code>on-milestone-start</code> 등. 해당 시점의 공통 동작 다음에 실행된다.</dd>
+  <dt>authority</dt><dd>계획 세션에서 한 번 받은 권한(로컬 커밋, push, 외부 쓰기, 새 비용, 사다리). 스킬 기본값·리뷰 SHIP·프로파일은 이를 새로 만들지 않는다.</dd>
+  <dt>done 파일</dt><dd>headless 실행기가 쓰는 완료 기록. 실제 종료 코드, RUN_ID, 전후 snapshot, 읽기 전용 여부를 담는다. 리뷰 완료의 유일한 근거다.</dd>
+  <dt>snapshot</dt><dd>검증·리뷰 대상 상태의 식별자(HEAD와 작업 트리 식별자, 대상 파일 해시). 요청과 결과가 같아야 판정을 읽는다.</dd>
+  <dt>인계</dt><dd>상태 파일과 인계 문서를 남기고 새 탭에 다음 조정자 세션을 기동하는 일. 부모 pane은 child가 닫는다.</dd>
+  <dt>롤링 분해</dt><dd>최초 계획 뒤 마일스톤 task를 한 마일스톤 앞서 분해하는 방식. M<sub>n</sub>의 마지막 웨이브 기동 직후 M<sub>n+2</sub>를 분해한다.</dd>
+  <dt>agent-orchestrator</dt><dd>터미널 오케스트레이션 툴을 감추는 명령. 동작 이름과 종료 코드가 계약이고, 툴별 차이는 어댑터가 맡는다.</dd>
+  <dt>진행 보드</dt><dd>10줄 이내 고정 형식의 진행 요약. 마일스톤 착수, 웨이브 통합, 게이트 판정, 멈춤, 인계 직전에 낸다.</dd>
+</dl>
+
+<footer>
+  <p>근거 문서: auto-chain 스킬(<code>SKILL.md</code>, <code>references/profile.md</code>·<code>sol-review.md</code>·<code>pane-worker.md</code>·<code>planning.md</code>·<code>task-brief.md</code>), 에이전트 정의, agent-orchestrator 계약 문서와 어댑터 작성 계약, 2.3.0 전환 보고. 수치는 해당 문서에 기록된 운영 실측을 옮긴 것이며, 전환 당일 수치는 1회 관측이다. gira 사례의 내부 식별자·호스트·경로는 일반화했다.</p>
+</footer>
+
+</main>
+</body>
+</html>
