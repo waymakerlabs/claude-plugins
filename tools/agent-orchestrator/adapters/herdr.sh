@@ -11,7 +11,7 @@
 
 AO_HERDR_MAX_RIGHT=${AGENT_ORCHESTRATOR_MAX_RIGHT:-5}
 # 오른쪽 열이 찼을 때 쓰는 탭 이름(한글). 호출자(auto-chain 등)가 덮어쓸 수 있다
-AO_HERDR_OVERFLOW_TAB=${AGENT_ORCHESTRATOR_OVERFLOW_TAB:-작업 넘침}
+AO_HERDR_OVERFLOW_TAB=${AGENT_ORCHESTRATOR_OVERFLOW_TAB:-[WO] 작업 넘침}
 
 # 전제: 11 = herdr 밖, 12 = 필수 바이너리 없음, 4 = 서버가 running 아님
 ao_adapter_check() {
