@@ -6,14 +6,12 @@
 
 ## 1. 전제와 리뷰어 고정
 
-- 리뷰어는 프로파일 `reviewer`(`references/profile.md`) 값이다: `opencode-sol`(기본) · `opencode-build` · `codex-cli`. 모델은 셋 다 GPT-6.1 Sol high다(`REVIEW_MODEL`·`REVIEW_EFFORT`로 바꿀 수 있다).
-  - `opencode-sol`: OpenCode `review-sol` 에이전트(`~/.config/opencode/agent/review-sol.md`, 수정하지 않는다).
-  - `opencode-build`: 쓰기 가능한 `build` 에이전트에 `review-sol.md`를 첨부한 우회(`REVIEW_AGENT_FILE`). 읽기 전용은 지시와 전후 snapshot 대조로만 지켜진다.
-  - (2.2.1) opencode 공통: 실행 파일은 `~/.opencode/bin/opencode`를 우선한다(`REVIEW_OPENCODE_BIN`으로 바꿈). 게이트웨이 키가 필요한 환경은 실행기 호출 **전에** 키를 export한다(예: `AIGW_OPENCODE_KEY=$(~/.claude/ai-router-refresh.sh | head -1)`, 값은 로그·상태 파일에 적지 않는다). 리뷰어 pane에서 실행할 때도 같다.
-  - `codex-cli`: `codex exec … -s read-only`. 샌드박스가 읽기 전용을 강제한다.
+- 리뷰어는 **codex CLI 하나**다(2.4.0). 프로파일 `reviewer` 키는 하위 호환으로 남기되 값은 `codex-cli`만 받는다(기본값 `codex-cli`). 모델은 GPT-6.1 Sol high(codex 모델 ID `gpt-6.1-sol`, `REVIEW_MODEL`·`REVIEW_EFFORT`로 바꿀 수 있다).
+  - `codex-cli`: `codex exec -m gpt-6.1-sol -c model_reasoning_effort="high" -s read-only --ephemeral …`. 샌드박스가 읽기 전용을 강제한다.
+  - 실행기 `scripts/review-run.sh`는 `opencode-sol`·`opencode-build` 값을 받으면 exit 2로 거부한다.
 - 실행기·대기 스크립트: `scripts/review-run.sh`, `scripts/review-wait.sh`(SKILL.md와 같은 디렉터리 기준, 인자는 §3·§4).
-- **착수 드라이런**(체인 착수 때, 이어받은 세션도 첫 리뷰 전 1회): 짧은 요청 파일(`# 판정: SHIP` 한 줄과 `## 검증 원장`에 HEAD 12자, 마지막 줄 `REVIEW-DONE`만 출력하라는 내용)을 §3 명령으로 돌린다. §5-1 유효 조건을 통과하면 그 리뷰어로 고정한다. 실패하면 `reviewer` 값 → `opencode-build` → `codex-cli` 순서로 다음을 시도한다(이미 시도한 값은 건너뛴다). 동작한 값과 실패 사유를 상태 파일 `## 결정`에 적고, 이후 모든 회차가 그 값을 쓴다. 근거: office 체인에서 `--agent review-sol`이 거부돼 7회 시도·약 10분을 썼다.
-- 읽기 전용 primary 에이전트(예: `review-sol-primary`)를 opencode에 따로 두는 것이 `opencode-build`보다 안전하다. 사용자 환경 변경이므로 **권장(사용자 확인)**으로만 제안한다.
+- **착수 드라이런**(체인 착수 때, 이어받은 세션도 첫 리뷰 전 1회): 짧은 요청 파일(`# 판정: SHIP` 한 줄과 `## 검증 원장`에 HEAD 12자, 마지막 줄 `REVIEW-DONE`만 출력하라는 내용)을 §3 명령으로 codex로 돌린다. §5-1 유효 조건을 통과하면 `codex-cli`로 고정하고 RUN_ID를 상태 파일 `## 결정`에 적는다. **실패하면 대체 리뷰어 없이** 원인(인증·모델·샌드박스)을 상태 파일 `## 결정`에 적고 사용자에게 보고하며 멈춘다. 리뷰 게이트를 열 수 없기 때문이다.
+- **리뷰어 이관(2.4.0)**: 이어받은 체인의 상태 파일 frontmatter가 `reviewer: opencode-sol|opencode-build`이면 첫 리뷰 전에 `codex-cli` 드라이런을 통과시킨 뒤 frontmatter를 `reviewer: codex-cli`로 바꾸고 `## 결정`에 "2.4.0 리뷰어 이관 opencode-* → codex-cli (드라이런 RUN_ID)"를 적는다. 이미 끝난 리뷰 기록 행(게이트 표의 reviewer·RUN_ID)은 고치지 않는다. 드라이런이 실패하면 위 착수 드라이런 실패와 같이 멈추고 보고한다.
 - 리뷰어는 이전 회차 결과를 인용하거나 `# 판정:` 같은 문자열을 시험 삼아 만들기도 한다. 결과의 판정 줄은 §5의 snapshot 대조를 통과해야 현재 판정이다.
 
 ## 2. snapshot과 요청 파일
@@ -183,8 +181,8 @@ bash "$S/scripts/review-wait.sh" "$DONE" "$PID" 3600   # Bash run_in_background,
   - 재검토(delta)였으면 첨부 이미지를 빼고 경로로 바꾼다.
   - 첫 회차(r1)였으면 요청을 영역 2개로 나눠(예: 제품 코드 / 시험·증거) 동시에 띄운다. 둘 다 SHIP이어야 SHIP이고 차단 finding은 합친다. 회차는 1회로 센다.
   - 무응답은 BLOCK이 아니라 `unverified`다.
-- 고정한 리뷰어가 재시도 뒤에도 `unverified`면 §1 순서의 다음 리뷰어를 드라이런하고, 통과하면 그 리뷰어로 같은 요청을 1회 보낸다. 바꾼 사실을 `## 결정`에 적는다. 이 전환은 **실행 장애에만** 쓴다(BLOCK을 받았다고 리뷰어를 바꾸지 않는다).
-- 그래도 안 되면:
+- (2.4.0) 리뷰어는 codex 하나이므로 다른 리뷰어로 전환하지 않는다. 재시도 뒤에도 `unverified`면 원인(인증·모델·샌드박스·실행 장애)을 `## 결정`에 적고 아래로 간다. 옛 `opencode-*` 값으로 바꾸지 않는다(실행기가 exit 2로 거부한다).
+- 재시도 뒤에도 안 되면:
   - **웨이브 고위험 검토**: `Agent`(model: opus, 읽기 전용 지시)로 같은 요청을 보조 검토하고 그 결과로 진행할 수 있다. 해당 task를 `sol-pending`으로 표시하고 마일스톤 최종 검토 범위에 넣는다.
   - **계획 검토·마일스톤 최종 검토**: Claude 리뷰로 대체하지 않는다. 게이트를 `unverified`로 두고 멈춤 조건 5로 보고한다.
 

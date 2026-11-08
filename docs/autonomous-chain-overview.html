@@ -138,7 +138,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 0.85rem; border-top: 
 <main>
 
 <h1>자율체인(auto-chain) 개요</h1>
-<p class="meta">대상: 이 환경을 처음 보는 개발자 · 기준: auto-chain 2.3.0 스킬 문서와 agent-orchestrator 계약 문서</p>
+<p class="meta">대상: 이 환경을 처음 보는 개발자 · 기준: auto-chain 2.4.0 스킬 문서와 agent-orchestrator 계약 문서</p>
 
 <p class="lead">자율체인은 여러 세션 분량의 큰 작업을 Claude Code가 사람 개입을 최소로 하며 끝까지 진행하게 하는 스킬이다. 작업을 <strong>마일스톤 → 웨이브 → task</strong>로 나누고, 마일스톤 하나를 조정자 세션 하나가 맡는다. 계획은 Opus 계획 에이전트가 쓰고, 검토는 다른 계열 모델(GPT-6.1 Sol)이 맡으며, 구현은 Claude worker가 병렬로 한다. 마일스톤이 끝나면 조정자는 상태 파일과 인계 문서를 남기고 새 세션을 열어 다음 마일스톤을 넘긴다. 모든 프로젝트에 공통인 절차는 스킬이 정하고, 프로젝트마다 다른 검증 명령·권한·추가 절차는 프로젝트 프로파일 파일이 정한다.</p>
 
@@ -208,7 +208,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 0.85rem; border-top: 
     <tr><td>구현</td><td><code>chain-worker</code></td><td>Sonnet · high</td><td>명세가 있는 task(기본)</td></tr>
     <tr><td>구현(판단)</td><td><code>chain-worker-deep</code></td><td>Opus · high</td><td>상태·동시성·권한 경계, 원인 조사가 핵심인 task</td></tr>
     <tr><td>구현(수정)</td><td><code>chain-worker-xhigh</code></td><td>Opus · xhigh</td><td>국소 수정으로 끝나지 않는 BLOCK·회귀 수정, 원인 모를 실패의 조사+수정</td></tr>
-    <tr><td>검토</td><td>리뷰어(기본 OpenCode <code>review-sol</code>, 또는 Codex CLI)</td><td>GPT-6.1 Sol · high</td><td>계획 검토, 웨이브 고위험 검토, 마일스톤 최종 검토</td></tr>
+    <tr><td>검토</td><td>리뷰어(codex CLI, <code>review-run.sh codex-cli</code>)</td><td>GPT-6.1 Sol · high</td><td>계획 검토, 웨이브 고위험 검토, 마일스톤 최종 검토</td></tr>
     <tr><td>파괴 검토</td><td><code>chain-breaker</code></td><td>Opus · high</td><td>기본 끔. 켜면 BLOCK 수정 뒤 리뷰와 동시에 "방금 수정이 깨뜨린 곳"을 재현으로 찾는다. 리포에 쓰지 않는다</td></tr>
   </tbody>
 </table>
@@ -239,7 +239,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 0.85rem; border-top: 
 
 <h3 id="review">1-4. 리뷰 게이트(Sol)</h3>
 
-<p>리뷰는 구현과 다른 계열 모델이 맡는다. 실행은 공통 실행기 <code>review-run.sh</code>가 하고, 리뷰어 종류(<code>opencode-sol</code> · <code>opencode-build</code> · <code>codex-cli</code>)는 프로파일 값 하나로 고른다. 리뷰어가 무엇이든 요청 파일 형식·판정 규칙·회차 규칙은 같다.</p>
+<p>리뷰는 구현과 다른 계열 모델이 맡는다. 실행은 공통 실행기 <code>review-run.sh</code>가 하고, 리뷰어는 codex CLI(<code>codex exec -m gpt-6.1-sol</code>, effort high, <code>-s read-only --ephemeral</code>) 하나다. 착수 드라이런이 실패하면 다른 리뷰어로 내려가지 않고 원인을 기록한 뒤 보고하고 멈춘다. 진행 중이던 체인의 상태 파일 reviewer가 <code>opencode-*</code>면 첫 리뷰 전에 codex 드라이런을 거쳐 <code>codex-cli</code>로 이관한다.</p>
 
 <ul>
   <li><strong>완료 근거는 done 파일 하나</strong>다. 실행기가 실제 종료 코드, RUN_ID, 리뷰 전후 snapshot(HEAD·작업 트리 식별자), 읽기 전용 여부를 기록한다. 로그 문자열이나 결과 파일 존재만으로는 완료도 통과도 아니다.</li>
@@ -598,8 +598,8 @@ task-brief: docs/chain/_profile/task-brief.md   # worker 덧붙임 지시서
 <pre><code>authority: { local-commit: yes, push: wave, external-write: no, new-cost: no,
              escalation: [extra-rounds:1, carry-reversible, stop] }
 verify-full: "&lt;프로젝트 CLI&gt; test &lt; /dev/null"
-skill: auto-chain 2.3.0
-reviewer: opencode-sol
+skill: auto-chain 2.4.0
+reviewer: codex-cli
 backend: herdr &lt;조정자 pane&gt;</code></pre>
 
 <h4>④ 조정자 커밋 규칙 — 스킬 커밋 절차에 덧붙임</h4>

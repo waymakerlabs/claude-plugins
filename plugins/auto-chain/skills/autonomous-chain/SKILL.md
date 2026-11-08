@@ -2,7 +2,7 @@
 name: autonomous-chain
 description: >-
   여러 세션 분량의 큰 작업, 설계 판단이 큰 구조 변경, 또는 사용자가 "자율체인으로" 진행을 명시 요청할 때 사용.
-  milestone → wave → task로 나누고, Opus(chain-planner-deep, 최초 계획은 xhigh)가 계획, GPT-6.1 Sol(OpenCode review-sol)이
+  milestone → wave → task로 나누고, Opus(chain-planner-deep, 최초 계획은 xhigh)가 계획, GPT-6.1 Sol(codex CLI)이
   검토, Claude worker가 병렬 구현한다. 마일스톤 하나를 세션 하나가 조정하고 다음 마일스톤 세션을 연다.
   worker 실행은 3단계 — ① Claude `Agent` 서브에이전트(기본) ② 다른 CLI는 headless 일회성 실행 + done 파일
   ③ 사용자가 지켜보거나 메인보다 오래 살아야 하는 작업만 옆 pane(`agent-orchestrator` 동작, 툴과 무관).
@@ -57,7 +57,7 @@ worker·planner·리뷰는 작업마다 아래 3단계 중 하나로 돌린다. 
 | 구현 | `chain-worker` | Sonnet high | 명세가 있는 task (기본) |
 | 구현(판단) | `chain-worker-deep` | Opus high | 상태·동시성·권한 경계나 원인 조사가 핵심일 때, `chain-worker` 실패 후 재시도 |
 | 구현(수정) | `chain-worker-xhigh` | Opus xhigh | (1.6.3) 수정 작업의 기본 — 국소 경로(§1)로 끝나지 않는 BLOCK 수정·회귀 수정·원인 조사가 필요한 수정은 처음부터 이 등급. 신규 구현 task에는 처음부터 배정하지 않는다 |
-| 검토 | 프로파일 `reviewer`(기본 OpenCode `review-sol`, 또는 `opencode-build`·`codex-cli`) — 실행기 `scripts/review-run.sh` | GPT-6.1 Sol high | 계획 검토, 웨이브 고위험 검토, 마일스톤 최종 검토 |
+| 검토 | codex CLI(`codex-cli`, 프로파일 `reviewer`는 하위 호환 키) — 실행기 `scripts/review-run.sh` | GPT-6.1 Sol high | 계획 검토, 웨이브 고위험 검토, 마일스톤 최종 검토 |
 | 파괴 검토 | `chain-breaker` | Opus high | (1.7.0) 기본 끔. 프로파일 `breaker: on`일 때만 BLOCK 수정 뒤 Sol delta와 동시에(§6). 리포에 쓰지 않음 |
 | 조정 | 메인 세션 | 세션 모델 | 마일스톤 조정, 기록, 통합 검증 |
 
@@ -242,7 +242,7 @@ BLOCK 수정이 인접 상태를 새로 깨뜨려 다음 회차에 새 BLOCK이 
 
 ### Sol 게이트
 
-실행 절차·요청 형식·리뷰어 선택·결과 판정·장애 처리는 `references/sol-review.md`를 따른다. 리뷰어(프로파일 `reviewer`)가 무엇이든 이 절의 게이트·회차·수렴 규칙은 같다. 이 문서의 "Sol 검토"는 고정한 리뷰어의 검토를 뜻한다.
+실행 절차·요청 형식·리뷰어 선택·결과 판정·장애 처리는 `references/sol-review.md`를 따른다. 이 문서의 "Sol 검토"는 codex CLI(`codex-cli`, Sol high) 리뷰를 뜻한다(2.4.0 단일화). 이어받은 체인의 상태 파일이 `reviewer: opencode-sol|opencode-build`이면 첫 리뷰 전에 codex 드라이런을 통과시키고 `reviewer: codex-cli`로 바꾼 뒤 `## 결정`에 "2.4.0 리뷰어 이관"을 적는다(`references/sol-review.md` §1). 드라이런이 실패하면 대체 리뷰어 없이 원인을 기록하고 멈춰 보고한다.
 
 | 게이트 | 대상 | 조건 | 무게 | 회차 |
 |---|---|---|---|---|
@@ -381,7 +381,7 @@ backlog: docs/chain/<id>/backlog.md
 started: <체인 시작 ISO 시각>          # 진행 보드 경과 시간 기준
 updated: <마지막 갱신 ISO 시각>        # (2.1.0) 마감 체크(§4)에서 반드시 고친다
 skill: auto-chain <버전>               # (2.2.0) 이 상태 파일을 쓴 스킬 버전. 이어받은 세션이 다르면 고치고 "## 결정"에 한 줄
-reviewer: <고정한 리뷰어>              # (2.2.0) sol-review.md §1 착수 드라이런 결과
+reviewer: codex-cli                    # (2.2.0, 2.4.0부터 codex-cli만) sol-review.md §1 착수 드라이런 결과
 ---
 
 ## 마일스톤

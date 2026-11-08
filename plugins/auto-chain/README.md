@@ -1,6 +1,6 @@
 # auto-chain
 
-큰 작업을 **milestone → wave → task**로 나누고, 마일스톤 하나를 Claude Code 세션 하나가 조정하며, task는 병렬 서브에이전트가 구현하는 자율 진행 skill입니다. 계획은 Opus, 검토는 다른 계열 모델(GPT-6.1 Sol — OpenCode `review-sol` 또는 Codex CLI)이 맡습니다. 프로젝트마다 다른 절차는 프로파일 파일로 정합니다.
+큰 작업을 **milestone → wave → task**로 나누고, 마일스톤 하나를 Claude Code 세션 하나가 조정하며, task는 병렬 서브에이전트가 구현하는 자율 진행 skill입니다. 계획은 Opus, 검토는 다른 계열 모델(GPT-6.1 Sol high — Codex CLI 하나)이 맡습니다. 프로젝트마다 다른 절차는 프로파일 파일로 정합니다.
 
 ## 구성
 
@@ -29,6 +29,7 @@
 - (1.7.0) 속도 우선(giki-editor-v2 회고): 화면 마일스톤은 Sol 최종 검토 없이 build·스모크로 마감, 데이터 마일스톤은 Sol 가벼운 게이트 1회(무거운 게이트는 계획이 `gate: heavy`로 표시한 마일스톤만). breaker 기본 끔(프로파일 `breaker: on`). 일반 문제는 30분 상한 → 백로그 `[30분]`, 간헐 실패는 `[quarantine]`, 데이터·권한 문제만 그 자리에서 해결. 시각 확인 `visual-check: request`(기다리지 않는 요청, 반응 없으면 넘김) 또는 `end`. 최초 계획은 두 층(골격·가로지르는 결정·첫 두 마일스톤 task)이고 이후는 마일스톤 마감마다 `chain-planner`가 M+2를 롤링 분해(Sol 검토 없음). worker 보고서 30줄.
 - (2.0.0) 실행 백엔드 분리: herdr pane 안이면 herdr(구현·계획 worker를 오른쪽 열 pane의 Claude 세션으로 띄우고, 조정자가 pane마다 sonnet high / opus high를 고름, worker와 조정자가 `herdr agent prompt`로 작업 중 대화), Orca 안이면 기존 Orca 방식. 짧은 탐색·조사만 서브에이전트. 판정 규칙(보고서·nonce·snapshot·게이트)은 그대로.
 - (2.1.0) 2체인 운영 분석(office·helpai) 반영: pane worker 정지는 transcript(jsonl) mtime과 `agent_status`로만 판정(10분 후보 → 화면 1회 → Escape 재지시, 재기동은 20분 무변화 2회), 조사 단계 진행 줄 10분 갱신, 조정자 맥락 150K 기준(예시)과 체인마다 새 조정자 세션, 프로젝트 가이드의 실행 수단 충돌 검사, 롤링 분해를 마지막 웨이브 기동 직후 병렬로, Sol 명령 사전 점검(쓰기 가능 우회 시 전후 git 대조), 검증 snapshot 격리, 확인 범위 = 보고서 + 위험 지점 diff, 시각 확인 `막힘` 상태, SHA 12자리, worker 메시지 `[worker <이름>] <done|failed|question|blocked>`, pane 기동 스크립트 `scripts/herdr-spawn-worker.sh`, 마감 체크(미해결 정리·`updated:` 갱신).
+- (2.4.0) 리뷰어를 codex CLI(`review-run.sh codex-cli`, `codex exec -m gpt-6.1-sol -c model_reasoning_effort="high" -s read-only --ephemeral`) 하나로 정리하고 opencode 리뷰어(`opencode-sol`·`opencode-build`)를 제거했습니다. 프로파일 `reviewer` 키는 하위 호환으로 남기되 값은 `codex-cli`만이며, 실행기는 opencode 값을 exit 2로 거부합니다. 이어받은 체인의 상태 파일이 `reviewer: opencode-*`이면 첫 리뷰 전에 codex 드라이런을 통과시키고 `codex-cli`로 이관합니다. 착수 드라이런이 실패하면 대체 리뷰어 없이 원인을 기록하고 멈춰 보고합니다. `worker:opencode-<agent>`(BLOCK 수정 구현 칸, `headless-run.sh`)는 리뷰가 아니라 그대로 둡니다. 근거: 2026-11-08 이 맥·office 맥미니 둘 다 codex 0.167.0로 read-only 실리뷰를 확인했고, opencode 경로는 인자 순서·래퍼·게이트웨이 키·에이전트 거부(office 7회·약 10분) 문제가 반복됐습니다.
 - (2.3.0) 오케스트레이션 툴 추상화: 실행 단계를 3단계로(① `Agent` 기본 — 웨이브 구현·BLOCK 수정 ② headless 일회성 실행 — Sol 검토 기본 `review_view: headless`, 비리뷰 다른 CLI는 `scripts/headless-run.sh` ③ pane — 최초 계획·인계를 넘기는 planner·마일스톤 인계·사용자가 지켜볼 작업만). 툴 명령은 `agent-orchestrator <동작>`으로만 부르고 10·11·12(unsupported·no backend·adapter error)면 ①·②로 내려감(①로 내려간 planner는 인계 전 회수 필수). `scripts/spawn-pane-worker.sh`(정책만 — 배치·이름·중복 검사는 어댑터, 10·11·12는 같은 코드로 전달)·`scripts/agent-stall-watch.sh`(`agent-status`·`agent-transcript`만, transcript 10이면 상태만), `references/pane-worker.md`. 옛 이름 스크립트는 2.3.x 동안 래퍼, 옛 `references/backend-herdr.md`는 포인터. Orca 경로 삭제(`references/backend-orca.md` — 복원은 태그 `auto-chain-v1.7.1-orca`). 탭·pane 이름 역할 접두어 `[OC]` 조정자·`[WO]` worker·`[RV]` 리뷰어(기본 `[WO] <name>`, 넘침 탭 `[WO] 자율체인 작업`). 프로파일 키 `review_view`. 시험 90건(기존 56건 이름 유지)
 - (2.2.2) herdr 탭·pane 이름을 항상 한글로: `herdr-spawn-worker.sh`가 split 직후 `pane rename`으로 `PANE_LABEL`(기본 `작업자 <name>`)을 붙이고(split에는 이름 옵션이 없다), 넘침 탭 기본 이름은 `자율체인 작업`. 조정자는 착수 때 자기 탭·pane이 번호·영문 기본값이면 한글로 바꾼다. 시험 56건
 - (2.2.1) 실기 확인(이 맥·office 맥미니) 반영: `review-run.sh` opencode 경로에서 메시지를 `-f`보다 앞에 둔다(`-f`가 배열이라 메시지를 파일로 읽어 `File not found`), 셸 래퍼 대신 실제 바이너리 `~/.opencode/bin/opencode`를 우선(`REVIEW_OPENCODE_BIN`) — 래퍼는 비대화형 실행에서 provider 초기화 실패. codex-cli·opencode-build 실제 리뷰 둘 다 done 파일로 회수 확인
@@ -58,7 +59,7 @@
 ## 요구사항
 
 - (2.3.0) 실행 단계는 3단계: ① Claude `Agent` 서브에이전트(기본, 추가 요구 없음) ② 다른 CLI의 headless 일회성 실행 ③ pane worker. ③은 이 리포의 `tools/agent-orchestrator`(설치 `tools/agent-orchestrator/install.sh` → `~/.local/bin/agent-orchestrator`)와 그것이 지원하는 오케스트레이션 툴 안에서만 쓰고, 없으면 ①·②로 내려갑니다. 툴 특이사항은 `tools/agent-orchestrator/docs/<backend>.md`
-- 리뷰어 하나(2.2.0, 프로파일 `reviewer`): OpenCode CLI + `review-sol` 에이전트 정의(`ai-gateway-openai/gpt-6.1-sol`, 기본) 또는 Codex CLI(`codex-cli`)
+- 리뷰어 하나(2.4.0): Codex CLI(`codex exec -m gpt-6.1-sol`, 읽기 전용 샌드박스). 프로파일 `reviewer` 키는 하위 호환으로 남기되 값은 `codex-cli`만 받습니다.
 
 ## 설계
 

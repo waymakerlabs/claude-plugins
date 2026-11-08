@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run-tests.sh — auto-chain 2.3.0 스크립트 시험 (가짜 codex·opencode·herdr, 실제 agent-orchestrator 개발 사본)
+# run-tests.sh — auto-chain 2.4.0 스크립트 시험 (가짜 codex·opencode·herdr, 실제 agent-orchestrator 개발 사본)
 #
 # 사용: scripts/test/run-tests.sh
 # 실제 herdr pane·리뷰어를 부르지 않는다. PATH 앞에 임시 폴더를 두고 가짜 실행 파일을 만든다.
@@ -67,7 +67,7 @@ esac
 exit 0
 SH
 
-# ───────── 가짜 opencode: 판정 블록 인용(닫히지 않음) 뒤 진짜 블록
+# ───────── 가짜 opencode: headless-run.sh의 worker:opencode-<agent> 시험용
 cat > "$FAKE/opencode" <<'SH'
 #!/usr/bin/env bash
 # 실제 opencode(yargs)처럼 -f/--file은 배열: 다음 플래그 전까지 오는 값을 모두 파일로 받는다.
@@ -81,12 +81,6 @@ for a in "$@"; do
     *) if [ $infile = 1 ] && [ ! -e "$a" ]; then printf 'Error: File not found: %s\n' "$a"; exit 1; fi ;;
   esac
 done
-if [ "${FAKE_MODE:-}" = unclosed ]; then
-  # 닫힌 SHIP 블록 뒤 마지막 BLOCK 블록이 REVIEW-DONE 없이 끝남(중단)
-  printf '# 판정: SHIP\n\n## 검증 원장\n- ok\nREVIEW-DONE\n'
-  printf '# 판정: BLOCK\n\n## BLOCK\n- B1 쓰는 중'
-  exit 0
-fi
 printf '\033[32m> reading request\033[0m\n'
 printf '# 판정: SHIP\n(이전 회차 인용 — 닫히지 않음)\n'
 printf 'tool: read file\n'
@@ -178,23 +172,16 @@ expect_keys rr-sigterm "$O/d6" exit=signal signal=TERM verdict=none
 pid6=$(sed -n 's/^RUN [^ ]* pid=\([0-9]*\).*/\1/p' "$O/run6.out")
 [ "$pid6" = "$bg" ] && ok rr-runline "RUN 줄 pid=$bg" || bad rr-runline "pid=$bg" "pid=$pid6"
 
-"$RR" opencode-sol "$REQ" "$O/r7.md" "$O/d7" "$R" > /dev/null
-first=$(awk 'NF{print;exit}' "$O/r7.md")
-expect_keys rr-opencode-extract "$O/d7" exit=0 verdict=BLOCK ro=same sandbox=n/a
-if [ "$first" = "# 판정: BLOCK" ] && tail -n 1 "$O/r7.md" | grep -qx 'REVIEW-DONE' && ! grep -q '이전 회차' "$O/r7.md"; then
-  ok rr-opencode-block "마지막 닫힌 블록만 추출"
-else bad rr-opencode-block "BLOCK 블록만" "$(tr '\n' '|' < "$O/r7.md")"; fi
-
 "$RR" bogus "$REQ" "$O/r8.md" "$O/d8" "$R" 2> /dev/null; rc=$?
 [ $rc = 2 ] && [ ! -f "$O/d8" ] && ok rr-badarg "rc=2, done 없음" || bad rr-badarg "rc=2 done 없음" "rc=$rc"
 
-# F1: 마지막으로 시작된 판정 블록이 닫히지 않았으면 이전 닫힌 블록을 쓰지 않는다
-# 2.2.1: opencode-build — 메시지가 -f 뒤에 있으면 실제 opencode는 메시지를 파일로 읽어 실패한다
-printf 'agent def\n' > "$O/review-sol.md"
-REVIEW_AGENT_FILE="$O/review-sol.md" "$RR" opencode-build "$REQ" "$O/r8b.md" "$O/d8b" "$R" > /dev/null
-expect_keys rr-opencode-build "$O/d8b" exit=0 verdict=BLOCK ro=same sandbox=n/a
-FAKE_MODE=unclosed "$RR" opencode-sol "$REQ" "$O/r9.md" "$O/d9" "$R" > /dev/null
-expect_keys rr-opencode-unclosed "$O/d9" exit=0 verdict=none result_bytes=0
+# 2.4.0: opencode 리뷰어는 제거됐다 — done 파일 없이 exit 2, 안내 메시지
+for rv in opencode-sol opencode-build; do
+  "$RR" $rv "$REQ" "$O/r-$rv.md" "$O/d-$rv" "$R" > /dev/null 2> "$O/e-$rv.txt"; rc=$?
+  if [ $rc = 2 ] && [ ! -f "$O/d-$rv" ] && grep -q '2.4.0부터 리뷰어는 codex-cli만 지원한다' "$O/e-$rv.txt"; then
+    ok rr-removed-$rv "rc=2, done 없음, 안내 메시지"
+  else bad rr-removed-$rv "rc=2 done 없음 안내" "rc=$rc done=$([ -f "$O/d-$rv" ] && echo 있음 || echo 없음)"; fi
+done
 
 # F2: snapshot의 git 실패를 삼키지 않는다
 FAKE_GIT_FAIL=status FAKE_MODE=ship "$RR" codex-cli "$REQ" "$O/r10.md" "$O/d10" "$R" > /dev/null

@@ -463,7 +463,7 @@ If `llmWikiWorkspace` is missing, the plugin auto-detects by searching for a fol
 
 ## ▶ auto-chain
 
-> Milestone → wave → task autonomous execution for large multi-session work. Opus plans, GPT-6.1 Sol (OpenCode `review-sol`) reviews, parallel Claude workers implement, and one lean coordinator session per milestone integrates, verifies and hands off to the next milestone. The execution backend is auto-selected (2.0.0): inside [herdr](https://herdr.dev), workers run as Claude sessions in side panes (coordinator stays large on the left, model picked per pane, two-way messaging during work); inside Orca, the 1.7.1 Orca-tab flow (tag `auto-chain-v1.7.1-orca`).
+> Milestone → wave → task autonomous execution for large multi-session work. Opus plans, GPT-6.1 Sol (codex CLI, read-only) reviews, parallel Claude workers implement, and one lean coordinator session per milestone integrates, verifies and hands off to the next milestone. The execution backend is auto-selected (2.0.0): inside [herdr](https://herdr.dev), workers run as Claude sessions in side panes (coordinator stays large on the left, model picked per pane, two-way messaging during work); inside Orca, the 1.7.1 Orca-tab flow (tag `auto-chain-v1.7.1-orca`).
 
 **Covers:**
 
