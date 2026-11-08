@@ -145,7 +145,7 @@ called "pane split w1:p2 --direction down --ratio 0.5" && ok pane-open-down-args
 run HERDR_PANE_ID= -- bash "$BIN" pane-open "작업자 3" --parent w1:p1 --cwd "$T"; chk pane-open-parent 0 w1:p4
 ao pane-open "작업자 4" --cwd "$T"; ao pane-open "작업자 5" --cwd "$T"; chk pane-open-fifth 0 w1:p6
 ao pane-open "작업자 6" --cwd "$T"; chk pane-open-overflow-tab 0 w1:p7
-called "tab create --workspace w1 --cwd $T --label 작업 넘침 --no-focus" && ok pane-open-overflow-label "넘침 탭 '작업 넘침'" || bad pane-open-overflow-label "tab create 작업 넘침" "$(grep 'tab create' "$FD/calls.log")"
+called "tab create --workspace w1 --cwd $T --label [WO] 작업 넘침 --no-focus" && ok pane-open-overflow-label "넘침 탭 '[WO] 작업 넘침'" || bad pane-open-overflow-label "tab create [WO] 작업 넘침" "$(grep 'tab create' "$FD/calls.log")"
 # 넘침 탭이 이미 있고 첫 pane이 비어 있으면 그대로 쓴다
 ao pane-open "작업자 7" --cwd "$T"; chk pane-open-overflow-reuse 0 w1:p7
 ao pane-open "작업자 8" --parent w1:p99 --cwd "$T"; chk pane-open-missing-parent 3

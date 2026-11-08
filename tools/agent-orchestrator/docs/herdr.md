@@ -24,7 +24,7 @@ herdr 관련 툴 특이사항은 이 문서 한 곳에만 둔다. 규칙 문서(
 
 - **포커스**: `tab create`·`pane split`에 항상 `--no-focus`. 사용자가 보던 pane을 빼앗지 않는다.
 - **이름**: `pane split`에는 이름 옵션이 없다 → split 직후 `pane rename <id> "<한글>"`. 이름 붙이기 실패는 경고만 하고 계속한다. 탭은 `tab create --label`. 탭·pane 이름은 한글, 에이전트 이름은 `[a-z][a-z0-9_-]{0,31}`(herdr 정규식).
-- **배치**: 오른쪽 열이 비면 기준 pane을 `--direction right`, 있으면 오른쪽 열에서 가장 높은 pane을 `--direction down --ratio 0.5`(2개 반반, 4개 4등분). 최대 5개, 넘치면 넘침 탭(기본 `작업 넘침`, `AGENT_ORCHESTRATOR_OVERFLOW_TAB`)을 재사용하거나 만든다. 넘침 탭 첫 pane이 빈 셸이면 그대로 쓴다.
+- **배치**: 오른쪽 열이 비면 기준 pane을 `--direction right`, 있으면 오른쪽 열에서 가장 높은 pane을 `--direction down --ratio 0.5`(2개 반반, 4개 4등분). 최대 5개, 넘치면 넘침 탭(기본 `[WO] 작업 넘침` — 역할 접두어, `AGENT_ORCHESTRATOR_OVERFLOW_TAB`)을 재사용하거나 만든다. 넘침 탭 첫 pane이 빈 셸이면 그대로 쓴다.
 - **cwd**: `--cwd`는 호출자의 신뢰된 폴더. 처음 보는 폴더는 Claude Code 폴더 신뢰 화면에서 멈춰 `agent start`가 `agent_not_ready`(→5)가 된다. 신뢰를 대신 승인하지 않는다 — `agent-read`로 화면 확인 → `agent-keys <이름> Escape` → 신뢰된 cwd로 다시 연다.
 - **agent start**: `--timeout 90000`. 이름 중복은 herdr가 막지 않을 수 있어 어댑터가 `agent list`로 먼저 검사한다(중복 3).
 - **agent prompt**: `--timeout`은 `--wait`와 함께만 유효하다. `--confirm` = `--wait --until working --until done --timeout 60000`. 빠른 완료(prompt 직후 바로 done)는 `--until done`이 없으면 대기가 성공하지 않는다 — 계약의 일부(음성 대조 `neg-send-until-done`). 프롬프트는 한 줄(개행은 Enter로 해석돼 중간 제출).
