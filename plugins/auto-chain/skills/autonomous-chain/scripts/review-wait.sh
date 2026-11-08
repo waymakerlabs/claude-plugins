@@ -11,7 +11,7 @@
 #   pid가 같고 start가 있으면, 살아 있는 프로세스의 시작 시각이 다를 때 PID 재사용으로 보고 lost(3).
 #   .run이 없거나 start가 비어 있으면 존재 여부만 본다.
 # 조정자는 이것만 run_in_background로 기다린다. 로그 grep·결과 파일 존재로 완료를 판단하지 않는다
-# (references/backend-herdr.md §7).
+# (references/sol-review.md §4).
 # bash 3.2 호환.
 
 set -u

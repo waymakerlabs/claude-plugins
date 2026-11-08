@@ -9,7 +9,7 @@
 - 리뷰어는 프로파일 `reviewer`(`references/profile.md`) 값이다: `opencode-sol`(기본) · `opencode-build` · `codex-cli`. 모델은 셋 다 GPT-6.1 Sol high다(`REVIEW_MODEL`·`REVIEW_EFFORT`로 바꿀 수 있다).
   - `opencode-sol`: OpenCode `review-sol` 에이전트(`~/.config/opencode/agent/review-sol.md`, 수정하지 않는다).
   - `opencode-build`: 쓰기 가능한 `build` 에이전트에 `review-sol.md`를 첨부한 우회(`REVIEW_AGENT_FILE`). 읽기 전용은 지시와 전후 snapshot 대조로만 지켜진다.
-  - (2.2.1) opencode 공통: 실행 파일은 `~/.opencode/bin/opencode`를 우선한다(`REVIEW_OPENCODE_BIN`으로 바꿈). 게이트웨이 키가 필요한 환경은 실행기 호출 **전에** 키를 export한다(예: `AIGW_OPENCODE_KEY=$(~/.claude/ai-router-refresh.sh | head -1)`, 값은 로그·상태 파일에 적지 않는다). herdr pane에서 실행할 때도 같다.
+  - (2.2.1) opencode 공통: 실행 파일은 `~/.opencode/bin/opencode`를 우선한다(`REVIEW_OPENCODE_BIN`으로 바꿈). 게이트웨이 키가 필요한 환경은 실행기 호출 **전에** 키를 export한다(예: `AIGW_OPENCODE_KEY=$(~/.claude/ai-router-refresh.sh | head -1)`, 값은 로그·상태 파일에 적지 않는다). 리뷰어 pane에서 실행할 때도 같다.
   - `codex-cli`: `codex exec … -s read-only`. 샌드박스가 읽기 전용을 강제한다.
 - 실행기·대기 스크립트: `scripts/review-run.sh`, `scripts/review-wait.sh`(SKILL.md와 같은 디렉터리 기준, 인자는 §3·§4).
 - **착수 드라이런**(체인 착수 때, 이어받은 세션도 첫 리뷰 전 1회): 짧은 요청 파일(`# 판정: SHIP` 한 줄과 `## 검증 원장`에 HEAD 12자, 마지막 줄 `REVIEW-DONE`만 출력하라는 내용)을 §3 명령으로 돌린다. §5-1 유효 조건을 통과하면 그 리뷰어로 고정한다. 실패하면 `reviewer` 값 → `opencode-build` → `codex-cli` 순서로 다음을 시도한다(이미 시도한 값은 건너뛴다). 동작한 값과 실패 사유를 상태 파일 `## 결정`에 적고, 이후 모든 회차가 그 값을 쓴다. 근거: office 체인에서 `--agent review-sol`이 거부돼 7회 시도·약 10분을 썼다.
@@ -118,10 +118,11 @@ S=<SKILL.md 디렉터리 절대 경로>; D=/tmp/chain-<chain-id>/reviews; mkdir 
 REQ="<요청 파일 절대 경로>"; RES="$D/<gate>-<n>-result.md"; DONE="$D/<gate>-<n>.done"; RUNF="$DONE.run"
 REVIEWER=<고정한 reviewer>; REPO="<리포 절대 경로>"
 CMD=$(printf '%q ' bash "$S/scripts/review-run.sh" "$REVIEWER" "$REQ" "$RES" "$DONE" "$REPO")
-# 실행: herdr는 backend-herdr.md §7(명령 pane), orca는 backend-orca.md §2, agent는 Bash run_in_background로 bash -c "$CMD"
+# 실행: review_view: headless(기본) → Bash run_in_background로 bash -c "$CMD"
+#       review_view: pane → pane-worker.md §7(pane-open "[RV] …" + pane-run). 10·11·12면 headless로
 ```
 
-- (2.2.0) 경로를 따옴표로 감싸 문자열에 끼우지 않는다. 인자마다 `printf %q`로 quote한 `CMD` 하나를 만들고, 세 백엔드 모두 이 `CMD`를 그대로 넘긴다(`herdr pane run`·`orca terminal create --command`는 명령을 셸 문자열로 받는다). 경로에 `'`·공백·`$(…)`가 있어도 인자 그대로 전달된다.
+- (2.2.0) 경로를 따옴표로 감싸 문자열에 끼우지 않는다. 인자마다 `printf %q`로 quote한 `CMD` 하나를 만들고, 두 실행 방식 모두 이 `CMD`를 그대로 넘긴다(`pane-run`은 명령을 셸 문자열로 받는다). 경로에 `'`·공백·`$(…)`가 있어도 인자 그대로 전달된다.
 - `<n>`은 회차·재시도마다 새 값이다(`final-M1-2`, 재시도 `final-M1-2b`). 실행기도 같은 경로의 이전 결과·done·로그를 `*.stale-<RUN_ID>`로 옮기지만 경로를 재사용하지 않는다.
 - **RUN 기록은 `<done>.run` 하나다**(`tee` 없음). `review-run.sh`가 직접 `RUN <RUN_ID> pid=<PID> start=<시작 시각>` 한 줄을 쓰고 stdout에도 같은 줄을 낸다. 기동 직후 이 줄에서 RUN_ID·PID를 읽어 상태 파일에 적는다(구동 증거). 이 파일이 생기기 전에는 §4 대기를 띄우지 않는다. `start`는 `review-wait.sh`가 PID 재사용을 가려내는 신원이다.
 - 로그·결과·done 파일은 `/tmp/chain-<chain-id>/`에 둔다. **리뷰가 진행되는 동안 조정자는 리포에 파일을 쓰지 않는다**(실행기 `ro` 검사가 깨진다). 판정을 기록한 뒤 결과 파일을 `reviews/`로 옮긴다.
@@ -150,7 +151,7 @@ bash "$S/scripts/review-wait.sh" "$DONE" "$PID" 3600   # Bash run_in_background,
   done
   ```
 
-  `REVIEW-STALL`이면 백엔드의 화면 읽기로 1회 보고(권한 질문·입력 대기인지 기록) 실행기 PID를 끝낸다. done 파일이 `exit=signal`로 남으면 §6 "무응답 재시도"로 간다.
+  `REVIEW-STALL`이면 (`review_view: pane`일 때) `agent-read <pane>`로 화면을 1회 보고, headless면 로그 끝 30줄을 1회 보고(권한 질문·입력 대기인지 기록) 실행기 PID를 끝낸다. done 파일이 `exit=signal`로 남으면 §6 "무응답 재시도"로 간다.
 - 실측(giki-parity M3, 9회): 리뷰 실행은 회당 1.5~6분. 소요를 말할 때는 done 파일 `started`·`ended`로 잰다.
 
 ## 5. 판정
@@ -173,7 +174,7 @@ bash "$S/scripts/review-wait.sh" "$DONE" "$PID" 3600   # Bash run_in_background,
 
    차단 finding이 하나도 없으면 실효 판정은 SHIP이다. 구현 모드에서는 §6-0 BLOCK 범위 밖 finding도 차단하지 않는다. 상태 파일에는 `원 판정 → 실효 판정`을 함께 적는다(예: `BLOCK→SHIP (MAJOR 2 → NOTE, block-on block)`).
 5. 상태 파일 기록: 게이트, 회차, reviewer, RUN_ID, snapshot(HEAD·작업 트리 식별자·대상 SHA), 원/실효 판정, 결과 파일 경로, 차단 finding id와 계열(`B8:C1`), delta면 각 finding의 해소 상태(`B8 부분 해소`). 원장에는 발생 줄 한 줄만 덧붙인다.
-6. pane·탭 정리: 백엔드 문서의 Sol 절.
+6. pane 정리(`review_view: pane`일 때): `pane-worker.md` §7.
 
 ## 6. 장애 처리
 

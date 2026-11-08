@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# run-tests.sh — auto-chain 2.2.0 스크립트 시험 (가짜 codex·opencode·herdr)
+# run-tests.sh — auto-chain 2.3.0 스크립트 시험 (가짜 codex·opencode·herdr, 실제 agent-orchestrator 개발 사본)
 #
 # 사용: scripts/test/run-tests.sh
 # 실제 herdr pane·리뷰어를 부르지 않는다. PATH 앞에 임시 폴더를 두고 가짜 실행 파일을 만든다.
+# pane worker 스크립트는 리포의 tools/agent-orchestrator(개발 사본)를 AGENT_ORCHESTRATOR로 부르고,
+# 그 어댑터가 가짜 herdr를 부른다. HOME은 임시 폴더로 바꿔 실제 설정·transcript를 읽지 않는다.
 # 결과: 케이스마다 "PASS|FAIL <이름> — <기대> / <실제>" 한 줄, 끝에 집계. 실패가 있으면 exit 1.
 # bash 3.2 호환.
 
@@ -116,7 +118,7 @@ case "$1 $2" in
   "agent get")
     st=$(cat "$D/status-$3" 2>/dev/null || echo "")
     if [ -z "$st" ]; then echo '{"error":{"code":"agent_not_found"}}'; exit 1; fi
-    echo "{\"result\":{\"agent\":{\"agent_status\":\"$st\",\"cwd\":\"/tmp/x\",\"agent_session\":{\"value\":\"uuid-1\"}}}}" ;;
+    echo "{\"result\":{\"agent\":{\"agent\":\"${FAKE_KIND:-claude}\",\"agent_status\":\"$st\",\"cwd\":\"/tmp/x\",\"agent_session\":{\"value\":\"uuid-1\"}}}}" ;;
   *) echo '{}' ;;
 esac
 SH
@@ -247,7 +249,20 @@ SR="$SCRIPTS/../references/sol-review.md"; SK="$SCRIPTS/../SKILL.md"
 if grep -q '\[안전\]' "$SR" && grep -E '^[[:space:]]*\| MAJOR ' "$SR" | grep -q '\[안전\]' && grep -q '\[안전\]' "$SK"; then ok doc-safety-tag "[안전] 태그 요청·매핑·SKILL"
 else bad doc-safety-tag "[안전] 3곳" "없음"; fi
 
-echo "== review-wait"
+RW="$SCRIPTS/review-wait.sh"
+export WAIT_INTERVAL=1
+echo "== headless-run"
+HR="$SCRIPTS/headless-run.sh"
+"$HR" opencode:work-x "$REQ" "$O/h1" "$R" > "$O/h1.out"; rc=$?
+expect_keys hr-opencode "$O/h1" exit=0 cli=opencode:work-x changed=no
+grep -q '^RUN .* pid=[0-9]* start=' "$O/h1.run" && [ "$(cat "$O/h1.run")" = "$(cat "$O/h1.out")" ] && ok hr-runfile "RUN 줄 = stdout" || bad hr-runfile "RUN 줄" "$(cat "$O/h1.run" 2>/dev/null)"
+grep -q 'File not found' "$O/h1.log" && bad hr-msg-order "메시지가 -f 앞" "File not found" || ok hr-msg-order "메시지가 -f 앞(파일로 읽히지 않음)"
+"$HR" bogus "$REQ" "$O/h2" "$R" 2> /dev/null; rc=$?
+[ $rc = 2 ] && [ ! -f "$O/h2" ] && ok hr-badarg "rc=2, done 없음" || bad hr-badarg "rc=2 done 없음" "rc=$rc"
+"$RW" "$O/h1" "$(sed -n 's/^RUN [^ ]* pid=\([0-9]*\).*/\1/p' "$O/h1.run")" 3 > /dev/null 2>&1; rc=$?
+[ $rc = 0 ] && ok hr-wait "review-wait.sh로 회수 rc=0" || bad hr-wait 0 "rc=$rc"
+
+
 RW="$SCRIPTS/review-wait.sh"
 export WAIT_INTERVAL=1
 "$RW" "$O/d1" $$ 5 > "$O/w1.out"; rc=$?
@@ -270,8 +285,20 @@ printf 'RUN y pid=%s start=%s\n' "$live" "$(LC_ALL=C ps -o lstart= -p "$live" | 
 kill "$live" 2> /dev/null; wait "$live" 2> /dev/null
 [ $rc = 4 ] && ok rw-identity-ok "신원 일치 rc=4(timeout)" || bad rw-identity-ok 4 $rc
 
-echo "== herdr-stall-watch"
-SW="$SCRIPTS/herdr-stall-watch.sh"
+# ───────── pane worker 시험 공통: 개발 사본 agent-orchestrator, 격리 HOME
+REPO_ROOT=$(cd "$SCRIPTS/../../../../.." && pwd)
+AO_DEV="$REPO_ROOT/tools/agent-orchestrator"
+[ -x "$AO_DEV/bin/agent-orchestrator" ] || { echo "FAIL ao-dev — 기대 $AO_DEV/bin/agent-orchestrator / 실제 없음"; exit 1; }
+export AGENT_ORCHESTRATOR="$AO_DEV/bin/agent-orchestrator"
+export HOME="$T/home"; mkdir -p "$HOME"
+export HERDR_ENV=1 HERDR_WORKSPACE_ID=w1
+unset HERDR_PANE_ID HERDR_TAB_ID AGENT_ORCHESTRATOR_BACKEND AGENT_ORCHESTRATOR_HOME
+# 실제 herdr를 건드리지 않음을 보장: 가짜가 아니면 즉시 중단(2.3.0 codex NOTE)
+if [ "$(command -v herdr)" = "$FAKE/herdr" ]; then ok ao-fake-herdr "PATH의 herdr = 가짜"
+else echo "FAIL ao-fake-herdr — 기대 $FAKE/herdr / 실제 $(command -v herdr) — 실제 herdr 접촉 위험으로 중단"; exit 1; fi
+
+echo "== agent-stall-watch"
+SW="$SCRIPTS/agent-stall-watch.sh"
 J="$T/jsonl"; mkdir -p "$J"
 # 분 전 → ISO UTC
 ago() { python3 -c "import datetime,sys;print((datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(minutes=float(sys.argv[1]))).strftime('%Y-%m-%dT%H:%M:%S.000Z'))" "$1"; }
@@ -350,35 +377,101 @@ printf 'T/a\tag-sb\t%s\n' "$J/stale.jsonl" > "$T/w9.tsv"
 out=$(STALL_ONCE=1 STALL_STATE_DIR="$T/state-9" "$SW" "$T/w9.tsv")
 [ -n "$out" ] && ok sw-key-restart "agent 바뀌면 새 알림" || bad sw-key-restart "알림 1줄" "출력 없음"
 
-echo "== herdr-spawn-worker"
-SP="$SCRIPTS/herdr-spawn-worker.sh"
+# 2.3.0: 옛 이름 래퍼가 같은 출력을 낸다
+out=$(STALL_ONCE=1 STALL_STATE_DIR="$T/state-w" "$SCRIPTS/herdr-stall-watch.sh" "$T/w9.tsv")
+out2=$(STALL_ONCE=1 STALL_STATE_DIR="$T/state-w2" "$SW" "$T/w9.tsv")
+[ -n "$out" ] && [ "$out" = "$out2" ] && ok sw-wrapper "옛 이름 래퍼 = 새 스크립트 출력" || bad sw-wrapper "같은 출력" "'$out' / '$out2'"
+# 2.3.0: jsonl 칸 unsupported(transcript 10) → 상태만 감시
+echo working > "$FAKE_DIR/status-ag-un"
+printf 'T-un\tag-un\tunsupported\n' > "$T/w10.tsv"
+out=$(STALL_ONCE=1 STALL_STATE_DIR="$T/state-10" "$SW" "$T/w10.tsv")
+[ "$out" = "T-un 감시 불가 · transcript unsupported (상태만 감시)" ] && ok sw-transcript-unsupported "unsupported 줄" || bad sw-transcript-unsupported "transcript unsupported" "$out"
+# 2.3.0: jsonl 칸이 비면 agent-transcript로 구한다. codex kind면 10 → unsupported
+printf 'T-cx\tag-un\t\n' > "$T/w11.tsv"
+out=$(FAKE_KIND=codex STALL_ONCE=1 STALL_STATE_DIR="$T/state-11" "$SW" "$T/w11.tsv")
+[ "$out" = "T-cx 감시 불가 · transcript unsupported (상태만 감시)" ] && ok sw-transcript-kind10 "빈 jsonl + codex kind → unsupported" || bad sw-transcript-kind10 "transcript unsupported" "$out"
+# 빈 jsonl + claude kind → agent-transcript가 격리 HOME의 transcript를 찾아 판정
+mkdir -p "$HOME/.claude/projects/-tmp-x"; cp "$J/stale.jsonl" "$HOME/.claude/projects/-tmp-x/uuid-1.jsonl"
+out=$(STALL_ONCE=1 STALL_STATE_DIR="$T/state-12" "$SW" "$T/w11.tsv")
+[ "$out" = "T-cx 정지 후보 · 마지막 진척 15분 전 · working (실측)" ] && ok sw-transcript-lookup "빈 jsonl → agent-transcript 경로로 판정" || bad sw-transcript-lookup "정지 후보 15분" "$out"
+# 2.3.0: 백엔드 없음(11)은 상태 읽기 실패와 구분해 rc를 보인다
+out=$(AGENT_ORCHESTRATOR_BACKEND=none STALL_ONCE=1 STALL_STATE_DIR="$T/state-13" "$SW" "$T/w10.tsv")
+[ "$out" = "T-un 감시 불가 · agent-orchestrator rc=11 (UNVERIFIED)" ] && ok sw-ao-rc "rc=11 줄" || bad sw-ao-rc "rc=11" "$out"
+out=$(AGENT_ORCHESTRATOR="$T/none/agent-orchestrator" STALL_ONCE=1 "$SW" "$T/w10.tsv" 2>/dev/null); rc=$?
+[ $rc = 12 ] && ok sw-ao-missing "진입점 없음 rc=12" || bad sw-ao-missing 12 "rc=$rc"
+
+echo "== spawn-pane-worker"
 BR="$T/brief.md"; echo brief > "$BR"
+# 같은 케이스를 새 경로(이름 그대로)와 옛 이름 래퍼(접두 w-)로 돌린다
+for SPV in new wrap; do
+if [ "$SPV" = new ]; then SP="$SCRIPTS/spawn-pane-worker.sh"; px=""; else SP="$SCRIPTS/herdr-spawn-worker.sh"; px="w-"; fi
 spawn() {  # $1 name, $2 effort, $3 첫 지시 뒤 상태
   rm -f "$FAKE_DIR/started"; echo "$3" > "$FAKE_DIR/status-$1"
-  HERDR_ENV=1 HERDR_WORKSPACE_ID=w1 PERM_FLAGS=--dangerously-skip-permissions ROLE=none \
+  PERM_FLAGS=--dangerously-skip-permissions ROLE=none \
     "$SP" "$1" sonnet "$2" "$BR" w1:p1 2> "$T/spawn.err"
 }
+: > "$FAKE_DIR/calls.log"
 out=$(spawn sp-a medium working); rc=$?
-case "$out" in "OK name=sp-a pane=w1:p9 model=sonnet effort=medium status=working "*) ok sp-medium "OK effort=medium status=working" ;; *) bad sp-medium "OK effort=medium" "rc=$rc $out $(cat "$T/spawn.err")" ;; esac
-grep -q 'pane rename w1:p9 작업자 sp-a' "$FAKE_DIR/calls.log" && ok sp-pane-label "split 직후 한글 pane 이름" || bad sp-pane-label "pane rename w1:p9 작업자 sp-a" "$(grep 'pane rename' "$FAKE_DIR/calls.log")"
-grep -q 'agent start sp-a .* --effort medium' "$FAKE_DIR/calls.log" && ok sp-medium-arg "--effort medium 전달" || bad sp-medium-arg "--effort medium" "$(grep 'agent start' "$FAKE_DIR/calls.log")"
+case "$out" in "OK name=sp-a pane=w1:p9 model=sonnet effort=medium status=working "*) ok "${px}sp-medium" "OK effort=medium status=working" ;; *) bad "${px}sp-medium" "OK effort=medium" "rc=$rc $out $(cat "$T/spawn.err")" ;; esac
+grep -qF 'pane rename w1:p9 [WO] 작업자 sp-a' "$FAKE_DIR/calls.log" && ok "${px}sp-pane-label" "split 직후 [WO] 한글 pane 이름" || bad "${px}sp-pane-label" "pane rename w1:p9 [WO] 작업자 sp-a" "$(grep 'pane rename' "$FAKE_DIR/calls.log")"
+grep -q 'agent start sp-a .* --effort medium' "$FAKE_DIR/calls.log" && ok "${px}sp-medium-arg" "--effort medium 전달" || bad "${px}sp-medium-arg" "--effort medium" "$(grep 'agent start' "$FAKE_DIR/calls.log")"
+# --parent 호환: HERDR_PANE_ID 없이 5번째 인자가 배치 기준이 된다
+grep -q 'pane layout --pane w1:p1' "$FAKE_DIR/calls.log" && ok "${px}sp-parent" "5번째 인자 → pane-open --parent w1:p1" || bad "${px}sp-parent" "pane layout --pane w1:p1" "$(grep 'pane layout' "$FAKE_DIR/calls.log")"
 out=$(spawn sp-b high "done"); rc=$?
-case "$out" in "OK name=sp-b "*"status=done "*) ok sp-fastdone "OK status=done (빠른 완료)" ;; *) bad sp-fastdone "OK status=done" "rc=$rc $out $(cat "$T/spawn.err")" ;; esac
+case "$out" in "OK name=sp-b "*"status=done "*) ok "${px}sp-fastdone" "OK status=done (빠른 완료)" ;; *) bad "${px}sp-fastdone" "OK status=done" "rc=$rc $out $(cat "$T/spawn.err")" ;; esac
 out=$(spawn sp-c high idle); rc=$?
-case "$out" in "OK name=sp-c "*"status=idle "*) ok sp-idle "OK status=idle" ;; *) bad sp-idle "OK status=idle" "rc=$rc $out" ;; esac
+case "$out" in "OK name=sp-c "*"status=idle "*) ok "${px}sp-idle" "OK status=idle" ;; *) bad "${px}sp-idle" "OK status=idle" "rc=$rc $out" ;; esac
 out=$(spawn sp-d high blocked); rc=$?
-[ $rc = 6 ] && ok sp-blocked "rc=6" || bad sp-blocked 6 "rc=$rc $out"
+[ $rc = 6 ] && ok "${px}sp-blocked" "rc=6" || bad "${px}sp-blocked" 6 "rc=$rc $out"
 out=$(spawn sp-e max working); rc=$?
-[ $rc = 2 ] && ok sp-badeffort "effort max 거부 rc=2" || bad sp-badeffort 2 "rc=$rc"
+[ $rc = 2 ] && ok "${px}sp-badeffort" "effort max 거부 rc=2" || bad "${px}sp-badeffort" 2 "rc=$rc"
+# jsonl: transcript 파일이 있으면 그 경로, codex kind면 unsupported
+out=$(spawn sp-j high working)
+case "$out" in *" jsonl=$HOME/.claude/projects/-tmp-x/uuid-1.jsonl") ok "${px}sp-jsonl" "jsonl=agent-transcript 경로" ;; *) bad "${px}sp-jsonl" "jsonl=…/uuid-1.jsonl" "$out" ;; esac
+out=$(FAKE_KIND=codex spawn sp-k high working)
+case "$out" in *" jsonl=unsupported") ok "${px}sp-jsonl-unsupported" "transcript 10 → jsonl=unsupported" ;; *) bad "${px}sp-jsonl-unsupported" "jsonl=unsupported" "$out" ;; esac
 
-# F10 음성 대조: --until done 을 빼면 빠른 완료에서 가짜 herdr가 실패시킨다
-sed 's/ --until "done"//' "$SP" > "$T/sp-nodone.sh"
-if grep -q -- '--until "done"' "$T/sp-nodone.sh"; then bad sp-neg-until "sed 적용" "남음"; else
+# F10 음성 대조(2.3.0 이전): 변형 대상은 실제 구현 위치인 어댑터 사본이다.
+# --until done 을 빼면 빠른 완료에서 가짜 herdr가 실패시킨다
+rm -rf "$T/ao"; cp -R "$AO_DEV" "$T/ao"
+sed 's/ --until "done"//' "$AO_DEV/adapters/herdr.sh" > "$T/ao/adapters/herdr.sh"
+if grep -q -- '--until "done"' "$T/ao/adapters/herdr.sh" || ! grep -q -- '--until "done"' "$AO_DEV/adapters/herdr.sh"; then bad "${px}sp-neg-until" "sed 적용(원본엔 있고 사본엔 없음)" "아님"; else
   rm -f "$FAKE_DIR/started"; echo "done" > "$FAKE_DIR/status-sp-f"
-  HERDR_ENV=1 HERDR_WORKSPACE_ID=w1 PERM_FLAGS=--dangerously-skip-permissions ROLE=none \
-    bash "$T/sp-nodone.sh" sp-f sonnet high "$BR" w1:p1 > /dev/null 2>&1; rc=$?
-  [ $rc = 6 ] && ok sp-neg-until "--until done 없으면 rc=6" || bad sp-neg-until 6 "rc=$rc"
+  AGENT_ORCHESTRATOR_HOME="$T/ao" PERM_FLAGS=--dangerously-skip-permissions ROLE=none \
+    "$SP" sp-f sonnet high "$BR" w1:p1 > /dev/null 2>&1; rc=$?
+  [ $rc = 6 ] && ok "${px}sp-neg-until" "어댑터 사본에서 --until done 없으면 rc=6" || bad "${px}sp-neg-until" 6 "rc=$rc"
 fi
+done
+
+# 2.3.0 spawn 계약: agent-orchestrator의 10·11·12는 같은 코드 그대로, stderr에 사유
+cat > "$FAKE/fake-ao" <<'AO'
+#!/usr/bin/env bash
+echo "ao $*" >> "$FAKE_DIR/ao.log"
+case "$1" in
+  whoami) [ -n "${FAKE_AO_WHOAMI:-}" ] && { echo "$FAKE_AO_WHOAMI"; exit 0; }; echo "agent-orchestrator: 자기 pane id 없음" >&2; exit 3 ;;
+  list) exit 0 ;;
+  pane-open) echo "agent-orchestrator: 사유-$FAKE_AO_RC" >&2; exit "$FAKE_AO_RC" ;;
+esac
+exit 4
+AO
+chmod +x "$FAKE/fake-ao"
+SP="$SCRIPTS/spawn-pane-worker.sh"
+for code in 10 11 12; do
+  AGENT_ORCHESTRATOR="$FAKE/fake-ao" FAKE_AO_RC=$code PERM_FLAGS=x ROLE=none \
+    "$SP" sp-x sonnet high "$BR" w1:p1 > /dev/null 2> "$T/spawn.err"; rc=$?
+  [ $rc = "$code" ] && grep -q "rc=$code" "$T/spawn.err" && grep -q "사유-$code" "$T/spawn.err" \
+    && ok "spc-pass-$code" "rc=$code 그대로, stderr 사유" || bad "spc-pass-$code" "rc=$code + 사유" "rc=$rc $(cat "$T/spawn.err")"
+done
+AGENT_ORCHESTRATOR="$FAKE/fake-ao" FAKE_AO_RC=4 PERM_FLAGS=x ROLE=none "$SP" sp-x sonnet high "$BR" w1:p1 > /dev/null 2>&1; rc=$?
+[ $rc = 4 ] && ok spc-place-4 "pane-open 4 → 배치 실패 4" || bad spc-place-4 4 "rc=$rc"
+grep -q -- 'pane-open \[WO\] 작업자 sp-x --parent w1:p1 --cwd ' "$FAKE_DIR/ao.log" && ok spc-parent-arg "5번째 인자 → --parent" || bad spc-parent-arg "--parent w1:p1" "$(grep pane-open "$FAKE_DIR/ao.log" | tail -1)"
+AGENT_ORCHESTRATOR="$T/none/agent-orchestrator" PERM_FLAGS=x ROLE=none "$SP" sp-x sonnet high "$BR" w1:p1 > /dev/null 2> "$T/spawn.err"; rc=$?
+[ $rc = 12 ] && grep -q 'adapter error' "$T/spawn.err" && ok spc-missing-12 "진입점 없음 rc=12" || bad spc-missing-12 12 "rc=$rc"
+: > "$FAKE_DIR/ao.log"
+AGENT_ORCHESTRATOR="$FAKE/fake-ao" FAKE_AO_WHOAMI=w1:p7 FAKE_AO_RC=10 PERM_FLAGS=x ROLE=none "$SP" sp-x sonnet high "$BR" > /dev/null 2>&1
+grep -q -- '--parent w1:p7' "$FAKE_DIR/ao.log" && ok spc-whoami "5번째 인자 없으면 whoami가 기준" || bad spc-whoami "--parent w1:p7" "$(cat "$FAKE_DIR/ao.log")"
+AGENT_ORCHESTRATOR="$FAKE/fake-ao" PERM_FLAGS=x ROLE=none "$SP" sp-x sonnet high "$BR" > /dev/null 2>&1; rc=$?
+[ $rc = 2 ] && ok spc-noparent "기준 pane 없음 rc=2" || bad spc-noparent 2 "rc=$rc"
 
 echo "== 집계: PASS $PASS / FAIL $FAIL"
 [ "$FAIL" = 0 ]

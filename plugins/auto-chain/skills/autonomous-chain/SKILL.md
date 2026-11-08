@@ -4,7 +4,8 @@ description: >-
   여러 세션 분량의 큰 작업, 설계 판단이 큰 구조 변경, 또는 사용자가 "자율체인으로" 진행을 명시 요청할 때 사용.
   milestone → wave → task로 나누고, Opus(chain-planner-deep, 최초 계획은 xhigh)가 계획, GPT-6.1 Sol(OpenCode review-sol)이
   검토, Claude worker가 병렬 구현한다. 마일스톤 하나를 세션 하나가 조정하고 다음 마일스톤 세션을 연다.
-  실행 백엔드는 자동 선택 — herdr pane 안이면 herdr(worker를 옆 pane의 Claude 세션으로 띄움), Orca 안이면 Orca 탭.
+  worker 실행은 3단계 — ① Claude `Agent` 서브에이전트(기본) ② 다른 CLI는 headless 일회성 실행 + done 파일
+  ③ 사용자가 지켜보거나 메인보다 오래 살아야 하는 작업만 옆 pane(`agent-orchestrator` 동작, 툴과 무관).
   프로젝트별 추가 절차는 `.claude/autonomous-chain.md` 프로파일이 정한다.
   작은 수정, 범위가 닫힌 일반 기능, 질문, 규약 검토에는 쓰지 않는다.
 ---
@@ -14,20 +15,22 @@ description: >-
 > 이 문서를 열었다면 체인을 시작하거나 이어받는 중이다. 절차를 기억으로 재구성하지 말고 아래를 따른다.
 > 설계 근거: 이 플러그인 리포의 `docs/design/claude-autonomous-chain.md`.
 
-reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planning.md`, `references/task-brief.md`, `references/sol-review.md`, `references/profile.md`, `references/backend-herdr.md`, `references/backend-orca.md`, (2.1.0) `scripts/herdr-spawn-worker.sh`(herdr pane worker 기동), (2.2.0) `scripts/review-run.sh`·`scripts/review-wait.sh`(리뷰 실행·대기), `scripts/herdr-stall-watch.sh`(pane worker 정지 감시). worker에게는 **절대 경로**로 넘긴다.
+reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planning.md`, `references/task-brief.md`, `references/sol-review.md`, `references/profile.md`, (2.3.0) `references/pane-worker.md`(③ 전용), `scripts/review-run.sh`·`scripts/review-wait.sh`(리뷰 실행·대기), `scripts/headless-run.sh`(② 비리뷰 실행), `scripts/spawn-pane-worker.sh`(③ 기동), `scripts/agent-stall-watch.sh`(③ 정지 감시). worker에게는 **절대 경로**로 넘긴다. 오케스트레이션 툴 명령은 `agent-orchestrator <동작>`(`${AGENT_ORCHESTRATOR:-$HOME/.local/bin/agent-orchestrator}`, 이 리포 `tools/agent-orchestrator/`)으로만 부르고, 툴 특이사항은 `tools/agent-orchestrator/docs/<backend>.md`에만 있다.
 
-## 1-1. 실행 백엔드 선택 (2.0.0)
+## 1-1. 실행 단계 선택 (2.3.0)
 
-체인을 시작하거나 이어받을 때 1회 고르고 상태 파일 frontmatter `backend:`에 적는다. 이어받은 세션도 다시 판정한다(사용자가 도구를 바꿨을 수 있다).
+worker·planner·리뷰는 작업마다 아래 3단계 중 하나로 돌린다. 체인 착수와 이어받은 세션 첫 착수 때 `"$AO" backend`(`AO=${AGENT_ORCHESTRATOR:-$HOME/.local/bin/agent-orchestrator}`)를 1회 보고 결과를 상태 파일 frontmatter `backend:`에 적는다(0이면 `<백엔드> <조정자 pane>`, 10·11·12면 `none (rc=<코드>)`). 조회는 ③이 필요할 때만 의미가 있다.
 
-1. 프로파일 `backend: herdr|orca|agent`가 있으면 그 값(전제가 깨지면 아래 순서로 내려간다)
-2. `test "${HERDR_ENV:-}" = 1` → **herdr** — `references/backend-herdr.md`를 읽고 따른다
-3. `orca status`가 ready → **orca** — `references/backend-orca.md`
-4. 둘 다 아니면 **agent** — 구현은 `Agent` 서브에이전트, 리뷰는 `run_in_background` Bash로 직접 실행(sol-review.md §3 실행기 + §4 done 파일 대기), 인계는 하지 않고 인계 문서만 남긴 뒤 사용자에게 다음 세션 시작 명령 한 줄을 보고한다
+| 단계 | 쓰는 작업 | 실행 |
+|---|---|---|
+| ① 기본 | 웨이브 구현 task, BLOCK 수정 worker, 전수 점검, 짧은 탐색·조사, `chain-breaker`, Sol 장애 때 Opus 보조 검토 | `Agent`(`subagent_type: auto-chain:<역할>`, `run_in_background: true`, 같은 웨이브의 독립 task는 한 메시지에서 병렬). 결과는 보고서 파일, 반환은 한 줄 |
+| ② headless | Sol 검토·원인 조사(`review_view: headless`, 기본), `worker:opencode-<agent>` 같은 다른 CLI 실행 | `run_in_background` Bash로 `scripts/review-run.sh`(리뷰) 또는 `scripts/headless-run.sh`(비리뷰) + done 파일을 `scripts/review-wait.sh`로 대기 |
+| ③ pane | 최초 계획 `chain-planner-deep`(D2), 인계를 넘겨 살아야 하는 롤링 분해·다음 마일스톤 planner, 마일스톤 인계, 사용자가 지켜보며 끼어들 작업·작업 도중 조정자와 대화가 필요한 작업, `review_view: pane`의 리뷰 | `references/pane-worker.md` — `spawn-pane-worker.sh`·`pane-open`·`agent-start`·`agent-send` |
 
-이 문서 본문의 "worker 기동", "Sol 기동", "인계"는 고른 백엔드 문서의 같은 절로 실행한다. 판정 규칙(보고서·done 파일·snapshot·게이트)은 백엔드와 무관하다. herdr `agent_status`는 화면과 다를 수 있으니 완료 판정은 보고서·worker 메시지로만 한다(§4·§5).
-
-- **(2.1.0) 프로젝트 가이드 충돌 검사**: 착수 때 프로파일뿐 아니라 프로젝트 자체 체인 가이드(예: `docs/**/chain-guide.md`, 리포 `CLAUDE.md`의 체인 절)도 읽는다. 가이드가 실행 수단을 이 스킬과 다르게 정하면(예: herdr 백엔드인데 worker를 `Agent` 서브에이전트로) 그 충돌을 상태 파일 `## 결정`에 한 줄로 적고 **백엔드 문서 §1 표를 우선한다**. 가이드가 명시적으로 `backend: agent`라고 할 때만 가이드를 따른다. 근거: helpai 체인에서 가이드가 worker를 `Agent`로 지정해 pane worker 이점(조정자 맥락 절약·작업 중 대화)을 잃었다.
+- **③에서 10·11·12를 받으면 ①·②로 내려간다.** 10(unsupported)·11(no backend)은 정상 내려감이라 실패 횟수에 넣지 않는다. 12(adapter error)는 내려가되 설치 결함으로 사용자에게 한 줄 알린다. **①로 내려간 작업은 현재 세션 안에서 끝나야 한다**(인계 전 회수 필수 — `Agent`는 child 세션이 승계할 수 없다). 그래서 ③ planner가 ①로 내려가면 마감 뒤 planner 완료를 기다리고 그 대기를 "## 시간"에 적는다(§3-1). 인계 자체가 ③을 못 쓰면 인계 문서만 남기고 사용자에게 다음 세션 시작 명령 한 줄을 보고한다(§9).
+- ③이 기본이 아닌 이유: pane 회수 지연(M1-10 리뷰 회수 179분), 조사 중 worker 정지 오판, 처음 보는 폴더의 신뢰 화면(`agent_not_ready`). ①은 완료 알림이 바로 오고 정지 감시가 필요 없다.
+- 판정 규칙(보고서·done 파일·snapshot·게이트)은 단계와 무관하다. ③의 에이전트 상태는 화면과 다를 수 있으니 완료 판정은 보고서·worker 메시지로만 한다(§4·§5).
+- **(2.1.0, 2.3.0 갱신) 프로젝트 가이드 충돌 검사**: 착수 때 프로파일뿐 아니라 프로젝트 자체 체인 가이드(예: `docs/**/chain-guide.md`, 리포 `CLAUDE.md`의 체인 절)도 읽는다. 가이드가 실행 수단을 이 3단계 기준과 다르게 정하면 그 충돌을 상태 파일 `## 결정`에 한 줄로 적고 **3단계 기준을 우선한다**. 가이드가 어떤 작업에 **명시적으로 pane을 요구하면** 그 작업은 ③을 허용한다(③을 쓸 수 없으면 위 내려감 규칙). 가이드가 옛 스크립트 이름(`herdr-spawn-worker.sh`·`herdr-stall-watch.sh`)이나 옛 문서 경로를 가리켜도 2.3.x 동안 래퍼·포인터 파일로 동작한다.
 - 프로젝트 가이드로 도는 체인도 착수 때 이 스킬을 `Skill`로 로드한다(가이드는 프로젝트 차이만 적고 절차는 이 문서가 진본이다).
 
 ## 1. 적용 범위와 실행 단계
@@ -35,14 +38,14 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 | 단계 | 판단 기준 | 실행 |
 |---|---|---|
 | 직접 | 결과가 뻔하고, 보고서만으로는 판정하기 어려워 어차피 코드를 봐야 하는 작은 수정 | 조정자가 직접 수정하고 영향 시험 실행 |
-| 병렬 | 파일 소유권을 나눌 수 있는 독립 단위가 2개 이상 | task를 worker에 맡김(herdr: 옆 pane, orca·agent: 서브에이전트) |
+| 병렬 | 파일 소유권을 나눌 수 있는 독립 단위가 2개 이상 | task를 worker에 맡김(§1-1 실행 단계 — 기본 ① `Agent`) |
 | 체인 | 여러 세션 분량, 설계 판단이 큼, 또는 사용자가 명시 요청 | 계획 세션 → 마일스톤 세션들 |
 
 - 직접과 병렬 중 무엇을 고를지는 조정자가 판단한다. 파일 수 같은 숫자 기준은 두지 않는다. 애매하면 가벼운 쪽을 고른다.
 - **(1.3.0) BLOCK 수정의 기본은 국소 경로다.** 리뷰 결과가 원인 위치(파일:줄)와 재현 입력을 특정했으면 worker를 띄우지 않는다. 조정자가 직접 고치고 → 재현 입력 회귀 시험 1~2건을 넣고 → 바꾼 모듈의 영향 시험만 돌리고 → 커밋 → **무거운 게이트면** Sol **delta 검토**(§6)를 받고, 가벼운 게이트면 영향 시험 결과를 상태 파일 "## Sol 검토"에 `fixed-local <커밋> · <시험 명령·결과>`로 적고 재검토 없이 진행한다(1.7.0). 프로파일 `breaker: on`이고 발동 조건에 맞을 때만 delta 검토와 동시에 파괴 검토를 돌린다(1.5.0, §6 "파괴 검토 동시 실행"). worker는 원인 조사가 필요하거나 수정이 여러 모듈·계약에 걸칠 때만 쓰고, (1.6.3) 그때는 처음부터 `chain-worker-xhigh`를 쓴다(Sonnet·deep 단계를 거치지 않는다). 신규 구현 task의 등급은 planner 표시를 따른다.
   - 근거(giki-parity M3 실측): worker BLOCK 수정 1회 31~96분(대부분 판단 왕복 — 시험·명령 실행은 96분 중 16분), 같은 성격 국소 수정을 조정자가 직접 했을 때 약 10분 + delta 검토 1.5분으로 SHIP.
   - (2.2.0) **원인과 위치가 명확한 작은 수정은 worker를 띄우지 않는 것이 기본이다** — BLOCK 수정뿐 아니라 웨이브 통합 실패·작은 후속 task도 같다. pane 기동·지시서·회수 비용이 수정 자체보다 크다. helpai 43.6h에서 FIX 구간이 약 775분으로 사람 대기 다음이었다.
-- 체인 적용 중에는 전역 CLAUDE.md의 병렬 에이전트·모델 선택 규칙, "Opus 초안 → codex 리뷰", "완료 시 codex 크로스체크", 인계 프로토콜의 Codex 크로스체크 대신 **이 스킬의 worker 배정(백엔드별)과 Sol 게이트**를 따른다.
+- 체인 적용 중에는 전역 CLAUDE.md의 병렬 에이전트·모델 선택 규칙, "Opus 초안 → codex 리뷰", "완료 시 codex 크로스체크", 인계 프로토콜의 Codex 크로스체크 대신 **이 스킬의 worker 배정(§1-1 실행 단계)과 Sol 게이트**를 따른다.
 
 ## 2. 역할과 모델
 
@@ -50,7 +53,7 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 |---|---|---|---|
 | 계획 | `chain-planner` | Opus high | (1.7.0) 롤링 분해(§3-1), 계획 delta 수정·출시 검토 삽입 등 최초 계획 뒤의 planner 호출(되돌리기 쉬운 설계) |
 | 계획(깊이) | `chain-planner-deep` | Opus xhigh | (1.6.5) 체인의 최초 계획은 항상. 이후 호출은 스키마, 외부 계약, 동시성, 보안처럼 되돌리기 어려운 설계일 때 |
-| 구현(작음) | `chain-worker` | Sonnet medium | (2.2.0) 문서·명세가 명확한 작은 구현(파일 몇 개, 판단 거의 없음). herdr pane worker에서만 effort를 낮춘다(`herdr-spawn-worker.sh`가 medium 허용) |
+| 구현(작음) | `chain-worker` | Sonnet medium | (2.2.0) 문서·명세가 명확한 작은 구현(파일 몇 개, 판단 거의 없음). ①은 `Agent`의 `model: sonnet`·`effort: medium`, ③은 `spawn-pane-worker.sh`의 medium |
 | 구현 | `chain-worker` | Sonnet high | 명세가 있는 task (기본) |
 | 구현(판단) | `chain-worker-deep` | Opus high | 상태·동시성·권한 경계나 원인 조사가 핵심일 때, `chain-worker` 실패 후 재시도 |
 | 구현(수정) | `chain-worker-xhigh` | Opus xhigh | (1.6.3) 수정 작업의 기본 — 국소 경로(§1)로 끝나지 않는 BLOCK 수정·회귀 수정·원인 조사가 필요한 수정은 처음부터 이 등급. 신규 구현 task에는 처음부터 배정하지 않는다 |
@@ -59,8 +62,8 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 | 조정 | 메인 세션 | 세션 모델 | 마일스톤 조정, 기록, 통합 검증 |
 
 - 위 표의 모델·effort는 역할별 기본값이다. 이름은 플러그인 접두사가 붙은 형태(`auto-chain:chain-worker` 등)로 쓴다.
-  - orca·agent 백엔드(서브에이전트): frontmatter에 고정된 값을 쓰고, `Agent` 호출 때 `model`을 넘겨 덮어쓰지 않는다.
-  - (2.0.0) herdr 백엔드(pane worker): 조정자가 pane마다 **sonnet medium / sonnet high / opus high** 중에서 고른다(medium은 2.2.0, 위 "구현(작음)" 행만. xhigh는 수정 사다리와 `chain-planner-deep`만). 기동 스크립트 성공 줄의 `effort=`가 요청값이고, 실제 적용값은 화면에서 확인해 "## 모델 적용 확인"에 적는다(확인 못 하면 `unverified`). 기준과 명령은 `references/backend-herdr.md` §3. 고른 값과 이유를 "## 진행" 비고에 적는다.
+  - (2.3.0) ① `Agent`: 기본은 frontmatter 값이다. 위 표와 다른 값(예: "구현(작음)"의 sonnet medium)이 필요하면 `Agent`의 `model`·`effort`로 지정하고 고른 값과 이유를 "## 진행" 비고에 적는다. 적용값은 `Agent` 호출 인자로 기록한다.
+  - ③ pane worker: 조정자가 pane마다 **sonnet medium / sonnet high / opus high** 중에서 고른다(xhigh는 수정 사다리와 `chain-planner-deep`만). 기동 스크립트 성공 줄의 `effort=`가 요청값이고, 실제 적용값은 화면에서 확인해 "## 모델 적용 확인"에 적는다(확인 못 하면 `unverified`). 기준과 명령은 `references/pane-worker.md` §3.
 - worker 등급은 planner가 task마다 표시한 대로 따른다. "중요해 보인다"는 이유로 올리지 않는다.
 - worker는 서브에이전트를 다시 만들지 않는다(정의에서 `Agent` 도구가 빠져 있다).
 - 실제로 적용된 모델·effort를 확인하지 못하면 상태 파일에 `unverified`로 두고 통과로 추론하지 않는다.
@@ -73,7 +76,7 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 3. planner 호출: (1.6.5) 체인의 **최초 계획은 위험도와 무관하게 항상 `chain-planner-deep`**이다. 최초 계획의 분해 품질이 이후 모든 마일스톤의 회차를 좌우하기 때문이다. 계획 검토 BLOCK 뒤 delta 수정·출시 검토 마일스톤 삽입 같은 이후 호출은 설계가 되돌리기 어려우면 `chain-planner-deep`, 아니면 `chain-planner`. (1.7.0) 최초 계획은 **두 층**이다: 전체 마일스톤 골격 + 마일스톤을 가로지르는 결정 + **첫 두 마일스톤만** task 분해(`references/planning.md` §2-1). (1.7.1) 시간 상한은 두지 않는다 — 계획은 충분히 한다. 대신 planner는 뼈대를 먼저 파일로 쓰고 조사를 묶어서 한다(§2-2). 조정자는 계획 문서 frontmatter 바로 다음 `진행:` 줄로 상태를 보고하고, planner를 멈추게 하지 않는다. 지시서에는 `references/planning.md` 절대 경로, 목표, `authority`, 기존 상태 경로, 프로파일 경로, 결함 계열 원장 경로(이전 체인 것이 있으면), 계획 문서 경로(기본 `docs/chain/<chain-id>/plan.md`)만 넣는다.
 4. 계획 `review: required`면 Sol 계획 검토(§6). BLOCK은 같은 planner에 delta만 넘겨 고친다(`SendMessage`로 이어가거나, 새 호출이면 BLOCK 결과 경로와 고칠 절만 넘긴다).
 5. 상태 파일, 질문 대기열, 결함 계열 원장(§6-1)을 만든다(§8). 원장이 이미 있으면(프로파일 `defect-classes`로 체인끼리 공유) 새로 만들지 않는다. 그다음 M1 진행 방식을 고른다.
-   - 기본: 인계 문서를 쓴 뒤 M1 세션을 백엔드의 인계 방식으로 연다(§9).
+   - 기본: 인계 문서를 쓴 뒤 M1 세션을 §9 인계 방식으로 연다.
    - 계획 세션의 맥락이 아직 충분하면(§9 "조정자 맥락 기준") 같은 세션에서 M1을 이어서 진행해도 된다(§4 절차 그대로). 이 경우 상태 파일 "## 결정"에 그렇게 했다고 남기고, 인계는 M1→M2부터 한다.
 
 ### 3-1. 롤링 분해 (1.7.0)
@@ -86,8 +89,9 @@ reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planni
 - 가로지르는 결정(스키마·외부 계약·저장 형식)을 바꿔야 하면 롤링 분해에서 고치지 않는다. `chain-planner-deep` delta + Sol 계획 검토(가벼운 게이트)로 올린다.
 - 진행 원장·외부 시스템에는 마일스톤은 최초 계획 때, task는 분해될 때 추가한다. 진척률 분모가 분해 시점에 늘어나는 것은 정상이다.
 - 끝내는 조건: M<n+2>가 없거나 이미 분해돼 있으면 건너뛴다. 그 밖에는 마지막 마일스톤까지 반드시 분해한다. 최초 계획이 M1·M2를 분해했으므로 M1 마감 때 M3, M2 마감 때 M4 … 순서다.
-- **(2.1.0) 마감 경로 밖에서 병렬로 한다.** 롤링 분해(또는 다음 마일스톤 계획)는 마감을 기다리지 않고 **마지막 웨이브 기동 직후** planner를 띄워 병렬로 시작한다(herdr는 pane planner). 근거: helpai에서 마감 뒤 계획을 순차로 돌려 마일스톤 사이 공백이 3h49m이었다. 지시서의 "앞 마일스톤 마감 보고"는 그 시점의 상태 파일·백로그 경로로 대신하고, 마감 결과가 분해를 바꾸면 마감 뒤 delta로 넘긴다.
-  - 마감·인계 때 계획이 끝나 있지 않으면 기다리지 않는다. 인계 문서에 `계획 진행 중 · pane <id> · agent <이름> · 보고서/계획 문서 <경로>`를 적고 **child가 회수**한다(§9 "진행 중인 worker" 규칙의 예외 — planner는 남긴 채 인계할 수 있다).
+- **(2.1.0) 마감 경로 밖에서 병렬로 한다.** 롤링 분해(또는 다음 마일스톤 계획)는 마감을 기다리지 않고 **마지막 웨이브 기동 직후** planner를 띄워 병렬로 시작한다(③ pane planner — 인계를 넘겨 살아야 하므로. §1-1). 근거: helpai에서 마감 뒤 계획을 순차로 돌려 마일스톤 사이 공백이 3h49m이었다. 지시서의 "앞 마일스톤 마감 보고"는 그 시점의 상태 파일·백로그 경로로 대신하고, 마감 결과가 분해를 바꾸면 마감 뒤 delta로 넘긴다.
+  - **③ planner일 때만**: 마감·인계 때 계획이 끝나 있지 않으면 기다리지 않는다. 인계 문서에 `계획 진행 중 · pane <id> · agent <이름> · 보고서/계획 문서 <경로>`를 적고 **child가 회수**한다(§9 "진행 중인 worker" 규칙의 예외).
+  - (2.3.0) ③을 쓸 수 없어 ① `Agent` planner로 돌렸으면 **인계 전 planner 완료·회수가 필수**다. 마감 뒤 planner를 기다리고 그 대기 분을 "## 시간"(죽은 시간이 아니라 `계획` 칸)에 적는다.
   - 프로젝트가 "Opus 초안 + codex 크로스체크" 같은 자체 계획 방식을 써도 같은 병렬화를 적용한다(초안을 마지막 웨이브 기동 직후 시작).
   - **병렬 planner는 리포의 계획 문서를 직접 고치지 않는다.** 출력은 `/tmp/chain-<chain-id>/plan-draft/`(분해 절·진행 줄 변경안)에 쓰고, 조정자가 게이트·검증이 끝난 뒤(§6 "병행 중 쓰기 금지"가 풀린 뒤) 계획 문서에 옮겨 커밋한다. 마일스톤 Sol 검토 도중 `plan.md`가 바뀌면 snapshot 대조(`sol-review.md` §5)가 깨져 `unverified`가 된다.
 
@@ -104,7 +108,7 @@ wave N:
 마지막 웨이브 기동 직후: 롤링 분해(§3-1) planner 병렬 기동 (2.1.0)
 마감 (마지막 웨이브 통합과 합침):
      종료 조건 확인 → verify.full → Sol 최종 검토(§6 게이트 표의 등급별) → BLOCK 수정(기록 줄에 계열 id)
-     → [on-milestone-close] → 시각 확인(§6-2) → 롤링 분해 회수(미완이면 인계 문서에 pane·경로)
+     → [on-milestone-close] → 시각 확인(§6-2) → 롤링 분해 회수(미완이면: ③ pane planner만 인계 문서에 pane·경로를 적고 child가 회수, ① Agent planner는 인계 전에 완료·회수 — §3-1·§9)
      → 마감 체크(아래) → wrap-up·인계 → 진행 보드 → 다음 마일스톤 세션 기동
 ```
 
@@ -118,8 +122,8 @@ wave N:
 
 ### worker 기동
 
-- **herdr 백엔드**: 오른쪽 열 pane에 Claude 세션으로 띄운다(`references/backend-herdr.md` §2~§5 — 배치, 모델 선택, 대화, 완료 감지, 정리). 짧은 탐색·조사만 `Agent` 서브에이전트로 한다(같은 문서 §1 표).
-- **orca·agent 백엔드**: `Agent`(`subagent_type: auto-chain:<worker 등급>`)로 띄운다. 같은 웨이브의 독립 task는 한 메시지에서 여러 개를 동시에 띄운다(`run_in_background: true`도 가능).
+- (2.3.0) **기본 ①**: `Agent`(`subagent_type: auto-chain:<worker 등급>`, `run_in_background: true`)로 띄운다. 같은 웨이브의 독립 task는 한 메시지에서 여러 개를 동시에 띄운다. 완료 알림이 오면 그 턴에서 보고서를 회수한다.
+- **③ pane**(§1-1 표의 작업만): `references/pane-worker.md` §2~§5(기동 스크립트, 모델 선택, 대화, 완료 감지, 정리).
 - 지시서에는 다음만 넣는다. 계획 전문을 붙이지 않는다.
   - 공통 지시서 `references/task-brief.md` 절대 경로 (+ 프로파일 `task-brief`가 있으면 그 경로)
   - 리포 절대 경로, 계획 문서 경로와 task 절 위치(`M1-W1-T03`)
@@ -276,7 +280,7 @@ BLOCK 수정이 인접 상태를 새로 깨뜨려 다음 회차에 새 BLOCK이 
 |---|---|
 | `extra-rounds:<k>` | 같은 방식으로 수정 → 재검토를 k회 더 한다(`round 4/3+2`처럼 적는다) |
 | `worker:chain-worker-deep` / `worker:chain-worker-xhigh` | 다음 BLOCK 수정 worker를 그 등급으로 올린다. 재검토 1회. §7 실패 사다리로 이미 그 등급 이상을 썼으면 건너뛴다 |
-| `worker:opencode-<agent>` | 다음 BLOCK 수정을 OpenCode `<agent>`(예: `work-sol-xhigh`)로 백엔드의 명령 pane·탭에서 구현한다. 명령 `opencode run --agent <agent> -f <worker 지시서(briefs/<task-id>.md, 형식 references/task-brief.md)>`를 파이프 없이 로그로 리다이렉트하고 실제 종료 코드를 남긴다(2.2.0 — `review-run.sh`는 리뷰 전용이라 쓰지 않는다). 완료 판정은 보고서 파일과 diff(§5). 재검토 1회 |
+| `worker:opencode-<agent>` | 다음 BLOCK 수정을 OpenCode `<agent>`(예: `work-sol-xhigh`)로 ② headless 구현한다(2.3.0): `run_in_background` Bash로 `scripts/headless-run.sh opencode:<agent> <worker 지시서(briefs/<task-id>.md, 형식 references/task-brief.md)> <done 파일> <리포>` → `scripts/review-wait.sh <done> <pid>`로 대기(`review-run.sh`는 리뷰 전용). done 파일은 실제 종료 코드·전후 snapshot이고, 완료 판정은 보고서 파일과 diff(§5). 재검토 1회 |
 | `carry-reversible` | 남은 BLOCK이 모두 **되돌릴 수 있는 제품 결함**(UI·로컬 코드, 되돌리기 = revert 몇 개)이면 멈추지 않는다. 게이트를 SHIP으로 기록하지 않고 `carried`로 기록한다. 각 finding을 질문 대기열에 "미해결 결함"으로, 다음 웨이브(마지막 마일스톤이면 후속 task)에 수정 task로 올린다. 마일스톤은 **조건부 마감**으로 닫고 마감 보고에 별도 절(아래)을 둔다. 남은 finding에 되돌리기 어려운 대상(스키마·배포/보안 설정·계약 문서·비가역 런타임 동작·외부 시스템 쓰기·main 병합)이 하나라도 걸리면 이 칸을 건너뛰고 다음 칸으로 간다 |
 | `stop` | 멈춤 조건 6 |
 
@@ -408,13 +412,13 @@ reviewer: <고정한 리뷰어>              # (2.2.0) sol-review.md §1 착수 
 
 ## 9. 인계
 
-- 다음 세션 기동과 부모 정리는 백엔드 문서를 따른다: herdr는 `references/backend-herdr.md` §8(새 탭 + `agent start`/`agent prompt`), orca는 `references/backend-orca.md` §3(전역 CLAUDE.md의 Orca 탭 인계 프로토콜). 어느 쪽이든 전역 인계 규칙의 Codex 크로스체크는 이 스킬의 Sol 게이트로 대체한다.
+- (2.3.0) 다음 세션 기동과 부모 정리는 ③ `references/pane-worker.md` §8(`tab-open "[OC] <한글> M<n+1>"` + `agent-start` + `agent-send --confirm`)을 따른다. ③을 쓸 수 없으면(10·11·12) 인계 문서만 남기고 다음 세션 시작 명령 한 줄을 사용자에게 보고한다. 전역 인계 규칙의 Codex 크로스체크는 이 스킬의 Sol 게이트로 대체한다.
 - 인계 프롬프트 예: `<상태 파일 절대 경로>와 <인계 문서 절대 경로>를 읽고 auto-chain 스킬로 M<n+1>을 진행해.`
-- 진행 중인 pane worker가 남아 있으면 인계하지 않는다. 회수·정리한 뒤 인계한다(맥락이 부족해 어쩔 수 없으면 아래 규칙대로 인계 문서에 pane id·agent 이름·보고서 경로와 회수 책임을 적는다). (2.1.0) 예외: 롤링 분해·다음 계획 planner는 남긴 채 인계할 수 있다(§3-1).
+- 진행 중인 worker가 남아 있으면 인계하지 않는다. 회수·정리한 뒤 인계한다. ① `Agent` worker는 예외 없이 인계 전에 회수한다. ③ pane worker만 맥락이 부족해 어쩔 수 없을 때 인계 문서에 pane id·에이전트 이름·보고서 경로와 회수 책임을 적고 넘길 수 있다. (2.1.0) 예외: ③ 롤링 분해·다음 계획 planner는 남긴 채 인계할 수 있다(§3-1).
 - 일지는 프로파일 `daily-log` 시점에 쓴다. 매 마일스톤 daily-log+handoff를 이중으로 만들지 않고 상태 파일을 재사용하며, 인계 문서에는 상태 파일에 없는 실행 맥락만 보탠다.
 - 맥락이 부족해지면 마일스톤 도중이라도 안전한 지점에서 인계하고 같은 마일스톤을 새 세션이 이어받는다. 진행 중인 worker·리뷰가 있으면 결과 회수 책임을 인계 문서에 적는다.
 - **(2.1.0) 조정자 맥락 기준**: 조정자 맥락이 **150K 토큰 미만**이면 "충분"으로 본다(예시 수치 — office 실측에서 200K를 넘은 조정자 세션 3개에 실수가 몰렸다. 인과는 UNVERIFIED. 프로파일에서 바꿔도 된다). 넘으면 웨이브·게이트가 끝난 안전 지점에서 마일스톤 도중이라도 인계한다. 수치를 확인할 수 없으면 추정임을 적는다.
-- **(2.1.0) 체인 경계 = 새 조정자 세션**: 체인이 끝난 세션에서 새 체인을 이어서 시작하지 않는다. 새 체인은 반드시 새 조정자 세션(herdr·orca는 새 탭)에서 연다.
+- **(2.1.0) 체인 경계 = 새 조정자 세션**: 체인이 끝난 세션에서 새 체인을 이어서 시작하지 않는다. 새 체인은 반드시 새 조정자 세션(③을 쓸 수 있으면 새 탭 `[OC] …`)에서 연다.
 
 ## 10. 진행 보고
 
@@ -473,14 +477,14 @@ Sol 검토는 `references/sol-review.md` §4대로 `scripts/review-wait.sh`를 `
 - 웨이브의 worker가 모두 반환했는데 감시가 남아 있으면(worker가 `- 진행: 완료`를 못 쓰고 끝난 경우) `TaskStop`으로 끝낸다.
 - 진행 이벤트가 30분 넘게 없으면 그 사실을 한 줄로 보고한다(멈춤은 아니다).
 
-pane worker 정지 감시(herdr 백엔드). 위 진행 감시와 별개로 웨이브마다 1개를 `Monitor`로 띄운다. (2.2.0) jsonl mtime이 아니라 transcript **내용**(마지막 진척 시각·그 뒤 API 재시도 수)과 `agent_status`로 판정하는 스크립트를 쓴다. 근거: API 오류 재시도도 jsonl을 갱신해 helpai M1-09 T5가 99분 동안 코드 0개로 돌았고, mtime 감시는 `blocked`를 알리지 않았다.
+③ pane worker 정지 감시. **③ worker가 있는 웨이브에만** 위 진행 감시와 별개로 웨이브마다 1개를 `Monitor`로 띄운다(① `Agent` worker는 완료 알림이 오므로 띄우지 않는다). (2.2.0) transcript mtime이 아니라 **내용**(마지막 진척 시각·그 뒤 API 재시도 수)과 `agent-status`로 판정한다. 근거: API 오류 재시도도 transcript를 갱신해 helpai M1-09 T5가 99분 동안 코드 0개로 돌았고, mtime 감시는 `blocked`를 알리지 않았다.
 
 ```bash
 W=$(mktemp)
-# 한 줄에 하나: <task><TAB><agent 이름><TAB><jsonl 경로>(herdr-spawn-worker.sh 성공 줄의 jsonl=) — 경로의 공백·@를 그대로 둔다
+# 한 줄에 하나: <task><TAB><에이전트 이름><TAB><jsonl 경로|unsupported|빈 값>(spawn-pane-worker.sh 성공 줄의 jsonl=) — 경로의 공백·@를 그대로 둔다
 printf '%s\t%s\t%s\n' T03 gp-m2w2t03 "/Users/…/<uuid>.jsonl" T04 gp-m2w2t04 "/Users/…/<uuid>.jsonl" > "$W"
-bash "<SKILL.md 디렉터리>/scripts/herdr-stall-watch.sh" "$W"
+bash "<SKILL.md 디렉터리>/scripts/agent-stall-watch.sh" "$W"
 ```
 
-- 출력 종류: `정지 후보`(working, 진척 10분 이상) · `API 재시도 반복` · `권한·입력 대기`(blocked) · `끝남`(done|idle — 보고 메시지가 없을 때 회수 계기) · `감시 불가`(UNVERIFIED — mtime으로 대신 추정하지 않는다). 상태별 10분 단위로 한 번씩만 나온다.
-- 이벤트는 후보일 뿐이다. 받은 뒤의 절차(화면 1회 → 재지시 → 재기동, API 재시도는 환경 문제로 실패 횟수에 넣지 않음)는 `references/backend-herdr.md` §6-1 「worker 정지 판정」을 따른다.
+- 출력 종류: `정지 후보`(working, 진척 10분 이상) · `API 재시도 반복` · `권한·입력 대기`(blocked) · `끝남`(done|idle — 보고 메시지가 없을 때 회수 계기) · `감시 불가`(UNVERIFIED — mtime으로 대신 추정하지 않는다. `transcript unsupported`면 상태만 감시). 상태별 10분 단위로 한 번씩만 나온다.
+- 이벤트는 후보일 뿐이다. 받은 뒤의 절차(화면 1회 → 재지시 → 재기동, API 재시도는 환경 문제로 실패 횟수에 넣지 않음)는 `references/pane-worker.md` §6-1 「worker 정지 판정」을 따른다.

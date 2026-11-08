@@ -22,6 +22,7 @@ reviewer: opencode-sol                     # (2.2.0) opencode-sol | opencode-bui
 block-on: block                            # (2.2.0) block | major
 light-gate-rereview: none                  # (2.2.0) none | delta
 root-cause: none                           # (2.2.0) none | sol
+review_view: headless                      # (2.3.0) headless | pane
 ---
 
 ## on-milestone-start
@@ -52,6 +53,7 @@ root-cause: none                           # (2.2.0) none | sol
 | `reviewer` | `opencode-sol` | (2.2.0) Sol 게이트의 리뷰어. `opencode-sol` = OpenCode `review-sol`, `opencode-build` = `build` 에이전트 + `review-sol.md` 첨부(읽기 전용은 지시·전후 대조로만), `codex-cli` = `codex exec -s read-only`. 착수 드라이런이 실패하면 `opencode-build` → `codex-cli` 순서로 내려가 동작한 값을 상태 파일 `## 결정`·frontmatter `reviewer:`에 고정한다(`references/sol-review.md` §1). 예: codex만 인증된 머신이면 `codex-cli` |
 | `block-on` | `block` | (2.2.0) 차단 심각도. `block`이면 BLOCK만 마감을 막고 MAJOR는 NOTE로 회수(백로그·후속 task), `major`면 MAJOR도 막는다. 매핑은 `references/sol-review.md` §5-4. 예: 결제·권한 코드가 많은 프로젝트면 `major` |
 | `light-gate-rereview` | `none` | (2.2.0) 가벼운 게이트 BLOCK 수정 뒤 재검토. `none` = `fixed-local` 기록(영향 시험)으로 끝, `delta` = delta 요청 1회 재검토(SKILL.md §6). 예: 웨이브 고위험 검토도 수정 확인을 리뷰어에게 받고 싶으면 `delta` |
+| `review_view` | `headless` | (2.3.0) Sol 검토 실행 화면. `headless` = `run_in_background` + `review-wait.sh`(② — sol-review.md §3), `pane` = 리뷰어 pane `[RV] …`에서 같은 명령(`pane-worker.md` §7, ③을 쓸 수 없으면 headless로 내려감). 완료·판정은 둘 다 done 파일. 예: 리뷰 화면을 직접 보고 싶은 프로젝트면 `pane` |
 | `root-cause` | `none` | (2.2.0) 원인 모를 실패 처리. `none` = 바로 `chain-worker-xhigh`가 조사+수정(전역 규칙과 같음), `sol` = 그 앞에 Sol 원인 조사 1회(1.6.2 방식, `references/sol-review.md` §7). SKILL.md §7 |
 
 `commit`·`push`에 스킬 기본값을 두지 않는 이유: 이 스킬의 기본값이 사용자 승인을 새로 만들면 안 되기 때문이다. `escalation` 기본값(1.4.0)은 승인을 새로 만들지 않는다 — `carry-reversible`은 되돌릴 수 있는 로컬 제품 결함만 넘기고 SHIP으로 기록하지 않으며, 외부 쓰기·push 범위는 `authority` 그대로다. 프로파일 값은 사용자가 그 프로젝트에 미리 둔 정책으로 보고, 계획 세션에서 다시 묻지 않는다.

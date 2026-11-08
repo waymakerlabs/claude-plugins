@@ -12,3 +12,4 @@
 | D6 링크 대상 | **세 머신 모두 마켓플레이스 사본**(`~/.claude/plugins/marketplaces/waymakerlabs-claude-plugins/tools/...`). 개발 중 시험은 개발 리포 경로를 직접 호출 | 세 머신 동일. 편집 중인 미완성 코드가 실제 세션에 바로 쓰이지 않는다(push+update 뒤에만 반영) |
 | D7 원격 조작 `--machine` | **이번 범위에서 제외**. gchat-g-on 메모리의 원격 prompt는 `docs/herdr.md`의 알려진 예외로 기재하고 `install.sh --check`의 잔존 허용 목록에 넣는다 | S1 계약을 작게 유지. 사용처 1곳 |
 | D8 helpai 대리 보고 ID | **helpai 쪽에서 S6에 결정**. 제안값: Agent worker는 `agent:<agentId>`, pane worker는 기존 `session:<UUID>` | helpai 체인 소유 규칙(Q24) |
+| D9 office gira 메모리 `herdr-parallel-agents.md`("구현은 `Agent` 대신 herdr 패널", 2026-11-06) | **새 3단계 기준으로 변경**(2026-11-08 주인님 결정 — 추천안). 옛 문구는 지우지 않고 "2026-11-08 변경: 3단계 기준으로 대체" 이력으로 남긴다. S6 전역 규칙 적용 때 메모리 3파일과 함께 반영(office 원격 쓰기, 백업 먼저) | S5 보고 §4-3. 프로젝트 메모리가 전역 규칙보다 구체적인 지시로 읽혀 옛 방식을 계속 따를 수 있다 |

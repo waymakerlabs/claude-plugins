@@ -152,15 +152,15 @@
     },
     {
       "name": "auto-chain",
-      "version": "2.2.2",
-      "description": "Milestone → wave → task autonomous execution for large multi-session work. Opus plans, GPT-6.1 Sol reviews (OpenCode review-sol or codex CLI via a common review runner), Claude workers implement in parallel, and a lean coordinator session per milestone integrates, verifies and hands off to the next milestone. Execution backend is auto-selected: inside herdr, workers run as Claude sessions in side panes (model chosen per pane, live two-way messaging); inside Orca, the 1.7.1 Orca-tab flow. Per-project hooks via .claude/autonomous-chain.md. Requires herdr or Orca, and OpenCode CLI with the review-sol agent or the Codex CLI.",
+      "version": "2.3.0",
+      "description": "Milestone → wave → task autonomous execution for large multi-session work. Opus plans, GPT-6.1 Sol reviews (OpenCode review-sol or codex CLI via a common review runner), Claude workers implement in parallel, and a lean coordinator session per milestone integrates, verifies and hands off to the next milestone. Workers run in three tiers: Claude Agent subagents by default, headless one-shot runs for other CLIs and reviews, and side-pane sessions (via the tool-neutral agent-orchestrator in tools/) only for watched work, planners that outlive a handoff, and milestone handoffs. Per-project hooks via .claude/autonomous-chain.md. Requires OpenCode CLI with the review-sol agent or the Codex CLI; side panes need agent-orchestrator and a supported tool.",
       "author": {
         "name": "waymakerlabs",
         "email": "peter@waymakerlabs.com"
       },
       "source": "./plugins/auto-chain",
       "category": "workflow",
-      "keywords": ["autonomous", "chain", "milestone", "wave", "subagent", "opencode", "sol", "opus", "자율체인", "claude-code", "herdr", "orca"],
+      "keywords": ["autonomous", "chain", "milestone", "wave", "subagent", "opencode", "sol", "opus", "자율체인", "claude-code", "agent-orchestrator"],
       "homepage": "https://github.com/waymakerlabs/claude-plugins"
     },
     {
