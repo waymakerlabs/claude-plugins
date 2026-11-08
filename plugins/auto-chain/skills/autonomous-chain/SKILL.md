@@ -108,7 +108,7 @@ wave N:
 마지막 웨이브 기동 직후: 롤링 분해(§3-1) planner 병렬 기동 (2.1.0)
 마감 (마지막 웨이브 통합과 합침):
      종료 조건 확인 → verify.full → Sol 최종 검토(§6 게이트 표의 등급별) → BLOCK 수정(기록 줄에 계열 id)
-     → [on-milestone-close] → 시각 확인(§6-2) → 롤링 분해 회수(미완이면 인계 문서에 pane·경로)
+     → [on-milestone-close] → 시각 확인(§6-2) → 롤링 분해 회수(미완이면: ③ pane planner만 인계 문서에 pane·경로를 적고 child가 회수, ① Agent planner는 인계 전에 완료·회수 — §3-1·§9)
      → 마감 체크(아래) → wrap-up·인계 → 진행 보드 → 다음 마일스톤 세션 기동
 ```
 

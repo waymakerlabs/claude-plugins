@@ -24,7 +24,7 @@
 #               --dangerously-skip-permissions가 있을 때만 그 플래그를 붙인다
 #   TAB_LABEL   오른쪽 열이 찼을 때 쓰는 넘침 탭 이름(기본 "[WO] 자율체인 작업" — 역할 접두어 + 한글)
 #               → AGENT_ORCHESTRATOR_OVERFLOW_TAB 으로 넘긴다
-#   PANE_LABEL  새 pane에 붙일 이름(기본 "[WO] <name>" — 역할 접두어 [OC] 조정자·[WO] worker·[RV] 리뷰어). 이름 붙이기 실패는 경고만
+#   PANE_LABEL  새 pane에 붙일 이름(기본 "[WO] 작업자 <name>" — 역할 접두어 + 한글, [OC] 조정자·[WO] worker·[RV] 리뷰어). 이름 붙이기 실패는 경고만
 #
 # 순서: 인자 검사 → 이름 중복(list --agents) → pane-open --parent → agent-start → agent-send --confirm
 #   → agent-status(working|done|idle) → 이름이 정확히 1개인지 재확인 → agent-transcript
@@ -48,7 +48,7 @@ die() { code=$1; shift; echo "spawn-pane-worker: $*" >&2; exit "$code"; }
 NAME=$1; MODEL=$2; EFFORT=$3; BRIEF=$4; MAIN=${5:-}
 ROLE=${ROLE:-chain-worker}
 TAB_LABEL=${TAB_LABEL:-[WO] 자율체인 작업}
-PANE_LABEL=${PANE_LABEL:-[WO] $NAME}
+PANE_LABEL=${PANE_LABEL:-[WO] 작업자 $NAME}
 AO=${AGENT_ORCHESTRATOR:-$HOME/.local/bin/agent-orchestrator}
 
 # [[ =~ ]]는 문자열 전체를 본다(grep은 줄 단위라 "ok\nBAD!"를 통과시킨다)
@@ -188,7 +188,10 @@ ao_run agent-transcript "$NAME"; c=$?
 case "$c" in
   0) J=$AO_OUT ;;
   10) J=unsupported ;;
-  *) J=unverified ;;
+  # worker는 이미 떠 있으므로 비0으로 끝내지 않는다. 대신 원래 코드를 stderr에 남겨
+  # 11(백엔드 없음)·12(설치 결함) 진단이 사라지지 않게 한다(2.3.0 codex NOTE)
+  *) J=unverified
+     echo "spawn-pane-worker: agent-transcript rc=$c — jsonl=unverified (12면 agent-orchestrator 설치 점검: install.sh --check)" >&2 ;;
 esac
 [ -n "$J" ] || J=unverified
 

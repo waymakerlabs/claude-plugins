@@ -293,7 +293,9 @@ export AGENT_ORCHESTRATOR="$AO_DEV/bin/agent-orchestrator"
 export HOME="$T/home"; mkdir -p "$HOME"
 export HERDR_ENV=1 HERDR_WORKSPACE_ID=w1
 unset HERDR_PANE_ID HERDR_TAB_ID AGENT_ORCHESTRATOR_BACKEND AGENT_ORCHESTRATOR_HOME
-[ "$(command -v herdr)" = "$FAKE/herdr" ] && ok ao-fake-herdr "PATH의 herdr = 가짜" || bad ao-fake-herdr "$FAKE/herdr" "$(command -v herdr)"
+# 실제 herdr를 건드리지 않음을 보장: 가짜가 아니면 즉시 중단(2.3.0 codex NOTE)
+if [ "$(command -v herdr)" = "$FAKE/herdr" ]; then ok ao-fake-herdr "PATH의 herdr = 가짜"
+else echo "FAIL ao-fake-herdr — 기대 $FAKE/herdr / 실제 $(command -v herdr) — 실제 herdr 접촉 위험으로 중단"; exit 1; fi
 
 echo "== agent-stall-watch"
 SW="$SCRIPTS/agent-stall-watch.sh"
@@ -411,7 +413,7 @@ spawn() {  # $1 name, $2 effort, $3 첫 지시 뒤 상태
 : > "$FAKE_DIR/calls.log"
 out=$(spawn sp-a medium working); rc=$?
 case "$out" in "OK name=sp-a pane=w1:p9 model=sonnet effort=medium status=working "*) ok "${px}sp-medium" "OK effort=medium status=working" ;; *) bad "${px}sp-medium" "OK effort=medium" "rc=$rc $out $(cat "$T/spawn.err")" ;; esac
-grep -qF 'pane rename w1:p9 [WO] sp-a' "$FAKE_DIR/calls.log" && ok "${px}sp-pane-label" "split 직후 [WO] pane 이름" || bad "${px}sp-pane-label" "pane rename w1:p9 [WO] sp-a" "$(grep 'pane rename' "$FAKE_DIR/calls.log")"
+grep -qF 'pane rename w1:p9 [WO] 작업자 sp-a' "$FAKE_DIR/calls.log" && ok "${px}sp-pane-label" "split 직후 [WO] 한글 pane 이름" || bad "${px}sp-pane-label" "pane rename w1:p9 [WO] 작업자 sp-a" "$(grep 'pane rename' "$FAKE_DIR/calls.log")"
 grep -q 'agent start sp-a .* --effort medium' "$FAKE_DIR/calls.log" && ok "${px}sp-medium-arg" "--effort medium 전달" || bad "${px}sp-medium-arg" "--effort medium" "$(grep 'agent start' "$FAKE_DIR/calls.log")"
 # --parent 호환: HERDR_PANE_ID 없이 5번째 인자가 배치 기준이 된다
 grep -q 'pane layout --pane w1:p1' "$FAKE_DIR/calls.log" && ok "${px}sp-parent" "5번째 인자 → pane-open --parent w1:p1" || bad "${px}sp-parent" "pane layout --pane w1:p1" "$(grep 'pane layout' "$FAKE_DIR/calls.log")"
@@ -462,7 +464,7 @@ for code in 10 11 12; do
 done
 AGENT_ORCHESTRATOR="$FAKE/fake-ao" FAKE_AO_RC=4 PERM_FLAGS=x ROLE=none "$SP" sp-x sonnet high "$BR" w1:p1 > /dev/null 2>&1; rc=$?
 [ $rc = 4 ] && ok spc-place-4 "pane-open 4 → 배치 실패 4" || bad spc-place-4 4 "rc=$rc"
-grep -q -- 'pane-open \[WO\] sp-x --parent w1:p1 --cwd ' "$FAKE_DIR/ao.log" && ok spc-parent-arg "5번째 인자 → --parent" || bad spc-parent-arg "--parent w1:p1" "$(grep pane-open "$FAKE_DIR/ao.log" | tail -1)"
+grep -q -- 'pane-open \[WO\] 작업자 sp-x --parent w1:p1 --cwd ' "$FAKE_DIR/ao.log" && ok spc-parent-arg "5번째 인자 → --parent" || bad spc-parent-arg "--parent w1:p1" "$(grep pane-open "$FAKE_DIR/ao.log" | tail -1)"
 AGENT_ORCHESTRATOR="$T/none/agent-orchestrator" PERM_FLAGS=x ROLE=none "$SP" sp-x sonnet high "$BR" w1:p1 > /dev/null 2> "$T/spawn.err"; rc=$?
 [ $rc = 12 ] && grep -q 'adapter error' "$T/spawn.err" && ok spc-missing-12 "진입점 없음 rc=12" || bad spc-missing-12 12 "rc=$rc"
 : > "$FAKE_DIR/ao.log"
