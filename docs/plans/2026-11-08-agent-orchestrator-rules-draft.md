@@ -151,9 +151,9 @@ codex에서는 ① = codex 내장 서브에이전트(병렬 에이전트 도구)
 
   <details><summary>이관 전 원문 (CLAUDE.md 43줄 · 81~108줄, 이 맥·office 동일)</summary>
 
-  ```markdown
+  ````markdown
   <적용 직전 백업에서 sed -n '43p;81,108p'로 뽑은 원문>
-  ```
+  ````
 
   </details>
 ~~~~
