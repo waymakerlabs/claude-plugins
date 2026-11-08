@@ -17,7 +17,7 @@
 #                     게이트웨이 키(AIGW_OPENCODE_KEY 등)가 필요하면 호출 전에 export한다(값은 기록하지 않음)
 #   REVIEW_KILL_GRACE TERM·INT·HUP을 받았을 때 리뷰어에 TERM 뒤 KILL까지 기다릴 초(기본 10)
 #
-# 하는 일 (references/backend-herdr.md §7, interface §1):
+# 하는 일 (references/sol-review.md §3, interface §1):
 #   1. RUN_ID=<YYYYmmdd-HHMMSS>-<4자 hex>. 이미 있는 result·done·log·run 파일은 *.stale-<RUN_ID>로 옮긴다
 #   2. <done-file>.run에 "RUN <RUN_ID> pid=<pid> start=<시작 시각>" 한 줄을 쓰고 stdout에도 같은 줄
 #      (start = LC_ALL=C ps -o lstart= — review-wait.sh가 PID 재사용을 가려낸다)
