@@ -1,6 +1,6 @@
 # agent-orchestrator S6 보고 — 전환 (2026-11-08)
 
-- 상태: **in-progress** — 순서 1~4 완료, 5는 helpai에 요청(미반영), 6(실사용 증거)은 다음 helpai 웨이브 대기.
+- 상태: **done** (2026-11-08 20:37) — 순서 1~6 완료. 5·6 증거는 §6.
 - 착수: helpai M1-11 W2 조정자가 T11·T12 회수 뒤 멈춤(19:49 「갱신」 줄, `fade4dc`, 조정자 `done`) — 주인님이 지정한 경계. gira는 중단 상태(주인님 확인).
 
 ## 1. 전환 전 기록 (19:34)
@@ -31,9 +31,15 @@
 
 ## 5. 남은 것
 
-- helpai `chain-guide.md` 반영: 요청 `docs/plans/2026-11-08-agent-orchestrator-S6-helpai-request.md`, helpai W2b 인계 「갱신」에 포인터(`3434ed3`, helpai push 안 함 — T14에서).
-- 계획 §5-4 6: 다음 helpai 웨이브의 ① Agent worker 기동·회수 1회, 인계 ③ 1회 성공 증거.
 - 홈 auto-chain 미설치 — 설치 여부는 주인님 확인 항목.
 - office·홈 실제 herdr pane 안에서 `agent-orchestrator backend` 1회(지금은 이 맥 pane 안에서만 `herdr` rc=0 확인).
 - 루트 `README.md:466`·`docs/auto-chain-guide.html`·`README.ko.md` herdr 서술 정리.
 - 되돌리기: `git revert -m 1 454e459`(설치 갱신을 위해 2.3.1로 버전 올림 필요할 수 있음), 전역 파일·메모리는 백업 `cp -p`.
+
+## 6. 순서 5·6 증거 (helpai 재시작 세션 `helpai-m111-w2b`)
+
+- 순서 5 chain-guide 반영: helpai `2649f4b`(20:10) — 요청 8항목, 리뷰 스크립트 경로 2.2.0 사본 → 2.3.0 캐시(progress 「결정」). 남은 herdr 언급 7곳은 이력·옛 이름 안내·백엔드 설명.
+- 순서 6 ① Agent worker 기동·회수: T14 `helpai-worker` 2개 — m111-r sonnet/high 20:11~20:18, m111-h opus/high 20:11~20:33. 두 보고서 `status: done`, 조정자 회수 커밋 `744c264`(20:36, 보고서 2·progress·backlog·시험 2줄). 기동부터 회수 커밋까지 25분(M1-10 pane 리뷰 회수 179분과 비교).
+- 순서 6 인계 ③: 이 세션이 `tab-open` → `agent-start` → `agent-send --confirm`(출력 `working`)으로 helpai 조정자를 새 탭 `w3:tK`에 기동, child가 부모 pane `w3:p2V`를 `close`(종료 0)하고 `self-name`으로 이름 유지·부여.
+- 부수 확인: office gira `gira-unify` 체인이 2.3.0으로 기동(planner `gu-plan2`, chain-planner-deep, ③ pane — 인계를 넘겨 사는 planner).
+- 발견: `tab-open`은 메인의 `HERDR_WORKSPACE_ID`로 탭을 연다. 다른 워크스페이스(helpai = w3)에는 환경변수를 덮어써야 했다 — `--workspace` 인자 검토 후보.
