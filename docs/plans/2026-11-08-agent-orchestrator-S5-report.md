@@ -82,3 +82,11 @@
 - 실측(이 herdr pane, 읽기만 — rename·pane 생성 없음): `whoami --field tab-label` → `[OC] 논의`, `--field pane-label` → `[OC] 논의 메인`(둘 다 rc 0).
 - 확인: `tools/agent-orchestrator/test/run-tests.sh` 134/134 PASS(총계 = EXPECT), auto-chain `scripts/test/run-tests.sh` 90/90 PASS. auto-chain 스크립트는 `self-name`을 부르지 않는다(scripts grep 0건). shellcheck 0건.
 - 남은 문제: auto-chain `references/pane-worker.md:46`의 `self-name` 설명이 옛 계약("번호·영문 기본값일 때만")으로 남아 있다. `plugins/**`는 이번 수정 범위 밖이라 고치지 않았다.
+
+## 7. 2·3회차 크로스체크 (메인 기록)
+
+- 리뷰어 codex Sol high. 무거운 게이트(최대 3회).
+- 2회차 `BLOCK`: 1회차 7건 중 6건 해소, BLOCK 2는 부분 해소 — 사용자 탭은 두고 pane만 `--force` 할 계약이 없었다. NOTE 1건(pane-worker.md "herdr 기본 이름" 잔존).
+- 반영: `self-name` 대상 자리에 `-`를 넘기면 그 대상을 건너뛴다(둘 다 `-`면 2). tools `2b84fed`(main `c0ff883`, 세 머신 배포 확인), 문서 `25d5973`. 시험 tools 137/137(건너뛰기 가드를 지우면 `self-name-skip-tab` FAIL 확인), auto-chain 90/90.
+- 3회차 **`SHIP`**: 2회차 BLOCK·NOTE 모두 해소, 새 finding 0.
+- 남은 결정: office gira 메모리 `herdr-parallel-agents.md`("구현은 pane", 2026-11-06) 처리 — 주인님 결정 대기. S6 적용 전에 확정한다.
