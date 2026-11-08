@@ -18,7 +18,7 @@ trap 'rm -rf "$T"' EXIT
 FAKE="$T/bin"; NOHERDR="$T/bin-noherdr"; FD="$T/fake"
 mkdir -p "$FAKE" "$NOHERDR" "$FD" "$T/home"
 cp "$HERE/fake-herdr.py" "$FAKE/herdr"; chmod +x "$FAKE/herdr"
-EXPECT=123
+EXPECT=134
 
 PASS=0; FAIL=0
 # 여러 줄 값은 ⏎로 이어 한 줄 한 케이스를 지킨다
@@ -153,13 +153,55 @@ reset_state; echo internal > "$FD/fail-pane-rename"
 ao pane-open "작업자 9" --cwd "$T"
 [ "$RC" = 0 ] && [ "$OUT" = w1:p2 ] && echo "$ERR" | grep -q '이름 붙이기 실패' && ok pane-open-rename-fail-warn "이름 실패는 경고만 rc=0" || bad pane-open-rename-fail-warn "rc=0 + 경고" "rc=$RC out=$OUT err=$ERR"
 
-echo "== self-name"
+echo "== self-name (S5 1회차 계약: 빈 값·숫자 → 인자 / 접두어 있음 → 유지 / 사용자 이름 → 접두어만)"
+# 현재 label 조작: setlabel <tab|pane> <id> <label>
+setlabel() {
+  FD="$FD" /usr/bin/python3 - "$@" <<'PY'
+import json, os, sys
+p = os.path.join(os.environ["FD"], "state.json"); s = json.load(open(p))
+for x in s[sys.argv[1] + "s"]:
+    if x[sys.argv[1] + "_id"] == sys.argv[2]:
+        x["label"] = sys.argv[3]
+json.dump(s, open(p, "w"))
+PY
+}
 reset_state
-ao self-name "오케스트레이터" "S1 구현"; chk self-name 0 ""
-called "tab rename w1:t1 오케스트레이터" && called "pane rename w1:p1 S1 구현" && ok self-name-calls "기본값(번호·빈 값)일 때 바꿈" || bad self-name-calls "tab·pane rename" "$(grep rename "$FD/calls.log")"
+# 탭 "1"(herdr 기본 번호)·pane 빈 값 → 인자 그대로
+ao self-name "[OC] 오케스트레이터" "[OC] S1 구현"; chk self-name 0 ""
+called "tab rename w1:t1 [OC] 오케스트레이터" && called "pane rename w1:p1 [OC] S1 구현" && ok self-name-calls "빈 값·숫자면 인자 그대로" || bad self-name-calls "tab·pane rename" "$(grep rename "$FD/calls.log")"
 : > "$FD/calls.log"
-ao self-name "다른 이름" "다른 pane"
-[ "$RC" = 0 ] && ! called "rename" && ok self-name-keep "한글 이름은 덮어쓰지 않음" || bad self-name-keep "rename 없음" "rc=$RC $(grep rename "$FD/calls.log")"
+ao self-name "[WO] 다른 이름" "[WO] 다른 pane"
+[ "$RC" = 0 ] && ! called "rename" && echo "$ERR" | grep -q '이름 유지' && ok self-name-keep "이미 [XX] 접두어면 유지(경고)" || bad self-name-keep "rename 없음 + 유지 경고" "rc=$RC $(grep rename "$FD/calls.log") err=$ERR"
+reset_state; setlabel pane w1:p1 3
+ao self-name "[OC] 탭" "[OC] 숫자 pane"
+[ "$RC" = 0 ] && called "pane rename w1:p1 [OC] 숫자 pane" && ok self-name-numeric "pane 숫자 이름 = 기본값" || bad self-name-numeric "pane rename" "rc=$RC $(grep rename "$FD/calls.log")"
+reset_state; setlabel tab w1:t1 "Peter review"; setlabel pane w1:p1 "Peter review"
+ao self-name "[OC] 새 작업" "[RV] 새 작업"
+[ "$RC" = 0 ] && called "tab rename w1:t1 [OC] Peter review" && called "pane rename w1:p1 [RV] Peter review" && ok self-name-user-en "사용자 영문 이름 본문 보존·접두어만" || bad self-name-user-en "[OC]/[RV] Peter review" "rc=$RC $(grep rename "$FD/calls.log")"
+reset_state; setlabel tab w1:t1 "헬프AI"
+ao self-name "[OC] 무시될 본문"
+[ "$RC" = 0 ] && called "tab rename w1:t1 [OC] 헬프AI" && ok self-name-user-ko "사용자 한글 이름 본문 보존·접두어만" || bad self-name-user-ko "[OC] 헬프AI" "rc=$RC $(grep rename "$FD/calls.log")"
+reset_state; setlabel tab w1:t1 "Peter review"
+ao self-name "새 작업"
+[ "$RC" = 0 ] && ! called "rename" && ok self-name-noprefix-arg "인자에 접두어 없으면 사용자 이름 유지" || bad self-name-noprefix-arg "rename 없음" "rc=$RC $(grep rename "$FD/calls.log")"
+reset_state; setlabel tab w1:t1 "[OC] 논의"; setlabel pane w1:p1 "[OC] 논의"
+ao self-name --force "[OC] 새 주제" "[OC] 새 주제 pane"
+[ "$RC" = 0 ] && called "tab rename w1:t1 [OC] 새 주제" && called "pane rename w1:p1 [OC] 새 주제 pane" && ! called "tab get" && ok self-name-force "--force는 판정 없이 바꿈" || bad self-name-force "tab·pane rename, get 없음" "rc=$RC $(cat "$FD/calls.log")"
+ao self-name --force; chk arg-self-name-force-only 2
+ao self-name --bogus "[OC] 탭"; chk arg-self-name-bad-opt 2
+ao whoami --field tab-label; chk whoami-tab-label 0 "[OC] 새 주제"
+reset_state
+ao whoami --field pane-label; chk whoami-pane-label-empty 0 ""
+run HERDR_TAB_ID= -- bash "$BIN" whoami --field tab-label; chk whoami-tab-label-missing 3
+# 가드 제거 시 실패 증명: 사용자 이름 보존 줄(GUARD:user-name)을 지운 사본은 본문을 갈아 끼운다
+cp -R "$AO" "$T/ao-nouserguard"
+grep -v 'GUARD:user-name' "$AO/adapters/herdr.sh" > "$T/ao-nouserguard/adapters/herdr.sh"
+if grep -q 'GUARD:user-name' "$T/ao-nouserguard/adapters/herdr.sh"; then bad neg-self-name-user-guard "가드 제거" "남음"; else
+  reset_state; setlabel tab w1:t1 "Peter review"
+  run AGENT_ORCHESTRATOR_HOME="$T/ao-nouserguard" -- bash "$BIN" self-name "[OC] 새 작업"
+  called "tab rename w1:t1 [OC] 새 작업" && ! called "tab rename w1:t1 [OC] Peter review" \
+    && ok neg-self-name-user-guard "가드 없으면 Peter review 본문이 바뀐다(Peter review 케이스가 FAIL할 조건)" || bad neg-self-name-user-guard "본문 교체" "rc=$RC $(grep rename "$FD/calls.log")"
+fi
 
 echo "== agent-start"
 reset_state
