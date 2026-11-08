@@ -1,0 +1,211 @@
+#!/usr/bin/env bash
+# agent-orchestrator — 오케스트레이션 툴(herdr 등) 추상화 진입점 (S1)
+#
+# 사용: agent-orchestrator <동작> [인자…]
+#   stdout = 필요한 값 한 줄(없으면 빈 출력, agent-read·list만 여러 줄). 사유·경고는 stderr. JSON 출력 없음.
+#
+# 동작(계약 진본: docs/plans/2026-11-08-agent-orchestrator-plan.md §1):
+#   backend                                         백엔드 이름
+#   whoami [--field pane|tab|workspace]             자기 pane id(기본)
+#   tab-open <한글 이름> [--cwd 경로]                새 탭 루트 pane id (포커스 이동 없음)
+#   pane-open <한글 이름> [--parent <pane>] [--cwd 경로]   새 pane id (배치는 어댑터 내부)
+#   self-name <탭 한글> [<pane 한글>]                번호·영문 기본값일 때만 바꿈
+#   agent-start <이름> <pane> --kind claude|codex -- <CLI 인자…>
+#   agent-send <이름|pane> <한 줄> [--confirm]      상태(working|done|idle)
+#   agent-wait <이름|pane> [--timeout 초]           최종 상태(done|idle). timeout 7
+#   agent-status <이름|pane>                        working|done|idle|blocked|unknown
+#   agent-session-id <이름|pane>                    세션 UUID
+#   agent-transcript <이름|pane>                    transcript 절대 경로 (kind claude만, 그 밖 10)
+#   agent-read <이름|pane> [--lines N]              화면 텍스트(여러 줄)
+#   agent-keys <이름|pane> <키>                     키 보내기(Escape 등)
+#   pane-run <pane> <셸 문자열>                     pane에서 명령 실행
+#   close <pane>                                    pane 닫기
+#   list --agents|--panes                           줄마다 <id>\t<이름>\t<상태>
+#
+# 종료 코드: 0 성공 / 2 인자 오류 / 3 대상 없음·충돌 / 4 백엔드 실행 실패 / 5 에이전트 준비 안 됨
+#   / 6 대상이 사용자 입력 대기(blocked) / 7 timeout / 10 unsupported / 11 no backend / 12 adapter error
+#
+# 백엔드 결정: AGENT_ORCHESTRATOR_BACKEND(none = 11) → ~/.config/agent-orchestrator/config 의 backend=
+#   → 자동(HERDR_ENV=1 → herdr) → 11. 어댑터: $AGENT_ORCHESTRATOR_HOME/adapters/<backend>.sh
+#   (AGENT_ORCHESTRATOR_HOME 기본 = 이 파일 실제 경로의 상위 폴더)
+# bash 3.2 호환.
+
+set -u
+
+# ── 설치 위치(심볼릭 링크를 따라가 실제 경로를 찾는다 — ~/.local/bin 링크 대비)
+src=$0
+while [ -h "$src" ]; do
+  dir=$(cd -P "$(dirname "$src")" && pwd)
+  src=$(readlink "$src")
+  case "$src" in /*) ;; *) src="$dir/$src" ;; esac
+done
+AO_HOME=${AGENT_ORCHESTRATOR_HOME:-$(cd -P "$(dirname "$src")/.." 2>/dev/null && pwd)}
+if [ -z "$AO_HOME" ] || [ ! -f "$AO_HOME/lib/common.sh" ]; then
+  echo "agent-orchestrator: lib/common.sh 없음 (AGENT_ORCHESTRATOR_HOME=${AO_HOME:-?})" >&2
+  exit 12
+fi
+# shellcheck source=/dev/null
+. "$AO_HOME/lib/common.sh" || { echo "agent-orchestrator: lib/common.sh 로딩 실패" >&2; exit 12; }
+
+usage() { ao_die 2 "$*  (사용법: $AO_HOME/bin/agent-orchestrator 머리 주석)"; }
+
+need_target() { ao_is_target "$1" || usage "대상은 에이전트 이름([a-z][a-z0-9_-]{0,31}) 또는 pane id: $1"; }
+need_pane() { ao_is_pane "$1" || usage "pane id 형식 오류: $1"; }
+need_label() { ao_one_line "$1" || usage "이름은 비어 있지 않은 한 줄이어야 함"; }
+abs_dir() {  # $1 경로 → 절대 경로(없는 폴더면 2)
+  [ -d "$1" ] || usage "폴더 없음: $1"
+  (cd "$1" && pwd -P)
+}
+
+# ── 1. 인자 검사(백엔드와 무관하게 먼저 — 호출자 버그는 늘 2)
+OP=${1:-}
+[ $# -gt 0 ] && shift
+ARGS=()
+case "$OP" in
+  backend)
+    [ $# = 0 ] || usage "backend 는 인자 없음" ;;
+  whoami)
+    FIELD=pane
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --field) [ $# -ge 2 ] || usage "--field 값 없음"; FIELD=$2; shift 2 ;;
+        *) usage "whoami 알 수 없는 인자: $1" ;;
+      esac
+    done
+    case "$FIELD" in pane|tab|workspace) ;; *) usage "--field 는 pane|tab|workspace: $FIELD" ;; esac
+    ARGS=("$FIELD") ;;
+  tab-open|pane-open)
+    NAME=""; CWD=$PWD; PARENT=""; npos=0
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --cwd) [ $# -ge 2 ] || usage "--cwd 값 없음"; CWD=$2; shift 2 ;;
+        --parent)
+          [ "$OP" = pane-open ] || usage "tab-open 에는 --parent 없음"
+          [ $# -ge 2 ] || usage "--parent 값 없음"; PARENT=$2; need_pane "$PARENT"; shift 2 ;;
+        --*) usage "$OP 알 수 없는 옵션: $1" ;;
+        *) npos=$((npos + 1)); NAME=$1; shift ;;
+      esac
+    done
+    [ "$npos" = 1 ] || usage "$OP <한글 이름> 이 정확히 하나 필요"
+    need_label "$NAME"
+    CWD=$(abs_dir "$CWD") || exit 2
+    if [ "$OP" = tab-open ]; then ARGS=("$NAME" "$CWD"); else ARGS=("$NAME" "$PARENT" "$CWD"); fi ;;
+  self-name)
+    [ $# -ge 1 ] && [ $# -le 2 ] || usage "self-name <탭 한글> [<pane 한글>]"
+    need_label "$1"; [ $# = 2 ] && need_label "$2"
+    ARGS=("$@") ;;
+  agent-start)
+    POS=(); KIND=""; CLI=()
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --) shift; CLI=("$@"); break ;;
+        --kind) [ $# -ge 2 ] || usage "--kind 값 없음"; KIND=$2; shift 2 ;;
+        --*) usage "agent-start 알 수 없는 옵션: $1" ;;
+        *) POS+=("$1"); shift ;;
+      esac
+    done
+    [ "${#POS[@]}" = 2 ] || usage "agent-start <이름> <pane id> --kind claude|codex -- <CLI 인자…>"
+    ao_is_name "${POS[0]}" || usage "에이전트 이름 형식 오류([a-z][a-z0-9_-]{0,31}): ${POS[0]}"
+    need_pane "${POS[1]}"
+    case "$KIND" in claude|codex) ;; *) usage "--kind 는 claude|codex: ${KIND:-없음}" ;; esac
+    ARGS=("${POS[0]}" "${POS[1]}" "$KIND" ${CLI[@]+"${CLI[@]}"}) ;;
+  agent-send)
+    POS=(); CONFIRM=0
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --confirm) CONFIRM=1; shift ;;
+        *) POS+=("$1"); shift ;;
+      esac
+    done
+    [ "${#POS[@]}" = 2 ] || usage "agent-send <이름|pane> <한 줄> [--confirm]"
+    need_target "${POS[0]}"
+    ao_one_line "${POS[1]}" || usage "프롬프트는 줄바꿈 없는 한 줄이어야 함(개행 = 중간 제출)"
+    ARGS=("${POS[0]}" "${POS[1]}" "$CONFIRM") ;;
+  agent-wait)
+    POS=(); SECS=3600
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --timeout) [ $# -ge 2 ] || usage "--timeout 값 없음"; SECS=$2; shift 2 ;;
+        --*) usage "agent-wait 알 수 없는 옵션: $1" ;;
+        *) POS+=("$1"); shift ;;
+      esac
+    done
+    [ "${#POS[@]}" = 1 ] || usage "agent-wait <이름> [--timeout 초]"
+    need_target "${POS[0]}"
+    ao_is_uint "$SECS" || usage "--timeout 은 양의 정수(초): $SECS"
+    ARGS=("${POS[0]}" "$SECS") ;;
+  agent-status|agent-session-id|agent-transcript)
+    [ $# = 1 ] || usage "$OP <이름>"
+    need_target "$1"; ARGS=("$1") ;;
+  agent-read)
+    POS=(); LINES_N=30
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --lines) [ $# -ge 2 ] || usage "--lines 값 없음"; LINES_N=$2; shift 2 ;;
+        --*) usage "agent-read 알 수 없는 옵션: $1" ;;
+        *) POS+=("$1"); shift ;;
+      esac
+    done
+    [ "${#POS[@]}" = 1 ] || usage "agent-read <이름|pane> [--lines N]"
+    need_target "${POS[0]}"
+    ao_is_uint "$LINES_N" || usage "--lines 는 양의 정수: $LINES_N"
+    ARGS=("${POS[0]}" "$LINES_N") ;;
+  agent-keys)
+    [ $# = 2 ] || usage "agent-keys <이름> <키>"
+    need_target "$1"
+    [[ $2 =~ ^[A-Za-z0-9+_-]{1,32}$ ]] || usage "키 형식 오류: $2"
+    ARGS=("$1" "$2") ;;
+  pane-run)
+    [ $# = 2 ] || usage "pane-run <pane id> <셸 문자열>"
+    need_pane "$1"
+    ao_one_line "$2" || usage "셸 문자열은 줄바꿈 없는 한 줄이어야 함"
+    ARGS=("$1" "$2") ;;
+  close)
+    [ $# = 1 ] || usage "close <pane id>"
+    need_pane "$1"; ARGS=("$1") ;;
+  list)
+    [ $# = 1 ] || usage "list --agents|--panes"
+    case "$1" in --agents) ARGS=(agents) ;; --panes) ARGS=(panes) ;; *) usage "list --agents|--panes: $1" ;; esac ;;
+  "") usage "동작 없음" ;;
+  *) usage "알 수 없는 동작: $OP" ;;
+esac
+
+# ── 2. 백엔드 결정
+BACKEND=""
+if [ -n "${AGENT_ORCHESTRATOR_BACKEND:-}" ]; then
+  BACKEND=$AGENT_ORCHESTRATOR_BACKEND
+else
+  CONF="$HOME/.config/agent-orchestrator/config"
+  if [ -f "$CONF" ]; then
+    BACKEND=$(sed -n 's/^[[:space:]]*backend[[:space:]]*=[[:space:]]*//p' "$CONF" | tail -1 | tr -d '[:space:]')
+  fi
+  if [ -z "$BACKEND" ]; then
+    if [ "${HERDR_ENV:-}" = 1 ]; then BACKEND=herdr; fi
+    # (예약) Rex: 판정 줄 자리 — 예: [ -n "${REX_SESSION:-}" ] && BACKEND=rex
+  fi
+fi
+[ -n "$BACKEND" ] || ao_die 11 "no backend: 설정·환경상 쓸 백엔드 없음 (herdr pane 밖)"
+[ "$BACKEND" = none ] && ao_die 11 "no backend: backend=none"
+ao_is_name "$BACKEND" || ao_die 12 "adapter error: 백엔드 이름 형식 오류: $BACKEND"
+
+# ── 3. 어댑터 로딩
+ADAPTER="$AO_HOME/adapters/$BACKEND.sh"
+[ -f "$ADAPTER" ] || ao_die 12 "adapter error: 어댑터 파일 없음: $ADAPTER"
+AO_ADAPTER_OK=""
+# shellcheck disable=SC1090
+. "$ADAPTER" || ao_die 12 "adapter error: 어댑터 로딩 실패: $ADAPTER"
+[ "$AO_ADAPTER_OK" = 1 ] || ao_die 12 "adapter error: 어댑터가 끝까지 로딩되지 않음(AO_ADAPTER_OK 없음): $ADAPTER"
+
+# ── 4. 동작 지원 여부(없는 함수 = 10) → 전제 검사(11·12·4) → 실행
+FN="op_${OP//-/_}"
+if [ "$OP" != backend ]; then
+  declare -F "$FN" >/dev/null || ao_die 10 "unsupported: 백엔드 $BACKEND 에 $OP 없음"
+fi
+if declare -F ao_adapter_check >/dev/null; then
+  ao_adapter_check
+fi
+if [ "$OP" = backend ]; then
+  echo "$BACKEND"
+  exit 0
+fi
+"$FN" ${ARGS[@]+"${ARGS[@]}"}

@@ -11,6 +11,7 @@ waymakerlabs-plugins/
 ├── plugins/
 │   ├── minimal-statusline/    # statusline 플러그인
 │   └── wrap-up/               # Obsidian 문서화 플러그인
+├── tools/                     # 플러그인 밖 공용 도구(marketplace.json 미등록) — 예: agent-orchestrator/
 ├── README.md
 └── CLAUDE.md
 ```

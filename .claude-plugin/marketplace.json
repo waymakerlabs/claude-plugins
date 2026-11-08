@@ -138,19 +138,6 @@
       "homepage": "https://github.com/waymakerlabs/claude-plugins"
     },
     {
-      "name": "orca-codex-delegate",
-      "version": "1.0.3",
-      "description": "Tracked Orca Run/Task orchestration procedures for delegating review or implementation work to Codex — read-only crosscheck and write-enabled implementation delegation, parallel batch dispatch as the default, worker profiles, known Orca CLI pitfalls, and finding-report format. Requires the Orca desktop app with orchestration enabled.",
-      "author": {
-        "name": "waymakerlabs",
-        "email": "peter@waymakerlabs.com"
-      },
-      "source": "./plugins/orca-codex-delegate",
-      "category": "workflow",
-      "keywords": ["orca", "codex", "orchestration", "delegation", "review", "crosscheck", "worker", "run-task-dispatch", "claude-code"],
-      "homepage": "https://github.com/waymakerlabs/claude-plugins"
-    },
-    {
       "name": "focused-analysis",
       "version": "1.1.0",
       "description": "Dual independent-track cross-verification for hard diagnostic questions — an Opus subagent and codex CLI run in parallel on the same question, then Claude synthesizes agreement/disagreement into one final judgment. Triggered by '집중 분석해줘'/'상세 분석해줘'. Requires the Codex CLI (installed and authenticated).",

@@ -1,0 +1,3 @@
+# kind	owner	path	selector	note
+link	ours-core	~/.local/bin/agent-orchestrator	-	백엔드 교체 시 보존. 오케스트레이터 자체 제거 때만 보관
+config	ours-core	~/.config/agent-orchestrator/config	backend=	교체 시 값만 바꿈(보존)

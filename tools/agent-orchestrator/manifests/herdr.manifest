@@ -1,0 +1,15 @@
+# kind	owner	path	selector	note
+hook	herdr	~/.claude/hooks/herdr-agent-state.sh	-	managed by herdr, 편집 금지
+setting	herdr	~/.claude/settings.json	hooks.*[command~=herdr-agent-state.sh]	-
+hook	herdr	~/.codex/herdr-agent-state.sh	-	managed by herdr
+setting	herdr	~/.codex/hooks.json	hooks.*[command~=herdr-agent-state.sh]	-
+adapter	ours-backend	tools/agent-orchestrator/adapters/herdr.sh	-	리포 파일(git으로 관리, 보관은 git 이력)
+doc	ours-backend	tools/agent-orchestrator/docs/herdr.md	-	-
+rule	ours-backend	~/.claude/CLAUDE.md	grep:herdr	잔존 검사 대상(자동 수정 안 함)
+rule	ours-backend	~/.codex/AGENTS.md	grep:herdr	-
+rule	ours-backend	plugins/auto-chain/skills/autonomous-chain	grep:herdr	활성 문서 전체(archive·CHANGELOG 제외)
+existing	-	~/.codex/config.toml	projects."/Users/peter/Dev/herdr-ios"	개발 프로젝트 신뢰 항목 — 보존(BLOCK 5)
+existing	-	~/.claude/projects/-Users-peter-Dev-herdr-ios/memory/	-	개발 프로젝트 메모리 — 보존
+existing	rex	~/.claude/settings.json	hooks.SessionStart[command~=rex __internal]	건드리지 않음
+existing	rex	~/.codex/hooks.json	hooks.SessionStart[command~=rex __internal]	건드리지 않음
+allow	-	~/.claude/projects/-Users-peter-Dev-gchat-g-on/memory/office-macmini-session-contact.md	grep:herdr --machine	D7 알려진 예외(잔존 허용)
