@@ -360,6 +360,7 @@ spawn() {  # $1 name, $2 effort, $3 첫 지시 뒤 상태
 }
 out=$(spawn sp-a medium working); rc=$?
 case "$out" in "OK name=sp-a pane=w1:p9 model=sonnet effort=medium status=working "*) ok sp-medium "OK effort=medium status=working" ;; *) bad sp-medium "OK effort=medium" "rc=$rc $out $(cat "$T/spawn.err")" ;; esac
+grep -q 'pane rename w1:p9 작업자 sp-a' "$FAKE_DIR/calls.log" && ok sp-pane-label "split 직후 한글 pane 이름" || bad sp-pane-label "pane rename w1:p9 작업자 sp-a" "$(grep 'pane rename' "$FAKE_DIR/calls.log")"
 grep -q 'agent start sp-a .* --effort medium' "$FAKE_DIR/calls.log" && ok sp-medium-arg "--effort medium 전달" || bad sp-medium-arg "--effort medium" "$(grep 'agent start' "$FAKE_DIR/calls.log")"
 out=$(spawn sp-b high "done"); rc=$?
 case "$out" in "OK name=sp-b "*"status=done "*) ok sp-fastdone "OK status=done (빠른 완료)" ;; *) bad sp-fastdone "OK status=done" "rc=$rc $out $(cat "$T/spawn.err")" ;; esac

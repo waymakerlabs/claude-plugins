@@ -15,7 +15,9 @@
 #               입증되지 않으므로 지시서에도 역할 규칙을 함께 적는다
 #   PERM_FLAGS  권한 플래그. 비우면 조정자 claude 프로세스의 실제 argv(원소 단위)에
 #               --dangerously-skip-permissions가 있을 때만 그 플래그를 붙인다
-#   TAB_LABEL   오른쪽 열이 찼을 때 쓰는 탭 이름(기본 chain-workers)
+#   TAB_LABEL   오른쪽 열이 찼을 때 쓰는 탭 이름(기본 "자율체인 작업" — 2.2.2 한글)
+#   PANE_LABEL  새 pane에 붙일 한글 이름(기본 "작업자 <name>"). split에는 이름 옵션이
+#               없어 split 직후 pane rename으로 붙인다(2.2.2). 실패해도 기동은 계속
 #
 # 하는 일 (references/backend-herdr.md §2~§3):
 #   1. 전제·인자 검사, 이름 중복 검사(agent list)
@@ -42,7 +44,8 @@ die() { code=$1; shift; echo "herdr-spawn-worker: $*" >&2; exit "$code"; }
 [ $# -ge 4 ] && [ $# -le 5 ] || die 2 "사용: $0 <name> <model> <effort> <brief-path> [main-pane]"
 NAME=$1; MODEL=$2; EFFORT=$3; BRIEF=$4; MAIN=${5:-${HERDR_PANE_ID:-}}
 ROLE=${ROLE:-chain-worker}
-TAB_LABEL=${TAB_LABEL:-chain-workers}
+TAB_LABEL=${TAB_LABEL:-자율체인 작업}
+PANE_LABEL=${PANE_LABEL:-작업자 $NAME}
 MAX_RIGHT=5
 
 # [[ =~ ]]는 문자열 전체를 본다(grep은 줄 단위라 "ok\nBAD!"를 통과시킨다)
@@ -188,6 +191,9 @@ case "${1:-error}" in
   *) die 4 "pane layout 해석 실패 (기준 pane $MAIN)" ;;
 esac
 [ -n "$P" ] || die 4 "pane 생성 실패"
+# 2.2.2: pane 이름(한글). split에는 이름 옵션이 없다. 실패는 경고만
+herdr pane rename "$P" "$PANE_LABEL" >/dev/null 2>&1 \
+  || echo "herdr-spawn-worker: pane 이름 붙이기 실패 pane=$P (기동은 계속)" >&2
 
 # 3. agent start
 # 역할 해석: ROLE=none → --agent 없음 / ':' 포함 → 그대로 / 프로젝트 정의

@@ -50,14 +50,15 @@ ROLE=chain-worker "$S" "$NAME" <sonnet|opus> <low|medium|high|xhigh> "<지시서
 - (2.2.0) `effort=`는 **요청값 그대로**다. 실제 적용값은 조정자가 화면 표시(`Sonnet 5.5 [medium]` 등)로 1회 확인해 함께 적는다(요청값과 다르면 둘 다 기록).
 - (2.2.0) `status=done|idle`은 첫 지시 뒤 이미 끝난 **빠른 완료**다. 실패가 아니다 — 바로 보고서를 회수한다(§5).
 - 실패하면 비0 종료와 사유를 stderr로 낸다: 2=인자·전제, 3=이름 중복, 4=배치, 5=`agent start`(대개 `agent_not_ready`), 6=첫 지시 실패·첫 지시 뒤 `blocked`/`unknown`·이중 기동. 4 이후 실패면 만든 pane은 닫지 않고 id를 출력한다. §6 장애 절로 간다.
-- `ROLE`(기본 `chain-worker`), `PERM_FLAGS`(비우면 조정자 claude 프로세스 — `argv[0]` 이름이 정확히 `claude`인 조상 — 의 **실제 argv 원소**(Linux `/proc/<pid>/cmdline`, macOS `KERN_PROCARGS2`)에 `--dangerously-skip-permissions`가 있을 때만 붙임. `ps args` 문자열은 인자 경계를 잃어 쓰지 않는다. argv를 못 읽으면 플래그 없이 기동하고 경고), `TAB_LABEL`(넘침 탭 이름)을 환경 변수로 바꿀 수 있다.
+- `ROLE`(기본 `chain-worker`), `PERM_FLAGS`(비우면 조정자 claude 프로세스 — `argv[0]` 이름이 정확히 `claude`인 조상 — 의 **실제 argv 원소**(Linux `/proc/<pid>/cmdline`, macOS `KERN_PROCARGS2`)에 `--dangerously-skip-permissions`가 있을 때만 붙임. `ps args` 문자열은 인자 경계를 잃어 쓰지 않는다. argv를 못 읽으면 플래그 없이 기동하고 경고), `TAB_LABEL`(넘침 탭 이름, 기본 `자율체인 작업`), `PANE_LABEL`(새 pane 이름, 기본 `작업자 <name>`)을 환경 변수로 바꿀 수 있다.
+- (2.2.2) **탭·pane 이름은 항상 한글이다.** `pane split`에는 이름 옵션이 없어, 스크립트는 split 직후 `herdr pane rename <id> "$PANE_LABEL"`을 실행한다(실패하면 경고만 하고 기동은 계속한다). 수동으로 만들 때도 같다. 조정자는 자기 탭·pane이 번호·영문 기본값이면 착수 때 `herdr tab rename "$HERDR_TAB_ID" "<한글>"`·`herdr pane rename "$HERDR_PANE_ID" "<한글>"`로 바꾼다(예: `M1-11 조정자`). 사용자가 붙인 한글 이름은 덮어쓰지 않는다. `agent start`의 에이전트 이름은 영문 정규식 그대로다.
   - `ROLE` 해석: `none` → `--agent` 없음 / `:` 포함(`auto-chain:chain-worker-deep`) → 그대로 / `$PWD/.claude/agents/<ROLE>.md`가 있으면 프로젝트 정의 이름(예: `ROLE=helpai-worker`) / 그 밖 → `auto-chain:<ROLE>`.
   - `--agent` 적용 여부는 화면의 모델·effort 표시로 입증되지 않는다. 역할 규칙(도구 제한·금지 사항)은 지시서에도 함께 적는다.
 - 아래 수동 명령은 스크립트가 하는 일의 참고이자 스크립트를 쓸 수 없을 때의 대안이다. Sol 명령 pane(§7)은 agent를 띄우지 않으므로 아래 수동 배치 규칙으로 만든다.
 
 - 오른쪽 열이 비어 있으면: `herdr pane split --current --direction right --cwd "$PWD" --no-focus`
 - 오른쪽 열에 pane이 있으면: `herdr pane layout --pane "$HERDR_PANE_ID"`로 오른쪽 열(x > 0)에서 **높이가 가장 큰** pane을 골라 `herdr pane split <그 pane> --direction down --ratio 0.5 --cwd "$PWD" --no-focus`. 이렇게 하면 2개 → 반반, 4개 → 4등분이 된다(실측: 58줄 화면에서 1개 58줄, 4개 14~15줄).
-- 오른쪽 열은 **최대 5개**. 그 이상 띄워야 하면 `herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$PWD" --label chain-<chain-id>-workers`로 탭을 하나 만들고 그 안에서 같은 규칙으로 나눈다(실측: 새 탭에서 2열 × 2~3행).
+- 오른쪽 열은 **최대 5개**. 그 이상 띄워야 하면 `herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$PWD" --label "자율체인 작업"`으로 탭을 하나 만들고 그 안에서 같은 규칙으로 나눈다(실측: 새 탭에서 2열 × 2~3행).
 - 새 pane의 id는 응답의 `.result.pane.pane_id`. 항상 `--no-focus`로 사용자의 포커스를 빼앗지 않는다.
 - `--cwd`는 **조정자의 현재 디렉터리(`$PWD`)**로 둔다. Claude Code는 처음 보는 폴더에서 신뢰 확인 화면을 띄우고 멈춘다(실측: `agent start`가 `agent_not_ready`). 조정자가 이미 돌고 있는 폴더는 신뢰된 폴더다. 대상 리포가 다르면 지시서에 리포 절대 경로를 적고 worker가 `git -C <리포>`·절대 경로로 일한다.
 
@@ -200,7 +201,7 @@ pid=$(sed -n 's/^RUN [^ ]* pid=\([0-9]*\).*/\1/p' "$DONE.run")   # 파일이 생
 다음 마일스톤 조정자를 **새 탭**에 띄운다(오른쪽 열이 아니라 탭 — 조정자는 크게 보여야 한다).
 
 ```bash
-R=$(herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$PWD" --label "chain-<chain-id>-M<n+1>")
+R=$(herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$PWD" --label "<짧은 한글 이름> M<n+1>")   # 2.2.2 한글(예: "헬프AI M1-12")
 ROOT=$(printf '%s' "$R" | grep -o '"pane_id":"[^"]*"' | head -1 | cut -d'"' -f4)
 NEXT="<chain-id 줄임>-m<n+1>"
 herdr agent start "$NEXT" --kind claude --pane "$ROOT" --timeout 90000 -- <현재 조정자와 같은 플래그(--model·--effort·권한 모드)>
