@@ -18,7 +18,7 @@ trap 'rm -rf "$T"' EXIT
 FAKE="$T/bin"; NOHERDR="$T/bin-noherdr"; FD="$T/fake"
 mkdir -p "$FAKE" "$NOHERDR" "$FD" "$T/home"
 cp "$HERE/fake-herdr.py" "$FAKE/herdr"; chmod +x "$FAKE/herdr"
-EXPECT=134
+EXPECT=137
 
 PASS=0; FAIL=0
 # 여러 줄 값은 ⏎로 이어 한 줄 한 케이스를 지킨다
@@ -188,7 +188,16 @@ reset_state; setlabel tab w1:t1 "[OC] 논의"; setlabel pane w1:p1 "[OC] 논의"
 ao self-name --force "[OC] 새 주제" "[OC] 새 주제 pane"
 [ "$RC" = 0 ] && called "tab rename w1:t1 [OC] 새 주제" && called "pane rename w1:p1 [OC] 새 주제 pane" && ! called "tab get" && ok self-name-force "--force는 판정 없이 바꿈" || bad self-name-force "tab·pane rename, get 없음" "rc=$RC $(cat "$FD/calls.log")"
 ao self-name --force; chk arg-self-name-force-only 2
+# "-" = 대상 건너뜀: 사용자 탭은 두고 pane만 --force (S5 2회차 BLOCK)
+reset_state; setlabel tab w1:t1 "[OC] Peter review"; setlabel pane w1:p1 "[OC] 논의"
+ao self-name --force - "[OC] 구현"
+[ "$RC" = 0 ] && called "pane rename w1:p1 [OC] 구현" && ! called "tab rename" && ! called "tab get" && ok self-name-skip-tab "탭 - 건너뜀, pane만 --force" || bad self-name-skip-tab "pane만 rename" "rc=$RC $(grep rename "$FD/calls.log")"
+reset_state; ao self-name "[OC] 탭만" -
+[ "$RC" = 0 ] && called "tab rename w1:t1 [OC] 탭만" && ! called "pane get" && ok self-name-skip-pane "pane - 건너뜀" || bad self-name-skip-pane "탭만" "rc=$RC $(grep -E "rename|pane get" "$FD/calls.log")"
+ao self-name - -; chk arg-self-name-both-skip 2
 ao self-name --bogus "[OC] 탭"; chk arg-self-name-bad-opt 2
+# 앞 케이스 상태에 기대지 않도록 label을 직접 둔다
+setlabel tab w1:t1 "[OC] 새 주제"
 ao whoami --field tab-label; chk whoami-tab-label 0 "[OC] 새 주제"
 reset_state
 ao whoami --field pane-label; chk whoami-pane-label-empty 0 ""

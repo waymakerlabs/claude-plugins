@@ -235,9 +235,11 @@ name_one() {
 op_self_name() {
   local force=$1
   shift
-  [ -n "${HERDR_TAB_ID:-}" ] || ao_die 3 "HERDR_TAB_ID 없음"
-  name_one tab "$HERDR_TAB_ID" "$1" "$force"
-  if [ $# -ge 2 ]; then
+  if [ "$1" != - ]; then   # "-" = 탭 건너뜀
+    [ -n "${HERDR_TAB_ID:-}" ] || ao_die 3 "HERDR_TAB_ID 없음"
+    name_one tab "$HERDR_TAB_ID" "$1" "$force"
+  fi
+  if [ $# -ge 2 ] && [ "$2" != - ]; then
     [ -n "${HERDR_PANE_ID:-}" ] || ao_die 3 "HERDR_PANE_ID 없음"
     name_one pane "$HERDR_PANE_ID" "$2" "$force"
   fi
