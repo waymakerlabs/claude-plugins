@@ -138,7 +138,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 0.85rem; border-top: 
 <main>
 
 <h1>자율체인(auto-chain) 개요</h1>
-<p class="meta">대상: 이 환경을 처음 보는 개발자 · 기준: auto-chain 2.4.0 스킬 문서와 agent-orchestrator 계약 문서</p>
+<p class="meta">대상: 이 환경을 처음 보는 개발자 · 기준: auto-chain 2.5.0 스킬 문서와 agent-orchestrator 계약 문서</p>
 
 <p class="lead">자율체인은 여러 세션 분량의 큰 작업을 Claude Code가 사람 개입을 최소로 하며 끝까지 진행하게 하는 스킬이다. 작업을 <strong>마일스톤 → 웨이브 → task</strong>로 나누고, 마일스톤 하나를 조정자 세션 하나가 맡는다. 계획은 Opus 계획 에이전트가 쓰고, 검토는 다른 계열 모델(GPT-6.1 Sol)이 맡으며, 구현은 Claude worker가 병렬로 한다. 마일스톤이 끝나면 조정자는 상태 파일과 인계 문서를 남기고 새 세션을 열어 다음 마일스톤을 넘긴다. 모든 프로젝트에 공통인 절차는 스킬이 정하고, 프로젝트마다 다른 검증 명령·권한·추가 절차는 프로젝트 프로파일 파일이 정한다.</p>
 
@@ -214,7 +214,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 0.85rem; border-top: 
 </table>
 </div>
 
-<p>조정자의 규율은 단순하다. worker 보고서와 <strong>실제 diff</strong>, 그리고 보고서가 가리킨 위험 지점만 본다. diff 밖의 worker 코드는 읽지 않고, worker가 통과시킨 시험을 task마다 다시 돌리지 않는다. git index에 쓰는 작업(add·commit)은 조정자만 한다. worker 여럿이 커밋하면 <code>index.lock</code>이 충돌하기 때문이다.</p>
+<p>조정자의 규율은 단순하다. worker 보고서와 <strong>실제 diff</strong>, 그리고 보고서가 가리킨 위험 지점만 본다. diff 밖의 worker 코드는 읽지 않고, worker가 통과시킨 시험을 task마다 다시 돌리지 않는다. git index에 쓰는 작업(add·commit)은 조정자만 한다. worker 여럿이 커밋하면 <code>index.lock</code>이 충돌하기 때문이다. 쓰기 크기에도 규칙이 있다(2.5.0). 조정자·planner·worker·breaker 모두 한 번의 Write·Edit 출력을 약 150줄·8KB 이하로 하고, 그보다 큰 파일은 절 제목만 담은 뼈대를 먼저 쓴 뒤 절마다 Edit로 채운다.</p>
 
 <h3 id="files">1-3. 상태 파일·질문 대기열·보고서</h3>
 
@@ -598,7 +598,7 @@ task-brief: docs/chain/_profile/task-brief.md   # worker 덧붙임 지시서
 <pre><code>authority: { local-commit: yes, push: wave, external-write: no, new-cost: no,
              escalation: [extra-rounds:1, carry-reversible, stop] }
 verify-full: "&lt;프로젝트 CLI&gt; test &lt; /dev/null"
-skill: auto-chain 2.4.0
+skill: auto-chain 2.5.0
 reviewer: codex-cli
 backend: herdr &lt;조정자 pane&gt;</code></pre>
 
