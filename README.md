@@ -517,6 +517,34 @@ Run it from the project folder you want to set up:
 
 ---
 
+## ▶ review-chain
+
+> QC follow-up chain. After development, one OC session takes the user's visual-QC findings into a queue and runs them in parallel: a dedicated worker per discussion-type feature, and one bundled worker for small non-overlapping fixes. The user discusses directly in each worker's tab or pane; the OC only receives results.
+
+**Covers:**
+
+- **State files are the source of truth** — `.review-chain/<chain-id>/` in the repo (excluded via `.git/info/exclude`): worker table, queue, and a `current-oc` indirection file so the OC can be replaced when its context fills.
+- **Conflicts before work** — workers submit file scopes first; overlapping scopes are held or ordered by the OC.
+- **Merges by the OC only, one at a time** — pinned to the reported SHA, `ff-only`. Workers commit only to their own worktree branch; push and shared files (version, release notes, ledger, JIRA) belong to the OC.
+- **Fixed one-line messages** — worker↔OC only, prefixed `[rc <chain-id>]`; no worker-to-worker talk.
+- **Up to 4 concurrent workers** in total. Large items are promoted to auto-chain.
+
+Requires `tools/agent-orchestrator` with a supported backend (e.g. herdr).
+
+#### Install
+
+```bash
+/plugin install review-chain@waymakerlabs-claude-plugins
+```
+
+#### Usage
+
+```bash
+Skill(review-chain:review-chain)
+```
+
+---
+
 ## Troubleshooting
 
 ### Usage shows N/A
