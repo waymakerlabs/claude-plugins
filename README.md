@@ -539,8 +539,10 @@ Requires `tools/agent-orchestrator` with a supported backend (e.g. herdr).
 
 #### Usage
 
+Say "리뷰체인으로 새 세션 열어줘" (or call `/review-chain:review-chain`) from the session where development just finished. By default that session only writes a short start memo and opens a fresh `[OC] <project> QC` tab, so the OC starts with a clean context. Say "이 세션에서" to make the current session the OC instead.
+
 ```bash
-Skill(review-chain:review-chain)
+/review-chain:review-chain
 ```
 
 ---

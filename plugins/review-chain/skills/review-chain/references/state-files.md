@@ -4,6 +4,7 @@
 
 ```
 .review-chain/
+├── launch-<YYYYMMDD-HHMM>.md # 시작 메모(launcher가 씀, launch.md §3)
 ├── <chain-id>/
 │   ├── current-oc            # pane id 한 줄
 │   ├── state.md

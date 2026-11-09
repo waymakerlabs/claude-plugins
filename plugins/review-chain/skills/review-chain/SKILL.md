@@ -5,7 +5,8 @@ description: >-
   중심 세션 OC 하나가 수정사항을 대기열로 받고, 논의형 feature마다 전용 worker(WO), 범위가 안 겹치는 사소한 수정은
   묶음 worker 하나에 맡긴다. 사용자는 worker 탭·pane에서 직접 논의하고, OC는 결과만 받아 병합(한 번에 하나)·
   공용 파일(VERSION·릴리즈 노트·진행 원장·외부 반영)을 맡는다. OC 컨텍스트가 차면 새 OC로 교체하고 worker는
-  `현재 OC` 파일로 보고 대상을 바꾼다. 사용자가 "리뷰체인으로", "QC 수정 체인" 등을 요청할 때 사용.
+  `현재 OC` 파일로 보고 대상을 바꾼다. 사용자가 "리뷰체인으로", "리뷰체인으로 새 세션 열어줘", "시각리뷰 시작",
+  "QC 수정 체인" 등을 요청할 때 사용. 기본은 부른 세션이 시작 메모만 쓰고 새 탭에 깨끗한 OC를 연다.
   여러 마일스톤·비가역 변경·설계 계획이 선행돼야 하는 항목은 이 스킬이 아니라 auto-chain으로 넘긴다.
 ---
 
@@ -18,11 +19,12 @@ description: >-
 - **OC**: 사용자와 QC를 진행하는 중심 세션 하나. 대기열·배정·충돌 판정·병합·공용 파일만 한다. 코드를 직접 고치지 않는다. 병합 판정은 보고 파일·diff 통계에 더해 **diff 본문 검토**로 한다 — 본문 정독은 읽기 전용 서브에이전트에 맡겨 결론 한 줄만 받고, 시험 파일·assertion 삭제는 OC가 직접 짚어 본다(§7-3).
 - **WO**: OC가 띄운 worker 세션. 논의형 feature 전용 worker와 잡수정 묶음 worker 두 종류다. 각자 자기 worktree·브랜치에서 일한다.
 - **체인 폴더** `$RC` = `<리포>/.review-chain/<chain-id>/`(§15 D1). 이 안의 파일이 진본이다.
-- reference(이 SKILL.md 폴더 기준, worker에게는 절대 경로로 넘긴다): `references/state-files.md`(상태 파일 형식), `references/messages.md`(메시지 형식), `references/worker-brief.md`(worker 지시서 틀), `references/oc-handover.md`(OC·worker 교체), `references/project-config.md`(프로젝트 설정), `scripts/rc-send.sh`(현재 OC를 읽어 보고 한 줄 전송).
+- reference(이 SKILL.md 폴더 기준, worker에게는 절대 경로로 넘긴다): `references/launch.md`(새 탭 OC로 시작), `references/state-files.md`(상태 파일 형식), `references/messages.md`(메시지 형식), `references/worker-brief.md`(worker 지시서 틀), `references/oc-handover.md`(OC·worker 교체), `references/project-config.md`(프로젝트 설정), `scripts/rc-send.sh`(현재 OC를 읽어 보고 한 줄 전송).
 - 오케스트레이션 툴은 `AO=${AGENT_ORCHESTRATOR:-$HOME/.local/bin/agent-orchestrator}`로만 부른다. 동작 계약은 `tools/agent-orchestrator/bin/agent-orchestrator` 머리 주석, 툴 특이사항은 `tools/agent-orchestrator/docs/<backend>.md`. pane 기동·정지 판정·이름 규칙은 auto-chain `references/pane-worker.md` §2·§6을 그대로 따른다(이 문서는 review-chain 정책만 적는다).
 
 ## 1. 시작과 재개
 
+0. **경로 판정 먼저**(`references/launch.md` §1). 첫 지시가 시작 메모(`launch-*.md`)를 가리키거나 사용자가 "이 세션에서"라고 명시했을 때만 이 세션이 OC로 1번부터 진행한다. 인계 문서(`oc-handover-*.md`)면 5번(재개). **그 밖 전부(기본)는 launch** — 이 세션은 시작 메모를 쓰고 새 탭 `[OC] <프로젝트 한글> QC`에 깨끗한 OC를 연 뒤 손을 뗀다(`references/launch.md` §2). auto-chain이 끝난 세션처럼 맥락이 무거운 세션이 OC가 되지 않게 하기 위해서다.
 1. `"$AO" backend`가 0인지 본다. 10·11·12면 이 스킬은 쓰지 않는다(사용자가 worker 탭에서 직접 대화하는 것이 핵심이라 ① `Agent`로 내려갈 수 없다). 12는 설치 결함으로 한 줄 알린다. 사용자에게 "review-chain은 오케스트레이션 툴 안에서만 동작한다"고 보고하고 멈춘다.
 2. `"$AO" self-name "[OC] <프로젝트 한글> QC" "[OC] <프로젝트 한글> QC"`. 확인은 `"$AO" whoami --field tab-label|pane-label`.
 3. 프로젝트 설정 `.claude/review-chain.md`를 읽는다(없으면 기본값, `references/project-config.md`).
@@ -183,3 +185,4 @@ review-chain 안에서 auto-chain을 돌리지 않는다(OC가 둘이 되어 보
 - D7 보조 대기(`agent-wait`)와 정지 감시를 두지 않는다 — 논의형은 사용자 대화로 오래 멈춰 있는 것이 정상이다.
 - D8 `ROLE=none` — auto-chain `chain-worker` 정의는 "사용자와 길게 논의"를 전제하지 않는다. 규칙은 지시서에 적는다.
 - D9 오케스트레이션 툴 밖이면 체인을 시작하지 않는다(내려감 없음).
+- D10 시작 기본은 launch(새 탭 깨끗한 OC, 0.1.1) — 보통 auto-chain이 끝난 무거운 세션에서 불리므로. 부른 세션이 OC가 되는 것은 사용자가 "이 세션에서"라고 할 때만. launcher→새 OC는 순차 대체라 전역 인계 규칙(새 탭 + `[OC]`)이 맞는 쓰임이다.

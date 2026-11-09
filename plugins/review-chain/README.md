@@ -10,6 +10,7 @@
 | `references/state-files.md` | 상태 파일(`current-oc`·`state.md`·`queue.md`) 형식 |
 | `references/messages.md` | worker↔OC 한 줄 메시지 형식(`[rc <chain-id>] …`) |
 | `references/worker-brief.md` | worker 지시서·보고 파일 틀 |
+| `references/launch.md` | 기본 시작 경로 — 부른 세션이 시작 메모를 쓰고 새 탭에 깨끗한 OC를 연다 |
 | `references/oc-handover.md` | OC 교체·worker 교체 절차 |
 | `references/project-config.md` | 프로젝트 설정 `.claude/review-chain.md` |
 | `scripts/rc-send.sh` | `current-oc`를 읽어 worker 보고 한 줄 전송 |
