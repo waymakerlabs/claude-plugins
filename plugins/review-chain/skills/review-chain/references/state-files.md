@@ -1,16 +1,22 @@
 # 상태 파일 형식
 
-`$RC` = `<리포>/.review-chain/<chain-id>/`. 모두 OC가 만든다. 사람이 읽는 markdown 표로 두고(OC·worker 모두 Read로 읽는다), 기계가 읽는 것은 `current-oc` 한 줄뿐이다.
+`$RC` = `<리포>/.review-chain/<chain-id>/`. 모두 OC가 만든다. 사람이 읽는 markdown 표로 두고(OC·worker 모두 Read로 읽는다), 스크립트가 읽고 쓰는 것은 받은편지함(`inbox.log`·`.cursor`)·`claims.tsv`·`shared-files`다(`current-oc`는 기록·호환용이며 메시지 라우팅에는 쓰이지 않는다).
 
 ```
 .review-chain/
 ├── launch-<YYYYMMDD-HHMM>.md # 시작 메모(launcher가 씀, launch.md §3)
 ├── <chain-id>/
-│   ├── current-oc            # pane id 한 줄
+│   ├── current-oc            # pane id 한 줄(기록·호환용 — 라우팅에 안 쓰임)
+│   ├── inbox.log             # worker→OC 받은편지함(rc-send.sh·rc-claim.sh가 덧붙임)
+│   ├── inbox.log.cursor      # OC가 처리한 줄 번호(rc-watch.sh --ack)
+│   ├── claims.tsv            # 파일 범위 선점 진본(rc-claim.sh)
+│   ├── claims.lock/          # 선점 중에만 있는 잠금 폴더
+│   ├── shared-files          # 공용 파일 패턴 한 줄 한 패턴(OC가 체인 시작 때)
 │   ├── state.md
 │   ├── queue.md
 │   ├── merge.lock            # 병합 중일 때만(단계 진행 기록)
-│   └── workers/<name>/{brief.md, report.md, plan-draft.md}
+│   └── workers/<name>/{brief.md, report.md, plan-draft.md, inbox.log, inbox.log.cursor}
+│                              # inbox.log = OC→그 worker 받은편지함, cursor = worker가 처리한 줄 번호
 ├── wt/<name>/                # git worktree
 └── archive/<name>/           # 정리 때 옮긴 데이터 사본
 ```
@@ -21,8 +27,16 @@
 w2:p4
 ```
 
-- 줄바꿈 하나로 끝나는 pane id 한 줄. 교체 때 OC가 임시 파일에 쓰고 `mv`로 바꾼다(읽는 쪽이 반쯤 쓴 파일을 보지 않게).
+- 줄바꿈 하나로 끝나는 pane id 한 줄. 교체 때 OC가 임시 파일에 쓰고 `mv`로 바꾼다.
+- **0.1.2부터 메시지 라우팅에 쓰이지 않는다**(받은편지함 경로가 고정). 현재 OC pane을 사람이 확인하거나 기존 도구와의 호환을 위해 기록으로 유지한다.
 - 같은 폴더의 `current-oc.log`에 `<시각> <pane id> <사유>`를 한 줄씩 덧붙인다(교체 이력).
+
+## 받은편지함 · claims.tsv · shared-files
+
+- `inbox.log`(worker→OC), `workers/<name>/inbox.log`(OC→worker): 한 줄 = 메시지 하나(`<HH:MM:SS> [rc <chain-id>] …`, 형식은 `messages.md`). 줄은 덧붙이기만 하고 지우지 않는다. `<inbox>.cursor`는 처리한 마지막 줄 번호 한 줄이며 `rc-watch.sh --ack`만 올린다(되감지 않음). 처리 안 한 줄 = cursor 뒤 줄(`rc-watch.sh --pending <inbox>`).
+- `claims.tsv`: `이름<TAB>패턴<TAB>active|released<TAB>시각` 한 줄씩. **파일 범위의 진본**이다. state.md worker 표 `파일 범위` 칸은 `[범위]`·`[범위변경]` 기록을 보고 OC가 옮겨 적는 거울이라, 어긋나면 `rc-claim.sh --list <$RC>`가 맞다. 해제(`--release`)는 줄을 지우지 않고 `released`로 바꾼다.
+- `claims.lock/`: 선점 중 잠깐 있는 폴더. 오래 남아 있으면(스크립트 종료 6의 원인) OC가 선점 중인 프로세스가 없음을 확인한 뒤 지운다.
+- `shared-files`: 설정 `shared-files`를 한 줄 한 패턴으로 옮긴 파일. 선점 패턴이 걸리면 `rc-claim.sh`가 종료 5로 거부한다. 없으면 공용 파일 검사를 하지 않는다.
 
 ## state.md
 
@@ -51,15 +65,12 @@ config: .claude/review-chain.md   # 없으면 default
 ## 결정
 - 14:22 Q3·Q7 범위 겹침(src/issue/Rail.tsx) — rail 우선, create 보류.
 
-## 미처리
-(oc-status: 교체중 동안 옛 OC가 받은 메시지 원문을 받은 순서대로 한 줄씩. 새 OC가 처리한 줄 끝에 ` → 처리 <시각>`)
-- 15:02 [rc rc-20261109-gira] [WO rail] [범위변경] /…/workers/rail/report.md 레일 아이콘 파일 추가
-
 ## 종료
 (체인 끝날 때만)
 ```
 
-- `oc-status: 교체중`인 동안 옛 OC는 새 OC 기동 전 마무리 기록(`oc-handover.md` §1-3·4)과 "## 미처리" 덧붙이기 말고는 상태 파일을 고치지 않는다(새 OC와 동시 편집 방지). `활성`으로 되돌리는 것은 새 OC다.
+- 0.1.2부터 "## 미처리" 절은 쓰지 않는다. 처리하지 못한 메시지는 받은편지함의 처리 위치(`inbox.log.cursor`) 뒤에 그대로 남는다.
+- `oc-status: 교체중`인 동안 옛 OC는 새 OC 기동 전 마무리 기록(`oc-handover.md` §1-3·4) 말고는 상태 파일을 고치지 않는다(새 OC와 동시 편집 방지). `활성`으로 되돌리는 것은 새 OC다.
 
 ## merge.lock
 
@@ -82,7 +93,7 @@ external-done: GIRA-12 댓글   # | skip
 
 - 표 한 줄 = worker 하나. 교체된 worker는 줄을 지우지 않고 상태 `교체됨`.
 - `마지막 보고` = `<시각> <종류> <한 줄>`. OC가 메시지를 받을 때마다 고친다.
-- 파일 범위는 리포 루트 기준 경로·glob, 쉼표 구분.
+- 파일 범위는 리포 루트 기준 경로·glob, 쉼표 구분. `claims.tsv`의 거울이다.
 
 ## queue.md
 

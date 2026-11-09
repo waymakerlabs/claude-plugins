@@ -1,55 +1,64 @@
 #!/usr/bin/env bash
-# rc-send.sh — review-chain worker → 현재 OC 보고 한 줄 전송
+# rc-send.sh — review-chain 메시지 한 줄을 받은편지함 파일에 덧붙인다 (0.1.2)
 #
-# 사용: rc-send.sh <chain 폴더 절대경로> <내 이름> <종류> "<한 줄 요지>"
-#   종류: 범위 | 범위변경 | 완료 | 질문 | 막힘 | 승격제안   (대괄호 없이)
+# 사용:
+#   worker → OC : rc-send.sh <chain 폴더> <내 이름> <종류> "<한 줄 요지>"
+#                 종류: 범위 | 범위변경 | 완료 | 질문 | 막힘 | 승격제안   (대괄호 없이)
+#                 → <chain 폴더>/inbox.log 에
+#                   <HH:MM:SS> [rc <chain-id>] [WO <이름>] [<종류>] <report 절대경로> <요지>
+#   OC → worker : rc-send.sh --to <worker 이름> <chain 폴더> <종류> "<한 줄>"
+#                 종류: 진행 | 보류 | 답 | main갱신 | 확인 | OC변경 | 닫기 | 승격
+#                 → <chain 폴더>/workers/<이름>/inbox.log 에
+#                   <HH:MM:SS> [rc <chain-id>] [OC] [<종류>] <한 줄>
 #
-# 하는 일: <chain 폴더>/current-oc 를 매번 읽어(pane id 를 외우지 않는다) 아래 형식으로 보낸다.
-#   current-oc 는 agent-orchestrator 의 pane id 형식(^[A-Za-z0-9]+:[A-Za-z0-9]+$)만 받는다. 고쳐 쓰지 않는다.
-#   [rc <chain-id>] [WO <이름>] [<종류>] <chain 폴더>/workers/<이름>/report.md <요지>
-#   chain-id = chain 폴더 이름. 요지의 줄바꿈·탭은 공백으로 바꾸고 300자에서 자른다.
-# 전송: agent-orchestrator agent-send <OC pane> "<메시지>" (--confirm 없음 — OC가 일하는 중이어도 된다)
+# 왜 파일인가: agent-send 는 상대 pane 입력창에 키보드처럼 쳐 넣어, 사용자가 그 pane에서
+#   치던 프롬프트와 섞인다. 받는 쪽은 Monitor(rc-watch.sh)로 이 파일을 지켜보고, 새 줄은
+#   대화에 시스템 알림으로 들어온다(입력창을 건드리지 않음 — 2026-11-09 실측).
+#   파일이 기록이므로 OC·worker가 교체돼도 아직 처리 안 한 줄이 남는다.
+# 요지의 줄바꿈·탭은 공백으로 바꾸고 300자에서 자른다. 한 줄을 printf 한 번으로 덧붙인다.
 #
-# 종료 코드: 0 전송 / 2 인자·형식 / 3 current-oc 없음·형식 오류 / 그 밖 = agent-send 의 코드 그대로
-#   실패하면 report.md 의 "- 진행:" 줄에 "미전송 [<종류>]"를 남기는 것은 호출자(worker) 몫이다.
-# 환경: AGENT_ORCHESTRATOR(진입점, 기본 $HOME/.local/bin/agent-orchestrator), RC_DRY_RUN=1 이면 보내지 않고 메시지만 출력.
+# 종료 코드: 0 기록 / 2 인자·형식
+# 환경: RC_DRY_RUN=1 이면 기록하지 않고 줄만 출력.
 # bash 3.2 호환.
 
 set -u
 
 die() { code=$1; shift; echo "rc-send: $*" >&2; exit "$code"; }
 
-[ $# = 4 ] || die 2 "사용: $0 <chain 폴더> <이름> <종류> \"<요지>\""
-RC=${1%/}; NAME=$2; KIND=$3; MSG=$4
-AO=${AGENT_ORCHESTRATOR:-$HOME/.local/bin/agent-orchestrator}
+TO=""
+if [ "${1:-}" = "--to" ]; then
+  [ $# = 5 ] || die 2 "사용: $0 --to <worker 이름> <chain 폴더> <종류> \"<한 줄>\""
+  TO=$2; RC=${3%/}; KIND=$4; MSG=$5
+  [[ $TO =~ ^[a-z][a-z0-9_-]{0,31}$ ]] || die 2 "이름 형식 오류: $TO"
+  case "$KIND" in 진행|보류|답|main갱신|확인|OC변경|닫기|승격) ;; *) die 2 "종류 오류: $KIND" ;; esac
+else
+  [ $# = 4 ] || die 2 "사용: $0 <chain 폴더> <이름> <종류> \"<요지>\"  |  $0 --to <이름> <chain 폴더> <종류> \"<한 줄>\""
+  RC=${1%/}; NAME=$2; KIND=$3; MSG=$4
+  [[ $NAME =~ ^[a-z][a-z0-9_-]{0,31}$ ]] || die 2 "이름 형식 오류: $NAME"
+  case "$KIND" in 범위|범위변경|완료|질문|막힘|승격제안) ;; *) die 2 "종류 오류: $KIND" ;; esac
+fi
 
 case "$RC" in /*) ;; *) die 2 "chain 폴더는 절대 경로: $RC" ;; esac
 [ -d "$RC" ] || die 2 "chain 폴더 없음: $RC"
-[[ $NAME =~ ^[a-z][a-z0-9_-]{0,31}$ ]] || die 2 "이름 형식 오류: $NAME"
-case "$KIND" in 범위|범위변경|완료|질문|막힘|승격제안) ;; *) die 2 "종류 오류: $KIND" ;; esac
-
-OC_FILE="$RC/current-oc"
-[ -f "$OC_FILE" ] || die 3 "current-oc 없음: $OC_FILE"
-# 매 전송마다 다시 읽는다(OC 교체 뒤 [OC변경]을 받은 worker가 재전송하면 새 값으로 간다).
-# 끝의 CR만 떼고 안쪽 공백은 그대로 둔다 — 'w2: p4' 같은 값을 고쳐 주지 않고 거부한다.
-OC=$(head -n 1 "$OC_FILE")
-OC=${OC%$'\r'}
-# agent-orchestrator lib/common.sh AO_PANE_RE 와 같은 엄격 형식(<workspace>:<pane>). '-'로 시작하는 값(옵션 오인)도 여기서 걸린다.
-[[ $OC =~ ^[A-Za-z0-9]+:[A-Za-z0-9]+$ ]] || die 3 "current-oc 형식 오류: '$OC'"
 
 CHAIN_ID=$(basename "$RC")
-REPORT="$RC/workers/$NAME/report.md"
 SUMMARY=$(printf '%s' "$MSG" | tr '\n\t\r' '   ')
 SUMMARY=${SUMMARY:0:300}
-LINE="[rc $CHAIN_ID] [WO $NAME] [$KIND] $REPORT $SUMMARY"
+NOW=$(date +%H:%M:%S)
+
+if [ -n "$TO" ]; then
+  [ -d "$RC/workers/$TO" ] || die 2 "worker 폴더 없음: $RC/workers/$TO"
+  BOX="$RC/workers/$TO/inbox.log"
+  LINE="$NOW [rc $CHAIN_ID] [OC] [$KIND] $SUMMARY"
+else
+  BOX="$RC/inbox.log"
+  LINE="$NOW [rc $CHAIN_ID] [WO $NAME] [$KIND] $RC/workers/$NAME/report.md $SUMMARY"
+fi
 
 if [ "${RC_DRY_RUN:-0}" = 1 ]; then
-  printf 'to=%s\t%s\n' "$OC" "$LINE"
+  printf 'box=%s\t%s\n' "$BOX" "$LINE"
   exit 0
 fi
 
-[ -x "$AO" ] || die 12 "agent-orchestrator 실행 불가: $AO"
-"$AO" agent-send "$OC" "$LINE" >/dev/null
-c=$?
-[ "$c" = 0 ] || die "$c" "agent-send 실패 rc=$c (to=$OC) — report.md 진행 줄에 미전송 [$KIND] 기록"
-echo "OK to=$OC kind=$KIND"
+printf '%s\n' "$LINE" >> "$BOX" || die 2 "기록 실패: $BOX"
+echo "OK box=$BOX kind=$KIND"

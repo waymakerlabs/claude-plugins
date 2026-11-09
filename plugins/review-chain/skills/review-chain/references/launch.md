@@ -31,6 +31,7 @@ launcher는 체인 폴더·worktree·worker를 만들지 않는다. 대기열 �
    ```
    - `--cwd`는 리포 루트(이미 신뢰된 폴더). 이름 `rc-oc`가 살아 있으면(3) `rc-oc-2`처럼 바꾼다. 기동은 1회.
    - 출력 working|done이 인계 증거다. 5·6·그 밖 실패면 메모 경로와 함께 사용자에게 보고하고 멈춘다.
+   - 이 `agent-send` 한 줄이 launcher가 새 OC에 보내는 유일한 입력이다(세션을 여는 첫 지시). 이후 launcher↔OC 사이에 메시지는 없다.
 6. 사용자에게 한 줄: `[OC] <프로젝트> QC — 새 탭에서 시작했습니다(<pane> · working). 그 탭에서 수정사항을 말씀해 주세요.`
 7. 그 뒤 launcher는 review-chain 일을 하지 않는다. 사용자가 이 탭에서 수정사항을 말하면 "새 OC 탭에서 말해 달라"고만 답한다.
 
@@ -54,7 +55,7 @@ launcher는 체인 폴더·worktree·worker를 만들지 않는다. 대기열 �
 
 ## 4. 새 OC의 첫 행동
 
-1. SKILL §1-1~§1-6을 진행한다(§1-4 새 체인, 메모의 사실로 `state.md` frontmatter·`queue.md` 초기 항목을 채운다).
+1. SKILL §1-1~§1-6을 진행한다(§1-4 새 체인, 메모의 사실로 `state.md` frontmatter·`queue.md` 초기 항목을 채운다). §1-4의 `inbox.log`·`shared-files` 생성과 받은편지함 Monitor 시작도 여기서 한다(첫 worker 기동 전).
 2. 메모의 "부모 닫기"가 허용이면 첫 착수 전에 `"$AO" close <부모 pane>`(실패는 무시). 금지면 닫지 않는다. launcher 탭에 다른 pane이 남아 있으면 탭은 닫히지 않는다.
 3. launcher는 부모 닫기를 이렇게 정한다: 같은 머신이고, launcher 탭에 살아 있는 worker pane·백그라운드 작업이 없고, 사용자가 남기라고 하지 않았으면 허용.
 4. 메모는 지우지 않는다(체인 폴더 `state.md` "## 결정"에 메모 경로 한 줄).
