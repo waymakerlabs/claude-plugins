@@ -23,7 +23,7 @@ launcher는 체인 폴더·worktree·worker를 만들지 않는다. 대기열 �
    - 공용 파일 위치(VERSION·릴리즈 노트·진행 원장), 외부 시스템(JIRA 등), 프로젝트 설정 `.claude/review-chain.md` 유무
    - 이 세션에서 사용자가 준 상시 권한(push·외부 쓰기)이 있으면 그대로, 없으면 "없음"
 4. `.git/info/exclude`에 `/.review-chain/`가 없으면 한 줄 추가하고, 시작 메모를 `<리포>/.review-chain/launch-<YYYYMMDD-HHMM>.md`에 쓴다(§3 틀, 60줄 이하).
-5. 새 탭에 OC를 연다(전역 「후속 세션 인계 프로토콜」의 새 탭 방식 — 순차 대체이므로 맞는 쓰임):
+5. 새 탭에 OC를 연다(전역 `session-handoff` 스킬(후속 세션 인계 프로토콜)의 새 탭 방식 — 순차 대체이므로 맞는 쓰임):
    ```bash
    ROOT=$("$AO" tab-open "[OC] <프로젝트 한글> QC" --cwd "<리포>")
    "$AO" agent-start rc-oc "$ROOT" --kind claude -- <이 세션과 같은 플래그 — ps -o args= -p $PPID>

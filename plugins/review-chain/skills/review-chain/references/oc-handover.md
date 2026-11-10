@@ -8,13 +8,13 @@ OC가 판단만 하고 진본이 파일에 있으므로, 교체 때 넘길 것�
 2. **동결**: `state.md` frontmatter `oc-status: 교체중`으로 바꾼다. 이 순간부터 옛 OC는 새 결정·병합·worker 답을 하지 않는다. 옛 OC는 자기 받은편지함 Monitor를 `TaskStop`으로 멈추고 더는 `--ack`하지 않는다. 그 뒤 들어온 줄은 처리 위치 뒤에 그대로 남아 새 OC가 처리한다(표도 고치지 않는다). 옛 OC pane이 닫힐 때까지 이 상태를 유지한다.
 3. 동결 직전까지의 `state.md` worker 표 `마지막 보고`, `queue.md` 상태, "## 결정"이 최신인지 본다. 머릿속에만 있는 판단(사용자와 방금 합의한 순서 등)은 "## 결정"에 한 줄로 적는다. 동결 전에 받았지만 아직 답하지 않은 줄은 `--ack`하지 않은 채 둔다(새 OC가 `--pending`으로 본다). 이미 처리한 줄은 반드시 `--ack`해 둔다(새 OC가 중복 처리하지 않게).
 4. 짧은 인계 문서 `$RC/oc-handover-<n>.md`: 체인 폴더 절대경로, 리포, 옛 OC pane, 진행 중 사용자 대화 요지(OC 탭에서 하던 QC 흐름), 다음 첫 행동. 옛 인계 문서는 지우지 않는다.
-5. 새 OC 기동 — **이 경우에만** 전역 「후속 세션 인계 프로토콜」의 새 탭 방식을 쓴다:
+5. 새 OC 기동 — **이 경우에만** 전역 `session-handoff` 스킬(후속 세션 인계 프로토콜)의 새 탭 방식을 쓴다:
    ```bash
    ROOT=$("$AO" tab-open "[OC] <프로젝트 한글> QC <n>" --cwd "$PWD")
    "$AO" agent-start rc-oc-<n> "$ROOT" --kind claude -- <옛 OC와 같은 플래그>
    "$AO" agent-send rc-oc-<n> "review-chain 스킬로 <$RC>/oc-handover-<n>.md 를 읽고 OC를 이어받아. 옛 OC pane: $("$AO" whoami)" --confirm
    ```
-   출력 working|done이 인계 증거다. 이름 규칙·재시도는 전역 프로토콜과 같다(기동은 1회).
+   출력 working|done이 인계 증거다. 이름 규칙·재시도는 전역 `session-handoff` 스킬과 같다(기동은 1회).
 6. 옛 OC는 새 OC가 pane을 닫을 때까지 2의 동결 규칙만 따른다(답하지 않고 `--ack`하지 않음). 사용자가 옛 OC 탭에서 말하면 "새 OC 탭(`[OC] … QC <n>`)에서 말해 달라"고만 답한다.
 
 ## 2. 재개 (새 OC)

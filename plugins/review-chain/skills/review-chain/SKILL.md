@@ -80,7 +80,7 @@ description: >-
    - 논의형: `P=$("$AO" tab-open "[WO] <기능 한글>" --cwd "$PWD")` → `"$AO" agent-start <name> "$P" --kind claude -- --model <m> --effort <e> [OC와 같은 권한 플래그]` → `"$AO" agent-send <name> "<brief 절대경로>를 읽고 그대로 진행해. 내 이름: <name>" --confirm`.
    - 잡수정: auto-chain `scripts/spawn-pane-worker.sh`를 `ROLE=none PANE_LABEL="[WO] 잡수정 <n>" TAB_LABEL="[WO] QC 작업 넘침"`으로 쓴다(권한 플래그 판정·성공 줄 형식 재사용). 첫 지시에 붙는 "조정자 pane" 값은 지시서가 무시하라고 적는다(보고는 받은편지함 파일로 간다).
    - **`agent-send`는 이 첫 지시 한 줄에만 쓴다.** 그 뒤 OC↔worker 메시지는 전부 받은편지함 파일(`rc-send.sh`)이고 입력창에 쳐 넣지 않는다(§6, §15 D11).
-   - **전역 인계 규칙(새 탭 + `[OC]`)으로 worker를 열지 않는다.** 그 규칙은 순차 대체(OC 교체)용이다. worker 탭·pane 이름은 항상 `[WO]`로 시작한다.
+   - **전역 인계 규칙(`session-handoff` 스킬 — 새 탭 + `[OC]`)으로 worker를 열지 않는다.** 그 규칙은 순차 대체(OC 교체)용이다. worker 탭·pane 이름은 항상 `[WO]`로 시작한다.
    - `--cwd`는 OC의 `$PWD`(신뢰된 리포 루트). worker는 worktree 절대 경로로 일한다(새 폴더 신뢰 화면 회피).
 5. 모델·effort: 논의형 `opus high`, 잡수정 `sonnet high`(명세가 아주 뻔하면 `sonnet medium`). 고른 값과 이유를 worker 표 비고에 한 줄.
 6. 기동 증거(`agent-send --confirm` 출력 working|done)를 worker 표에 적고 사용자에게 한 줄 보고한다: `[WO] 진행 레일 — 탭 열림(w2:p9 · working). 그 탭에서 논의해 주세요.`
