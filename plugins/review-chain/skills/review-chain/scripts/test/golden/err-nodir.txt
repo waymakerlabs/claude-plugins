@@ -1,0 +1,5 @@
+[stdout]
+
+[stderr]
+rc-send: chain 폴더 없음: <TMP>/sc/nodir
+[rc] 2

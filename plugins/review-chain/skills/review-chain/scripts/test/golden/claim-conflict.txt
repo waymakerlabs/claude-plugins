@@ -1,0 +1,7 @@
+[stdout]
+
+[stderr]
+CONFLICT src/a/b.txt↔alice:src/a/ lib/x.sh↔alice:lib/*.sh
+[rc] 4
+[box rc-20260101-claim/inbox.log]
+HH:MM:SS [rc rc-20260101-claim] [WO bob] [충돌] <TMP>/sc/rc-20260101-claim/workers/bob/report.md 선점 거부: src/a/b.txt↔alice:src/a/ lib/x.sh↔alice:lib/*.sh

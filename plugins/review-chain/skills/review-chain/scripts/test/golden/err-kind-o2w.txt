@@ -1,0 +1,5 @@
+[stdout]
+
+[stderr]
+rc-send: 종류 오류: 완료
+[rc] 2

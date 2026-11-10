@@ -28,6 +28,11 @@
 #
 # 순서: 인자 검사 → 이름 중복(list --agents) → pane-open --parent → agent-start → agent-send --confirm
 #   → agent-status(working|done|idle) → 이름이 정확히 1개인지 재확인 → agent-transcript
+# 첫 지시(agent-send --confirm)는 이 새 세션에 키보드로 넣는 **유일한 시도 1회**다(2.6.0).
+#   실패·응답 유실·상태 불명확이어도 이 스크립트는 재전송하지 않고 호출자도 재전송하지 않는다
+#   (입력창에 남은 지시가 나중에 제출돼 작업자가 둘이 된다). 호출자는 agent-status·transcript로 착수를
+#   1회 확인하고, 안 됐으면 만든 pane을 close → list --panes에서 사라진 것을 확인한 뒤에만
+#   새 pane·새 이름(또는 ①)으로 다시 띄운다. 이후 메시지는 inbox-send/inbox-watch(pane-worker.md §4).
 # 출력: 성공하면 stdout 한 줄
 #   OK name=<n> pane=<id> model=<m> effort=<요청값> status=<working|done|idle> jsonl=<경로|unsupported|unverified>
 #   (jsonl = 정지 감시 입력. agent-transcript가 10이면 unsupported, 그 밖 실패면 unverified.
@@ -167,8 +172,9 @@ esac
 
 # 첫 지시: 지시서는 파일, 프롬프트는 포인터 한 줄.
 # --confirm = working 또는 done 관측까지(빠른 완료 허용이 계약)
+# 이 호출은 이 세션의 유일한 agent-send 시도다. 실패·불명확 시 같은 입력창에 다시 보내지 않는다(위 머리 주석).
 ao_run agent-send "$NAME" "$BRIEF 를 읽고 그대로 진행해. 내 이름: $NAME. 조정자 pane: $MAIN" --confirm; c=$?
-[ "$c" = 0 ] || fail 6 "$c" "첫 지시 실패 pane=$P"
+[ "$c" = 0 ] || fail 6 "$c" "첫 지시 실패 pane=$P — 재전송 금지: 착수를 agent-status·agent-transcript로 1회 확인하고, 안 됐으면 pane close 확인(list --panes에서 사라짐) 뒤 새 pane으로"
 
 # 4. 상태 확인 + 중복 재확인
 # working = 진행 중. done·idle = 첫 지시 뒤 이미 끝남(빠른 완료 — 실패가 아니다).
@@ -178,7 +184,7 @@ st=$AO_OUT
 [ "$c" = 0 ] || fail 6 "$c" "첫 지시 뒤 상태 조회 실패 pane=$P"
 case "$st" in
   working|done|idle) ;;
-  *) die 6 "첫 지시 뒤 상태가 ${st:-없음} (working|done|idle 아님) pane=$P — 화면 1회 확인: agent-orchestrator agent-read $NAME --lines 30" ;;
+  *) die 6 "첫 지시 뒤 상태가 ${st:-없음} (working|done|idle 아님) pane=$P — 재전송 금지, 화면 1회 확인: agent-orchestrator agent-read $NAME --lines 30 — pane close 확인 뒤 새 pane으로" ;;
 esac
 name_count; c=$?
 [ "$c" = 0 ] || fail 6 "$c" "기동 뒤 에이전트 목록 조회 실패 pane=$P"

@@ -1,0 +1,5 @@
+[stdout]
+box=<TMP>/sc/rc-20260101-demo/workers/bob/inbox.log	HH:MM:SS [rc rc-20260101-demo] [OC] [확인] dry 한 줄
+[stderr]
+[rc] 0
+[box bob/inbox.log]

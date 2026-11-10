@@ -1,0 +1,5 @@
+[stdout]
+
+[stderr]
+rc-send: 종류 오류: 진행
+[rc] 2

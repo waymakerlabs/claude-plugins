@@ -19,6 +19,7 @@
 
 ## 핵심 규칙
 
+- (0.1.4) 받은편지함 기록·감시를 `agent-orchestrator inbox-send --raw`·`inbox-watch` 공용 동작으로 옮겼습니다(`rc-send.sh`·`rc-claim.sh`가 같은 잠금으로 기록, 형식은 그대로). Monitor를 못 쓸 때 상대가 유휴면 `agent-send`로 알리던 예외를 없앴습니다. `rc-send.sh` 기록 실패는 종료 4.
 - 진본은 리포 안 `.review-chain/<chain-id>/`의 상태 파일입니다(`.git/info/exclude`로 추적 제외). OC는 판단만 합니다.
 - 메시지는 받은편지함 파일(`inbox.log`)에 덧붙이고, 받는 쪽이 `Monitor`로 지켜봅니다. 상대 pane 입력창에 쳐 넣지 않아 사용자가 치던 프롬프트와 섞이지 않습니다. 경로가 고정이라 OC가 교체돼도 worker는 바꿀 것이 없고, 처리 위치(`.cursor`) 뒤의 줄이 새 OC에 이어집니다.
 - 충돌은 착수 전에: worker가 `rc-claim.sh`로 파일 범위를 스스로 선점하고(겹침 없으면 OC 승인 없이 착수), 겹칠 때만 OC가 보류·순서를 정합니다. 병합은 OC만, 한 번에 하나.

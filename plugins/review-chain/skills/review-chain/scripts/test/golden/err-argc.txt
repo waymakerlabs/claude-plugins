@@ -1,0 +1,5 @@
+[stdout]
+
+[stderr]
+rc-send: 사용: <SCRIPTS>/rc-send.sh <chain 폴더> <이름> <종류> "<요지>"  |  <SCRIPTS>/rc-send.sh --to <이름> <chain 폴더> <종류> "<한 줄>"
+[rc] 2

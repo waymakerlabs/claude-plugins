@@ -1,0 +1,4 @@
+[stdout]
+CLAIMED alice src/a/ lib/*.sh
+[stderr]
+[rc] 0

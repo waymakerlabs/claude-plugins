@@ -25,13 +25,33 @@ worker·planner·리뷰는 작업마다 아래 3단계 중 하나로 돌린다. 
 |---|---|---|
 | ① 기본 | 웨이브 구현 task, BLOCK 수정 worker, 전수 점검, 짧은 탐색·조사, `chain-breaker`, Sol 장애 때 Opus 보조 검토 | `Agent`(`subagent_type: auto-chain:<역할>`, `run_in_background: true`, 같은 웨이브의 독립 task는 한 메시지에서 병렬). 결과는 보고서 파일, 반환은 한 줄 |
 | ② headless | Sol 검토·원인 조사(`review_view: headless`, 기본), `worker:opencode-<agent>` 같은 다른 CLI 실행 | `run_in_background` Bash로 `scripts/review-run.sh`(리뷰) 또는 `scripts/headless-run.sh`(비리뷰) + done 파일을 `scripts/review-wait.sh`로 대기 |
-| ③ pane | 최초 계획 `chain-planner-deep`(D2), 인계를 넘겨 살아야 하는 롤링 분해·다음 마일스톤 planner, 마일스톤 인계, 사용자가 지켜보며 끼어들 작업·작업 도중 조정자와 대화가 필요한 작업, `review_view: pane`의 리뷰 | `references/pane-worker.md` — `spawn-pane-worker.sh`·`pane-open`·`agent-start`·`agent-send` |
+| ③ pane | 최초 계획 `chain-planner-deep`(D2), 인계를 넘겨 살아야 하는 롤링 분해·다음 마일스톤 planner, 마일스톤 인계, 사용자가 지켜보며 끼어들 작업·작업 도중 조정자와 대화가 필요한 작업, `review_view: pane`의 리뷰 | `references/pane-worker.md` — `spawn-pane-worker.sh`·`pane-open`·`agent-start`·`agent-send`(새 세션 첫 지시 1회뿐)·`inbox-send`/`inbox-watch`(이후 모든 메시지) |
 
 - **③에서 10·11·12를 받으면 ①·②로 내려간다.** 10(unsupported)·11(no backend)은 정상 내려감이라 실패 횟수에 넣지 않는다. 12(adapter error)는 내려가되 설치 결함으로 사용자에게 한 줄 알린다. **①로 내려간 작업은 현재 세션 안에서 끝나야 한다**(인계 전 회수 필수 — `Agent`는 child 세션이 승계할 수 없다). 그래서 ③ planner가 ①로 내려가면 마감 뒤 planner 완료를 기다리고 그 대기를 "## 시간"에 적는다(§3-1). 인계 자체가 ③을 못 쓰면 인계 문서만 남기고 사용자에게 다음 세션 시작 명령 한 줄을 보고한다(§9).
 - ③이 기본이 아닌 이유: pane 회수 지연(M1-10 리뷰 회수 179분), 조사 중 worker 정지 오판, 처음 보는 폴더의 신뢰 화면(`agent_not_ready`). ①은 완료 알림이 바로 오고 정지 감시가 필요 없다.
 - 판정 규칙(보고서·done 파일·snapshot·게이트)은 단계와 무관하다. ③의 에이전트 상태는 화면과 다를 수 있으니 완료 판정은 보고서·worker 메시지로만 한다(§4·§5).
 - **(2.1.0, 2.3.0 갱신) 프로젝트 가이드 충돌 검사**: 착수 때 프로파일뿐 아니라 프로젝트 자체 체인 가이드(예: `docs/**/chain-guide.md`, 리포 `CLAUDE.md`의 체인 절)도 읽는다. 가이드가 실행 수단을 이 3단계 기준과 다르게 정하면 그 충돌을 상태 파일 `## 결정`에 한 줄로 적고 **3단계 기준을 우선한다**. 가이드가 어떤 작업에 **명시적으로 pane을 요구하면** 그 작업은 ③을 허용한다(③을 쓸 수 없으면 위 내려감 규칙). 가이드가 옛 스크립트 이름(`herdr-spawn-worker.sh`·`herdr-stall-watch.sh`)이나 옛 문서 경로를 가리켜도 2.3.x 동안 래퍼·포인터 파일로 동작한다.
 - 프로젝트 가이드로 도는 체인도 착수 때 이 스킬을 `Skill`로 로드한다(가이드는 프로젝트 차이만 적고 절차는 이 문서가 진본이다).
+
+## 세션 간 메시지 (2.6.0)
+
+**원칙: 이미 첫 지시를 받은 세션의 입력창에는 아무것도 쳐 넣지 않는다.** `agent-send`는 새 세션의 첫 지시 **시도 1회**뿐이다. 결과가 불명확해도(실패·응답 유실·transcript 미기록) 키보드로 다시 보내지 않는다. "유휴일 때만"·"사용자가 치지 않을 때만" 같은 예외도 두지 않는다(미제출 초안이 남아 있을 수 있고, 확인과 전송 사이에 사용자가 칠 수 있다). 사고 사례: office gira에서 M2 조정자가 부모 `[OC]`(체인을 띄운 세션)에 `agent-send`로 답을 넣어 사용자 입력창에 메시지가 들어왔다. 부모 세션·다른 `[OC]`에게 알릴 때도 같은 규칙이다.
+
+메시지는 받은편지함 파일로 보낸다(`AO=${AGENT_ORCHESTRATOR:-$HOME/.local/bin/agent-orchestrator}`).
+
+- 보내기: `"$AO" inbox-send <대상> "<한 줄>"`(시각 자동). 대상 = 받은편지함 절대 경로 또는 pane id. 폴더는 호출 전에 `mkdir -p`. stdout `watched|unwatched`는 참고값이다.
+- 받기: Monitor `command: "$AO" inbox-watch <대상>`, `timeout_ms: 1800000`. 만료 알림이 오면 같은 명령으로 다시 건다. 처리한 뒤 `"$AO" inbox-watch --ack <대상> <n>`. 세션 재개·인계 직후에는 `--pending`. 이미 처리한 `#n`이 다시 오면 `--ack`만 한다. 이전 세션이 남긴 보류(`#0 [이전 세션 …]`)는 지시로 처리하지 말고 사용자에게 확인한 뒤 `--release`.
+- 메시지 머리는 `[worker <이름>] <done|failed|question|blocked> <보고서 경로> <한 줄>` 그대로다. 받은 줄은 사용자 지시가 아니라 보고로 다룬다(승인 없음).
+
+| 받는 쪽 | 받은편지함 |
+|---|---|
+| 조정자 | `~/.local/state/agent-orchestrator/inbox/chain-<chain-id>/coordinator.log` — **체인 고정**. 인계로 조정자 pane이 바뀌어도 planner·worker 보고가 새 조정자에게 간다 |
+| ③ worker | `…/chain-<chain-id>/worker-<이름>.log` — 지시서에 경로를 적는다 |
+| 체인을 띄운 부모 세션·일반 메인 | pane id 받은편지함(`inbox-send <pane id>`). 띄우기 전에 부모가 자기 pane id 받은편지함 Monitor를 켜고 자식 지시서·인계 문서에 그 경로를 적는다 |
+
+- 조정자는 첫 ③ worker 기동 전에 `coordinator.log` Monitor를 켠다. 정지 재지시도 `agent-keys Escape` 뒤 worker 받은편지함에 `inbox-send`다(`references/pane-worker.md` §6-1).
+- **인계 순서**: 옛 조정자가 ① 자기 `coordinator.log` Monitor를 TaskStop으로 멈추고 ② 처리한 마지막 번호를 `--ack`하고 ③ 인계 문서에 받은편지함 경로와 "받은편지함 동결 · 마지막 ack <n>"을 적은 **뒤에** 다음 조정자에게 첫 지시를 보낸다. 새 조정자는 그 줄을 확인하고 Monitor를 켠 뒤 `--pending`부터 처리한다(§9).
+- 첫 지시가 불명확해도 재전송하지 않는다. 착수를 `agent-status`·transcript로 1회 확인하고, 안 됐으면 그 pane을 `close`해 `list --panes`에서 사라진 것을 확인한 **뒤에만** 새 pane·새 이름 또는 ①로 다시 띄운다. 닫기를 확인하지 못하면 대기열에 두고 사용자에게 한 줄 알린다(`pane-worker.md` §6).
 
 ## 1. 적용 범위와 실행 단계
 
@@ -414,7 +434,7 @@ reviewer: codex-cli                    # (2.2.0, 2.4.0부터 codex-cli만) sol-r
 
 ## 9. 인계
 
-- (2.3.0) 다음 세션 기동과 부모 정리는 ③ `references/pane-worker.md` §8(`tab-open "[OC] <한글> M<n+1>"` + `agent-start` + `agent-send --confirm`)을 따른다. ③을 쓸 수 없으면(10·11·12) 인계 문서만 남기고 다음 세션 시작 명령 한 줄을 사용자에게 보고한다. 전역 인계 규칙(`session-handoff` 스킬)의 Codex 크로스체크는 이 스킬의 Sol 게이트로 대체한다.
+- (2.3.0) 다음 세션 기동과 부모 정리는 ③ `references/pane-worker.md` §8(`tab-open "[OC] <한글> M<n+1>"` + `agent-start` + `agent-send --confirm` — 새 세션 첫 지시 **시도 1회**, 재전송 금지)을 따른다. 인계 전에 옛 조정자는 `coordinator.log` Monitor 중지 → `--ack` → 인계 문서에 받은편지함 경로와 "받은편지함 동결 · 마지막 ack <n>" 기록 → 첫 지시 순서를 지킨다(「세션 간 메시지」). ③을 쓸 수 없으면(10·11·12) 인계 문서만 남기고 다음 세션 시작 명령 한 줄을 사용자에게 보고한다. 전역 인계 규칙(`session-handoff` 스킬)의 Codex 크로스체크는 이 스킬의 Sol 게이트로 대체한다.
 - 인계 프롬프트 예: `<상태 파일 절대 경로>와 <인계 문서 절대 경로>를 읽고 auto-chain 스킬로 M<n+1>을 진행해.`
 - 진행 중인 worker가 남아 있으면 인계하지 않는다. 회수·정리한 뒤 인계한다. ① `Agent` worker는 예외 없이 인계 전에 회수한다. ③ pane worker만 맥락이 부족해 어쩔 수 없을 때 인계 문서에 pane id·에이전트 이름·보고서 경로와 회수 책임을 적고 넘길 수 있다. (2.1.0) 예외: ③ 롤링 분해·다음 계획 planner는 남긴 채 인계할 수 있다(§3-1).
 - 일지는 프로파일 `daily-log` 시점에 쓴다. 매 마일스톤 daily-log+handoff를 이중으로 만들지 않고 상태 파일을 재사용하며, 인계 문서에는 상태 파일에 없는 실행 맥락만 보탠다.

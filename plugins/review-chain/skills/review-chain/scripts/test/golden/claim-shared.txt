@@ -1,0 +1,7 @@
+[stdout]
+
+[stderr]
+rc-claim: 공용 파일(OC 전용): docs/shared.md ↔ docs/shared.md — 범위에서 빼고 다시 선점
+[rc] 5
+[box rc-20260101-claim/inbox.log]
+HH:MM:SS [rc rc-20260101-claim] [WO bob] [충돌] <TMP>/sc/rc-20260101-claim/workers/bob/report.md 선점 거부: src/a/b.txt↔alice:src/a/ lib/x.sh↔alice:lib/*.sh

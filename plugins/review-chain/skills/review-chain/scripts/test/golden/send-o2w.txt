@@ -1,0 +1,6 @@
+[stdout]
+OK box=<TMP>/sc/rc-20260101-demo/workers/alice/inbox.log kind=답
+[stderr]
+[rc] 0
+[box alice/inbox.log]
+HH:MM:SS [rc rc-20260101-demo] [OC] [답] 계속 진행해

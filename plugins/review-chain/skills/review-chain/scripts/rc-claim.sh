@@ -14,6 +14,8 @@
 #   끝의 / 와 /** 는 폴더로 본다.
 # 동작: 잠금(claims.lock 폴더) → 판정 → 겹침 없음이면 기록하고 0. 겹치면 기록하지 않고
 #   OC 받은편지함(inbox.log)에 [충돌] 한 줄을 남기고 4. 공용 파일이면 5.
+#   [충돌] 줄은 `agent-orchestrator inbox-send --raw`로 덧붙인다(rc-send.sh 와 같은 잠금).
+#   환경: AGENT_ORCHESTRATOR=<실행 파일> (기본 ~/.local/bin/agent-orchestrator)
 #   이미 같은 worker가 같은 패턴을 쥐고 있으면 다시 쓰지 않는다(재실행 무해).
 # 종료 코드: 0 선점 / 2 인자 / 4 충돌(대기 — OC 답을 기다린다) / 5 공용 파일 / 6 잠금 실패
 # bash 3.2 호환.
@@ -94,8 +96,11 @@ while IFS=$'\t' read -r n q st _; do
 done < "$RC/claims.tsv"
 
 if [ -n "$HITS" ]; then
-  printf '%s [rc %s] [WO %s] [충돌] %s/workers/%s/report.md 선점 거부:%s\n' \
-    "$(date +%H:%M:%S)" "$(basename "$RC")" "$NAME" "$RC" "$NAME" "$HITS" >> "$RC/inbox.log"
+  AO=${AGENT_ORCHESTRATOR:-$HOME/.local/bin/agent-orchestrator}
+  LINE=$(printf '%s [rc %s] [WO %s] [충돌] %s/workers/%s/report.md 선점 거부:%s' \
+    "$(date +%H:%M:%S)" "$(basename "$RC")" "$NAME" "$RC" "$NAME" "$HITS")
+  "$AO" inbox-send --raw "$RC/inbox.log" "$LINE" >/dev/null \
+    || echo "rc-claim: 경고: 충돌 알림 기록 실패 ($RC/inbox.log) — OC에 직접 알릴 것" >&2
   echo "CONFLICT$HITS" >&2
   exit 4
 fi

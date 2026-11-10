@@ -1,0 +1,7 @@
+[stdout]
+OK box=<TMP>/sc/rc-20260101-demo/inbox.log kind=질문
+[stderr]
+[rc] 0
+[box rc-20260101-demo/inbox.log]
+HH:MM:SS [rc rc-20260101-demo] [WO alice] [완료] <TMP>/sc/rc-20260101-demo/workers/alice/report.md 구현 끝. 시험 12개 통과
+HH:MM:SS [rc rc-20260101-demo] [WO bob] [질문] <TMP>/sc/rc-20260101-demo/workers/bob/report.md 줄바꿈 탭 포함 요지

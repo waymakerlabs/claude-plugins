@@ -1,0 +1,5 @@
+[stdout]
+
+[stderr]
+rc-send: chain 폴더는 절대 경로: rel/path
+[rc] 2

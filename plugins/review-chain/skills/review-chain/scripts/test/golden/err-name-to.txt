@@ -1,0 +1,5 @@
+[stdout]
+
+[stderr]
+rc-send: 이름 형식 오류: 9bad
+[rc] 2

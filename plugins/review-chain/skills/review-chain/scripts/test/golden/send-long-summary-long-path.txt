@@ -1,0 +1,6 @@
+[stdout]
+OK box=<TMP>/sc/deep-directory-name-number-1/deep-directory-name-number-2/deep-directory-name-number-3/deep-directory-name-number-4/deep-directory-name-number-5/deep-directory-name-number-6/deep-directory-name-number-7/deep-directory-name-number-8/rc-20260101-a-very-long-chain-folder-name-for-path-length/inbox.log kind=막힘
+[stderr]
+[rc] 0
+[box rc-20260101-a-very-long-chain-folder-name-for-path-length/inbox.log]
+HH:MM:SS [rc rc-20260101-a-very-long-chain-folder-name-for-path-length] [WO alice] [막힘] <TMP>/sc/deep-directory-name-number-1/deep-directory-name-number-2/deep-directory-name-number-3/deep-directory-name-number-4/deep-directory-name-number-5/deep-directory-name-number-6/deep-directory-name-number-7/deep-directory-name-number-8/rc-20260101-a-very-long-chain-folder-name-for-path-length/workers/alice/report.md 가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바사가나다라마바

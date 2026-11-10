@@ -1,0 +1,5 @@
+[stdout]
+
+[stderr]
+rc-send: worker 폴더 없음: <TMP>/sc/rc-20260101-demo/workers/carol
+[rc] 2
