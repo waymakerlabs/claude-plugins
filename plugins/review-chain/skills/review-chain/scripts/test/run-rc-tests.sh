@@ -123,7 +123,8 @@ if [ "$TOTAL" = 40 ] && [ "$SENDS" = 20 ] && [ "$CLAIMS" = 20 ] && [ "$BROKEN" =
 else
   bad "동시 기록" "total=$TOTAL sends=$SENDS claims=$CLAIMS broken=$BROKEN (기대 40/20/20/0)"
 fi
-ls "$CRC"/inbox.log.lock* >/dev/null 2>&1 && bad "동시 기록 뒤 잠금 잔존" "$(ls -d "$CRC"/inbox.log.lock*)" || ok "동시 기록 뒤 잠금 잔존 없음"
+# 잠금은 커널 flock(<log>.flock 파일)이라 남는 폴더가 없다 — 옛 mkdir 잠금 폴더가 생기지 않는지 본다
+ls -d "$CRC"/inbox.log.lock* >/dev/null 2>&1 && bad "동시 기록 뒤 잠금 폴더 잔존" "$(ls -d "$CRC"/inbox.log.lock*)" || ok "동시 기록 뒤 잠금 폴더 잔존 없음"
 
 # ── 3. rc-send 종료 4: 기록 실패 ────────────────────────────────────────────────
 FRC=$(mkchain "$TMP" rc-20260101-fail)
@@ -152,6 +153,8 @@ C=$(head -n 1 "$WB.cursor" 2>/dev/null)
 [ "$C" = 2 ] && ok "rc-watch --ack 되감지 않음" || bad "rc-watch --ack 되감김" "cursor=$C"
 P=$("$W" --pending "$WB")
 case "$P" in "#3 "*"줄 3") ok "rc-watch --pending 은 cursor 뒤만" ;; *) bad "rc-watch --pending(ack 뒤)" "$P" ;; esac
+"$W" --release "$WB"; [ $? = 0 ] && ok "rc-watch --release 전달(0)" || bad "rc-watch --release"
+"$W" --release >/dev/null 2>&1; [ $? = 2 ] && ok "rc-watch --release 인자 부족 → 2" || bad "rc-watch --release 인자 부족"
 
 # watch: cursor 뒤 줄부터 나오고, 켠 뒤 도착한 줄도 나온다
 "$W" "$WB" > "$TMP/watch.out" 2>"$TMP/watch.err" & WPID=$!; disown "$WPID" 2>/dev/null

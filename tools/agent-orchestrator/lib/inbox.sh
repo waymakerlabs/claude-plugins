@@ -8,13 +8,13 @@
 #   inbox-watch --release <대상>          이전 세션 보류 범위(log.held) 해제
 # 대상 = 절대 경로(*.log) 또는 pane id(→ ~/.local/state/agent-orchestrator/inbox/pane-<:를 _>.log).
 # 종료 코드: 0 / 2 인자·대상 형식(4000자 초과 포함) / 4 기록·잠금·ack 실패.
-# 잠금 = mkdir <log>.lock (+ pid 파일, trap 해제). macOS bash 3.2, flock 없음.
+# 잠금 = 커널 flock(<log>.flock, /usr/bin/perl 경유). macOS bash 3.2.
 # AO_INBOX_TRACE=<파일> 은 시험 전용: 임계구역 진입·이탈을 기록한다(겹침 검사).
 # shellcheck shell=bash
 
 AO_INBOX_DIR="$HOME/.local/state/agent-orchestrator/inbox"
 AO_INBOX_MAX=4000
-_AOI_LOG=""; _AOI_LOCK=""; _AOI_RECOVER=""; _AOI_MARK=""; _AOI_TOKEN=""; _AOI_PIDS=""; _AOI_TMPD=""
+_AOI_LOG=""; _AOI_LOCK=""; _AOI_MARK=""; _AOI_TOKEN=""; _AOI_PIDS=""; _AOI_TMPD=""
 _AOI_CUR=0; _AOI_LO=0; _AOI_HI=0
 
 _aoi_usage() {
@@ -40,7 +40,6 @@ _aoi_prepare() {
   mkdir -p "${_AOI_LOG%/*}" 2>/dev/null || ao_die 4 "받은편지함 폴더 생성 실패: ${_AOI_LOG%/*}"
 }
 
-_aoi_mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null; }
 _aoi_alive() { kill -0 "$1" 2>/dev/null || LC_ALL=C ps -p "$1" >/dev/null 2>&1; }
 # 프로세스 시작 시각(ps lstart, C 로캘·공백 정리). 없으면 빈 출력
 _aoi_lstart() { LC_ALL=C ps -o lstart= -p "$1" 2>/dev/null | tr -s ' ' | sed 's/^ //; s/ $//'; }
@@ -53,68 +52,30 @@ _aoi_put() {
   ao_die 4 "파일 갱신 실패: $1"
 }
 
-# ── 잠금
-# 5초 동안 mkdir 시도 → 그 뒤 5초는 시도마다 복구(_aoi_recover)도 한다 → 끝까지 못 잡으면 4.
-# 잠금 폴더가 없는데 mkdir이 실패하면(폴더 쓰기 불가) 곧바로 4.
+# ── 잠금 = 커널 flock(<log>.flock, fd 9). 프로세스가 죽으면 커널이 풀므로 잔존 잠금·복구가 없다
+#    (r1~r3의 mkdir 잠금은 복구자가 새 소유자의 잠금을 지우는 경쟁이 있어 바꿨다 — 완료 검토 B1).
+#    bash에는 flock이 없어 /usr/bin/perl(세 머신 5.34 실측)이 상속받은 fd 9에 걸고 끝난다.
+#    잠금은 열린 파일 설명에 붙으므로 perl이 끝나도 이 셸이 fd 9를 닫을 때까지 유지된다(실측).
+#    약 10초(AO_INBOX_LOCK_TRIES × 0.05초) 못 잡으면 4. 잠금을 쥔 채 자식을 띄우지 않는다.
+AO_PERL=${AO_PERL:-/usr/bin/perl}
 _aoi_lock() {
-  local L="$_AOI_LOG.lock" i=0 miss=0
-  while :; do
-    if mkdir "$L" 2>/dev/null; then
-      _AOI_LOCK=$L
-      if ! echo $$ > "$L/pid" 2>/dev/null; then
-        rm -f "$L/pid" 2>/dev/null; rmdir "$L" 2>/dev/null; _AOI_LOCK=""
-        ao_die 4 "잠금 pid 기록 실패: $L/pid"
-      fi
-      return 0
-    fi
-    if [ ! -d "$L" ]; then
-      [ -w "${_AOI_LOG%/*}" ] || ao_die 4 "잠금 생성 실패(폴더 쓰기 불가): $L"
-      miss=$((miss + 1))
-      [ "$miss" -lt 200 ] || ao_die 4 "잠금 생성 실패(mkdir 반복 실패): $L"
-      continue
-    fi
-    i=$((i + 1))
-    [ "$i" -le 200 ] || ao_die 4 "잠금 대기 시간 초과(약 10초, 소유 pid $(cat "$L/pid" 2>/dev/null || echo ?)): $L"
-    [ "$i" -gt 100 ] && _aoi_recover "$L"
-    sleep 0.05
-  done
+  local F="$_AOI_LOG.flock" rc
+  [ -x "$AO_PERL" ] || ao_die 4 "잠금에 쓸 perl 없음: $AO_PERL"
+  exec 9>>"$F" 2>/dev/null || ao_die 4 "잠금 파일 열기 실패: $F"
+  _AOI_LOCK=$F
+  "$AO_PERL" -MFcntl=:flock -MTime::HiRes=sleep -e '
+    open(my $f, ">&=", 9) or exit 4;
+    for (1 .. $ARGV[0]) { exit 0 if flock($f, LOCK_EX | LOCK_NB); sleep 0.05 }
+    exit 7' "${AO_INBOX_LOCK_TRIES:-200}"; rc=$?
+  case "$rc" in
+    0) return 0 ;;
+    7) _aoi_unlock; ao_die 4 "잠금 대기 시간 초과: $F" ;;
+    *) _aoi_unlock; ao_die 4 "잠금 실패(perl rc=$rc): $F" ;;
+  esac
 }
-
-# 잔존 잠금 복구: <L>.recover 를 잡은 쪽 하나만. 그 안에서 pid를 다시 읽어
-# 죽은 프로세스이거나, pid가 없고(숫자 아님 포함) 잠금이 10초 넘게 묵었을 때만 지운다.
-_AOI_RECOVER_WARNED=0
-_aoi_recover() {
-  local L=$1 R="$1.recover" pid="" now m
-  if mkdir "$R" 2>/dev/null; then
-    _AOI_RECOVER=$R
-    if [ -d "$L" ]; then
-      pid=$(cat "$L/pid" 2>/dev/null)
-      if [[ $pid =~ ^[0-9]+$ ]]; then
-        if ! _aoi_alive "$pid"; then
-          rm -f "$L/pid"; rmdir "$L" 2>/dev/null && ao_warn "죽은 소유자(pid $pid)의 잠금을 복구함: $L"
-        fi
-      else
-        now=$(date +%s); m=$(_aoi_mtime "$L")
-        if [ -n "$m" ] && [ $((now - m)) -gt 10 ]; then
-          rm -f "$L/pid"; rmdir "$L" 2>/dev/null && ao_warn "pid 없는 묵은 잠금(10초 초과)을 복구함: $L"
-        fi
-      fi
-    fi
-    rmdir "$R" 2>/dev/null; _AOI_RECOVER=""
-  elif [ "$_AOI_RECOVER_WARNED" = 0 ]; then
-    now=$(date +%s); m=$(_aoi_mtime "$R")
-    if [ -n "$m" ] && [ $((now - m)) -gt 30 ]; then
-      _AOI_RECOVER_WARNED=1
-      ao_warn "복구 잠금이 30초 넘게 남아 있음 — 복구자가 죽었다면 수동 삭제: rmdir '$R'"
-    fi
-  fi
-}
-
 _aoi_unlock() {
   [ -n "$_AOI_LOCK" ] || return 0
-  if [ "$(cat "$_AOI_LOCK/pid" 2>/dev/null)" = "$$" ]; then
-    rm -f "$_AOI_LOCK/pid"; rmdir "$_AOI_LOCK" 2>/dev/null
-  fi
+  exec 9>&-
   _AOI_LOCK=""
 }
 
@@ -123,7 +84,6 @@ _aoi_cleanup() {
   local p tok=""
   for p in $_AOI_PIDS; do kill "$p" 2>/dev/null; done
   _aoi_unlock
-  [ -n "$_AOI_RECOVER" ] && rmdir "$_AOI_RECOVER" 2>/dev/null
   if [ -n "$_AOI_MARK" ] && [ -n "$_AOI_TOKEN" ] && [ -f "$_AOI_MARK" ]; then
     tok=$(awk '{print $NF; exit}' "$_AOI_MARK" 2>/dev/null)
     [ "$tok" = "$_AOI_TOKEN" ] && rm -f "$_AOI_MARK"
@@ -235,7 +195,9 @@ _aoi_watch() {
   if [ -n "$sid" ]; then
     _aoi_lock
     old=$(head -1 "$_AOI_LOG.owner" 2>/dev/null)
-    if [ -n "$old" ] && [ "$old" != "$sid" ] && [ ! -f "$_AOI_LOG.held" ]; then
+    # 바뀔 때마다 보류 범위를 cursor+1..지금 마지막 줄로 다시 잡는다(이미 held가 있어도 —
+    # A→B→C면 B의 미처리 줄도 C에게는 이전 세션 것이다. 완료 검토 B2)
+    if [ -n "$old" ] && [ "$old" != "$sid" ]; then
       _aoi_cursor; total=$(_aoi_count)
       [ "$total" -gt "$_AOI_CUR" ] && _aoi_put "$_AOI_LOG.held" "$((_AOI_CUR + 1)) $total"
     fi

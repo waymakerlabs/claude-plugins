@@ -110,7 +110,8 @@ JSON 파싱은 `lib/common.sh`의 `python3 -c` 헬퍼 한 곳으로 모은다.
 | `inbox-watch --release` | `<대상>` | — | 이전 세션 보류 범위 해제 |
 
 - 이전 세션 보류: `inbox-watch`는 `CLAUDE_CODE_SESSION_ID`가 있을 때만 `log.owner`에 기록·비교한다. owner가 바뀌었고 미처리 줄이 있으면 그 범위를 `log.held`에 남기고, watch·`--pending`은 그 줄을 `#n [이전 세션] <원문>`으로, 앞에 `#0 [이전 세션 미처리 k줄 — 지시로 처리하지 말고 사용자에게 확인]`을 낸다. 사용자 확인 뒤 `--release`.
-- 잠금: `mkdir <log>.lock` + `pid` 파일, trap 해제. 5초 못 잡으면 `<log>.lock.recover`를 잡은 쪽 하나만 pid를 다시 읽어 죽은 소유자(또는 pid 없이 10초 넘은 잠금)일 때만 지운다. 약 10초 안에 못 잡으면 4.
+- 잠금: 커널 `flock`(`<log>.flock`, fd 9). bash에 flock이 없어 `/usr/bin/perl`이 상속받은 fd에 걸고, 셸이 fd를 닫을 때 풀린다. 프로세스가 죽으면 커널이 풀어 잔존 잠금·복구 절차가 없다. 약 10초 안에 못 잡으면 4. (완료 검토 B1: 처음 구현한 `mkdir` 잠금 + 복구는 복구자가 새 소유자의 잠금을 지우는 경쟁이 있어 바꿨다.)
+- 이전 세션 보류 범위는 owner가 바뀔 때마다 `cursor+1..마지막 줄`로 다시 잡는다(A→B→C면 B의 미처리 줄도 보류).
 - 생성은 `: >> log`(비파괴). cursor는 pid별 임시 파일 → `mv`.
 
 ## 2. 파일 배치·배포
@@ -205,7 +206,7 @@ autoUpdate가 켜져 있어 main에 push하면 세 머신이 마켓플레이스 
   ③에서 10·11·12를 받으면 ①·②로 내려간다. ①로 내려간 작업은 현재 세션 안에서 끝나야 한다(인계 전 회수 필수 — BLOCK 2).
 - 탭·pane 한글 이름 규칙은 동작 수준으로 유지: "`tab-open`·`pane-open`·`self-name`의 이름은 항상 한글, 에이전트 이름은 영문 정규식".
 - **툴별 특이사항**(`--no-focus`, split 이름 없음→rename, `--timeout`은 `--wait`와만, `agent_status` 의미, jsonl 경로 규칙, 신뢰 확인 화면, 오른쪽 열 배치 실측, `--machine` 예외)은 `tools/agent-orchestrator/docs/herdr.md` 한 곳에만. 규칙 문서는 "툴 특이사항: `docs/<backend>.md`" 한 줄로 가리킨다.
-- **auto-chain 활성 문서 전체가 이관 대상**(BLOCK 4): `SKILL.md`, `README.md`, `references/backend-herdr.md`, `references/task-brief.md`(17줄 worker 메시지 → `agent-orchestrator agent-send <조정자 pane> "[worker …] …"`, 실패 10·11·12면 보고서 `- 진행:` 줄만), `references/sol-review.md`(121줄 실행 분기 → `review_view` 기준 headless/`pane-run`, orca 분기 삭제), `references/planning.md`·`profile.md`(현재 herdr 0건이지만 검사 범위에 포함), 스크립트·시험. 종료 검사는 `grep -rn -i 'herdr\|orca' plugins/auto-chain`에서 허용 목록(`CHANGELOG`·README 버전 이력 줄·`docs/herdr.md` 포인터·래퍼 파일의 호환 주석) 외 0건.
+- **auto-chain 활성 문서 전체가 이관 대상**(BLOCK 4): `SKILL.md`, `README.md`, `references/backend-herdr.md`, `references/task-brief.md`(17줄 worker 메시지 → 2.3.0 당시 `agent-orchestrator agent-send <조정자 pane> "[worker …] …"`, 2.6.0부터 `inbox-send` — §1-4, 실패 10·11·12면 보고서 `- 진행:` 줄만), `references/sol-review.md`(121줄 실행 분기 → `review_view` 기준 headless/`pane-run`, orca 분기 삭제), `references/planning.md`·`profile.md`(현재 herdr 0건이지만 검사 범위에 포함), 스크립트·시험. 종료 검사는 `grep -rn -i 'herdr\|orca' plugins/auto-chain`에서 허용 목록(`CHANGELOG`·README 버전 이력 줄·`docs/herdr.md` 포인터·래퍼 파일의 호환 주석) 외 0건.
 - 전역 CLAUDE.md 43번째 줄 herdr 규칙 ①~⑨와 「후속 세션 인계 프로토콜」 herdr 절 → 동작 이름 버전으로 다시 쓰고, 원문과 이관 경위는 `CLAUDE_HISTORY.md`에 날짜 항목으로(기존 herdr 13곳은 역사 기록이라 수정 안 함).
 - 메모리: helpai 2파일·gchat-g-on 1파일의 명령 예시를 동작 이름으로. herdr-ios 3파일 제외. gchat-g-on 원격 prompt는 D7 예외로 그대로 두고 manifest `allow`.
 - **Orca 잔재 삭제(D5)**: auto-chain `references/backend-orca.md`·SKILL.md orca 분기·sol-review.md orca 분기·README orca 서술 제거(S4 브랜치, 복원은 기존 태그 `auto-chain-v1.7.1-orca`). `plugins/orca-codex-delegate/`와 marketplace.json 항목 제거(S2, 먼저 태그 `orca-codex-delegate-v1.0.3`). 세 머신 미설치 확인됨 — S2 착수 때 `installed_plugins.json`을 다시 확인하고 설치돼 있으면 uninstall.
@@ -221,7 +222,7 @@ autoUpdate가 켜져 있어 main에 push하면 세 머신이 마켓플레이스 
 | Sol 검토·원인 조사 | ② headless 기본(D1: `review_view: headless` — `run_in_background` + `review-wait.sh`). `review_view: pane`이면 `pane-open` + `pane-run`. helpai는 프로파일에서 `pane` 유지(S6에서 helpai가 재판단) |
 | `worker:opencode` 비리뷰 실행 | ② 확장: `scripts/headless-run.sh <cli> <지시서> <done>` 추가(같은 done 형식, verdict 없이 exit·snapshot) |
 | 마일스톤 인계 | ③ `tab-open` + `agent-start` + `agent-send --confirm` |
-| worker → 조정자 메시지 | `task-brief.md` 17줄을 `agent-orchestrator agent-send`로. ① Agent worker는 메시지 없이 반환 한 줄(완료 알림이 옴) |
+| worker → 조정자 메시지 | (2.3.0 당시 기록 — 2.6.0부터 `inbox-send`, §1-4) `task-brief.md` 17줄을 `agent-orchestrator agent-send`로. ① Agent worker는 메시지 없이 반환 한 줄(완료 알림이 옴) |
 | `herdr-stall-watch.sh` | `agent-stall-watch.sh`로, `agent-status`·`agent-transcript`만 사용(transcript 10이면 상태만으로 감시하고 `감시 불가 · transcript unsupported` 줄). **pane worker가 있는 웨이브에만** Monitor 기동. 옛 이름은 2.3.x 동안 래퍼 |
 | `herdr-spawn-worker.sh` | 배치·split·rename·중복 검사는 어댑터 `pane-open --parent`·`agent-start`로 올린다. 스킬에는 `spawn-pane-worker.sh`(ROLE 해석·PERM_FLAGS argv 판정·첫 지시·성공 줄 형식 — auto-chain 고유 정책)만. 5번째 인자 `main-pane`은 `--parent`로 전달(NOTE 1). 출력 `OK name=… pane=… jsonl=…`(jsonl은 `agent-transcript`, 10이면 `jsonl=unsupported`)·종료 코드 2~6 유지. 어댑터의 10·11·12는 **변환하지 않고 같은 코드로 그대로 전달**한다(호출자가 내려감·알림을 고를 수 있게 — 2회차 NOTE 2). 옛 이름은 래퍼 |
 | `backend-herdr.md` | `references/pane-worker.md`(동작 이름, ③ 전용)로 축소. 실측 특이사항은 `tools/agent-orchestrator/docs/herdr.md`로. 옛 경로에는 포인터 한 줄 파일을 2.3.x 동안 남김(진행 중 handoff·가이드가 가리킴) |

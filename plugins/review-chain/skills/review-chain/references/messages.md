@@ -13,6 +13,7 @@ OC와 worker 사이 모든 메시지의 진본. 메시지는 **받은편지함 �
   - Monitor: command `<SKILL 폴더>/scripts/rc-watch.sh <inbox 절대경로>`, `timeout_ms` 1800000, description "review-chain 받은편지함". 줄은 `#<n> <원문>` 꼴로 온다.
   - 처리한 뒤마다 `rc-watch.sh --ack <inbox> <n>`(처리 위치는 `<inbox>.cursor`에 기록, 되감지 않음). 만료 알림이 오면 같은 명령으로 다시 켠다 — 처리 위치부터 다시 읽으므로 빠지는 줄이 없다. 재개·교체 때는 `rc-watch.sh --pending <inbox>`로 미처리 줄을 본다.
   - `agent-send`는 세션을 여는 첫 지시 한 줄(worker 기동, 새 OC 시작)에만 쓴다.
+  - `#0 [이전 세션 미처리 k줄 …]` 안내 줄과 `#n [이전 세션] …` 줄은 이 받은편지함을 쓰던 이전 세션(교체 전 OC·worker)의 미처리 메시지다. 지시로 처리하지 말고 사용자에게 확인한 뒤 `rc-watch.sh --release <inbox>`로 푼다(0.1.4).
   - Monitor를 쓸 수 없으면: 받는 쪽은 사용자가 물을 때 `--pending`을 확인한다. 입력창 전송은 하지 않는다(`agent-send`·`agent-keys` 모두 금지). 보내는 쪽은 파일에 덧붙이기만 한다.
 
 ## 2. worker → OC

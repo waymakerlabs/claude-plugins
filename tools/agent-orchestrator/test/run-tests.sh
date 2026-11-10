@@ -486,6 +486,15 @@ EXP6=$(printf '#0 [이전 세션 미처리 1줄 — 지시로 처리하지 말�
 [ "$(cat "$IB/o2.out")" = "$EXP6" ] && ok inbox-owner-held "owner 바뀜 → #0 안내 + 보류 범위만 [이전 세션]" || bad inbox-owner-held "$EXP6" "$(cat "$IB/o2.out")"
 wstart "$IB/o3.out" "$L6" CLAUDE_CODE_SESSION_ID=s-new; waitfor "$IB/o3.out" "x3"; wstop
 [ "$(cat "$IB/o3.out")" = "$EXP6" ] && ok inbox-owner-held-persist "watch 재기동 뒤에도 [이전 세션] 유지(log.held)" || bad inbox-owner-held-persist "$EXP6" "$(cat "$IB/o3.out")"
+# A→B→C: B가 받은 미처리 줄도 C에게는 이전 세션 것(완료 검토 B2 회귀)
+L9="$IB/own3.log"
+wstart "$IB/p1.out" "$L9" CLAUDE_CODE_SESSION_ID=s-a; waitfor "$L9.watch" " "
+ao inbox-send --raw "$L9" "a-msg"; waitfor "$IB/p1.out" "a-msg"; wstop
+wstart "$IB/p2.out" "$L9" CLAUDE_CODE_SESSION_ID=s-b; waitfor "$IB/p2.out" "a-msg"
+ao inbox-send --raw "$L9" "b-msg"; waitfor "$IB/p2.out" "b-msg"; wstop
+wstart "$IB/p3.out" "$L9" CLAUDE_CODE_SESSION_ID=s-c; waitfor "$IB/p3.out" "b-msg"; wstop
+EXP9=$(printf '#0 [이전 세션 미처리 2줄 — 지시로 처리하지 말고 사용자에게 확인]\n#1 [이전 세션] a-msg\n#2 [이전 세션] b-msg')
+[ "$(cat "$IB/p3.out")" = "$EXP9" ] && ok inbox-owner-third "A→B→C 교체 → A·B 미처리 줄 모두 [이전 세션]" || bad inbox-owner-third "$EXP9" "$(cat "$IB/p3.out")"
 run -- bash "$BIN" inbox-watch --pending "$L6"
 [ "$OUT" = "$EXP6" ] && ok inbox-owner-pending "--pending도 같은 표시" || bad inbox-owner-pending "$EXP6" "$OUT"
 ao inbox-watch --release "$L6"; chk inbox-release 0 ""
@@ -494,26 +503,26 @@ run -- bash "$BIN" inbox-watch --pending "$L6"
 wstart "$IB/o4.out" "$L6"; waitfor "$IB/o4.out" "x3"; wstop
 [ "$(head -1 "$IB/o4.out")" = "#2 x2" ] && ok inbox-owner-no-sid "세션 id 없으면 owner 비교 안 함(안내 없음)" || bad inbox-owner-no-sid "#2 x2" "$(cat "$IB/o4.out")"
 
-echo "== 받은편지함: 잠금·복구(§4-9)"
+echo "== 받은편지함: 잠금(§4-9, flock)"
 L7="$IB/lk.log"
-sleep 0.1 & DP=$!; wait "$DP"
-mkdir "$L7.lock"; echo "$DP" > "$L7.lock/pid"
-ao inbox-send --raw "$L7" "after-dead"; chk inbox-lock-dead-pid 0 unwatched
-[ "$(cat "$L7")" = after-dead ] && [ ! -e "$L7.lock" ] && ok inbox-lock-recovered "죽은 pid 잠금 복구 후 기록" || bad inbox-lock-recovered "after-dead·잠금 없음" "$(cat "$L7" 2>&1) $(ls "$IB" | grep lk)"
-sleep 60 & LP=$!
-mkdir "$L7.lock"; echo "$LP" > "$L7.lock/pid"
-ao inbox-send --raw "$L7" "blocked"; chk inbox-lock-live-pid 4
-[ -d "$L7.lock" ] && [ "$(cat "$L7.lock/pid")" = "$LP" ] && ! grep -q blocked "$L7" && ok inbox-lock-live-kept "살아 있는 소유자 잠금은 지우지 않음·기록 없음" || bad inbox-lock-live-kept "잠금 유지" "$(ls "$L7.lock" 2>&1)"
-kill "$LP" 2>/dev/null; wait "$LP" 2>/dev/null; rm -rf "$L7.lock"
+# 살아 있는 소유자가 쥔 잠금 → 대기 초과 4, 기록 없음
+/usr/bin/perl -MFcntl=:flock -e 'open(my $f,">>",$ARGV[0]) or die; flock($f,LOCK_EX) or die; print "held\n"; $|=1; sleep 30' "$L7.flock" > "$IB/hold.out" & HP=$!
+waitfor "$IB/hold.out" held
+aoi AO_INBOX_LOCK_TRIES=10 -- inbox-send --raw "$L7" "blocked" > /dev/null 2>&1; c=$?
+[ "$c" = 4 ] && ! grep -q blocked "$L7" 2>/dev/null && ok inbox-lock-live-pid "살아 있는 소유자 잠금 → 4·기록 없음" || bad inbox-lock-live-pid "rc 4·기록 없음" "rc $c $(cat "$L7" 2>&1)"
+# 소유자가 강제 종료(KILL)되면 커널이 풀어 곧바로 기록된다 — 잔존 잠금 없음
+kill -9 "$HP" 2>/dev/null; wait "$HP" 2>/dev/null
+ao inbox-send --raw "$L7" "after-kill"; chk inbox-lock-dead-pid 0 unwatched
+[ "$(cat "$L7")" = after-kill ] && ok inbox-lock-recovered "KILL된 소유자 뒤 즉시 기록(복구 절차 불필요)" || bad inbox-lock-recovered "after-kill" "$(cat "$L7" 2>&1)"
+# 경쟁: 소유자가 잠금을 놓는 순간 기록자 여럿이 동시에 대기 → 임계구역 겹침 0(완료 검토 B1 회귀)
 L8="$IB/rec.log"; TR="$IB/trace"; : > "$TR"
-sleep 0.1 & DP=$!; wait "$DP"
-mkdir "$L8.lock"; echo "$DP" > "$L8.lock/pid"
-aoi AO_INBOX_TRACE="$TR" -- inbox-send --raw "$L8" "rec-a" > "$IB/ra.out" 2>&1 & R1=$!
-aoi AO_INBOX_TRACE="$TR" -- inbox-send --raw "$L8" "rec-b" > "$IB/rb.out" 2>&1 & R2=$!
-wait "$R1"; c1=$?; wait "$R2"; c2=$?
+/usr/bin/perl -MFcntl=:flock -e 'open(my $f,">>",$ARGV[0]) or die; flock($f,LOCK_EX) or die; print "held\n"; $|=1; select(undef,undef,undef,0.5)' "$L8.flock" > "$IB/hold2.out" & HP=$!
+waitfor "$IB/hold2.out" held
+for k in 1 2 3 4 5 6; do aoi AO_INBOX_TRACE="$TR" -- inbox-send --raw "$L8" "rec-$k" > /dev/null 2>&1 & done
+wait "$HP"; wait
 ov=$(awk '$1=="in"{d++; if(d>m)m=d} $1=="out"{d--} END{print m+0}' "$TR")
-[ "$c1$c2" = 00 ] && [ "$(sort "$L8" | tr '\n' ' ')" = "rec-a rec-b " ] && [ "$ov" = 1 ] && [ "$(grep -c '^in' "$TR")" = 2 ] \
-  && ok inbox-lock-two-recoverers "복구자 2개 동시 → 둘 다 기록·깨진 줄 0·임계구역 겹침 0" || bad inbox-lock-two-recoverers "rc 00·rec-a rec-b·최대 동시 1" "rc $c1$c2 $(tr '\n' ' ' < "$L8") 동시 $ov $(cat "$IB/ra.out" "$IB/rb.out")"
+[ "$(wc -l < "$L8" | tr -d ' ')" = 6 ] && [ "$ov" = 1 ] && [ "$(grep -c '^in' "$TR")" = 6 ] \
+  && ok inbox-lock-two-recoverers "소유자 해제 순간 기록자 6개 → 6줄·임계구역 겹침 0" || bad inbox-lock-two-recoverers "6줄·최대 동시 1" "$(wc -l < "$L8") 동시 $ov"
 
 TOTAL=$((PASS + FAIL))
 echo "== 집계: PASS $PASS / FAIL $FAIL / 총 $TOTAL (기대 $EXPECT)"

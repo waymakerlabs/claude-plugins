@@ -7,6 +7,7 @@
 #   rc-watch.sh --ack <inbox.log> <줄 번호>  그 줄까지 처리했다고 <inbox.log>.cursor 에 기록
 #                                            (지금 값보다 클 때만 — 되감지 않는다)
 #   rc-watch.sh --pending <inbox.log>        처리 안 한 줄만 출력하고 끝(재개·교체 때 확인용)
+#   rc-watch.sh --release <inbox.log>        이전 세션 보류(#0 안내 줄) 해제 — 사용자 확인 뒤
 #
 # 실제 동작은 `agent-orchestrator inbox-watch`(같은 인자 형식, cursor 는 <경로>.cursor)가 한다.
 #   이 스크립트는 인자만 검사하고 exec 한다. 환경: AGENT_ORCHESTRATOR=<실행 파일>
@@ -28,11 +29,11 @@ case "${1:-}" in
     [ $# = 3 ] || die 2 "사용: $0 --ack <inbox.log> <줄 번호>"
     [[ $3 =~ ^[0-9]+$ ]] || die 2 "줄 번호 오류: $3"
     exec "$AO" inbox-watch --ack "$2" "$3" ;;
-  --pending)
-    [ $# = 2 ] || die 2 "사용: $0 --pending <inbox.log>"
-    exec "$AO" inbox-watch --pending "$2" ;;
+  --pending|--release)
+    [ $# = 2 ] || die 2 "사용: $0 $1 <inbox.log>"
+    exec "$AO" inbox-watch "$1" "$2" ;;
 esac
 
-[ $# = 1 ] || die 2 "사용: $0 <inbox.log> | --ack <inbox.log> <n> | --pending <inbox.log>"
+[ $# = 1 ] || die 2 "사용: $0 <inbox.log> | --ack <inbox.log> <n> | --pending <inbox.log> | --release <inbox.log>"
 case "$1" in /*) ;; *) die 2 "절대 경로: $1" ;; esac
 exec "$AO" inbox-watch "$1"
