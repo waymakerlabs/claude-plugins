@@ -138,7 +138,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 0.85rem; border-top: 
 <main>
 
 <h1>자율체인(auto-chain) 개요</h1>
-<p class="meta">대상: 이 환경을 처음 보는 개발자 · 기준: auto-chain 2.5.0 스킬 문서와 agent-orchestrator 계약 문서</p>
+<p class="meta">대상: 이 환경을 처음 보는 개발자 · 기준: auto-chain 2.6.0 스킬 문서와 agent-orchestrator 계약 문서 · 발표자료(그림·표 위주, 리뷰체인 포함)는 <a href="auto-chain-guide.html">auto-chain-guide.html</a> · QC 수정 체인은 <code>plugins/review-chain</code>(0.1.4)</p>
 
 <p class="lead">자율체인은 여러 세션 분량의 큰 작업을 Claude Code가 사람 개입을 최소로 하며 끝까지 진행하게 하는 스킬이다. 작업을 <strong>마일스톤 → 웨이브 → task</strong>로 나누고, 마일스톤 하나를 조정자 세션 하나가 맡는다. 계획은 Opus 계획 에이전트가 쓰고, 검토는 다른 계열 모델(GPT-6.1 Sol)이 맡으며, 구현은 Claude worker가 병렬로 한다. 마일스톤이 끝나면 조정자는 상태 파일과 인계 문서를 남기고 새 세션을 열어 다음 마일스톤을 넘긴다. 모든 프로젝트에 공통인 절차는 스킬이 정하고, 프로젝트마다 다른 검증 명령·권한·추가 절차는 프로젝트 프로파일 파일이 정한다.</p>
 
@@ -258,6 +258,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 0.85rem; border-top: 
 
 <ul>
   <li><strong>동작</strong>: <code>backend</code>, <code>whoami</code>, <code>tab-open</code>, <code>pane-open</code>, <code>self-name</code>, <code>agent-start</code>, <code>agent-send</code>, <code>agent-wait</code>, <code>agent-status</code>, <code>agent-session-id</code>, <code>agent-transcript</code>, <code>agent-read</code>, <code>agent-keys</code>, <code>pane-run</code>, <code>close</code>, <code>list</code>. stdout은 값 한 줄, 사유·경고는 stderr, JSON 출력 없음.</li>
+  <li><strong>받은편지함 동작</strong>(2.6.0): <code>inbox-send [--raw] &lt;대상&gt; &lt;한 줄&gt;</code>, <code>inbox-watch &lt;대상&gt;</code>(Monitor 명령), <code>inbox-watch --ack|--pending|--release</code>. 대상은 절대 경로(<code>*.log</code>) 또는 pane id. 백엔드 결정 전에 처리해 오케스트레이션 툴 밖에서도 동작한다. 기록은 커널 flock 잠금 아래 덧붙임이고, 종료 코드는 0 / 2(인자·대상 형식) / 4(기록·잠금·ack 실패)다.</li>
   <li><strong>어댑터</strong>: 진입점이 인자를 검사한 뒤 <code>adapters/&lt;백엔드&gt;.sh</code>를 불러 <code>op_&lt;동작&gt;</code> 함수를 호출한다. 지원하지 않는 동작은 함수를 정의하지 않으면 된다(진입점이 10을 반환). 툴 특이사항은 <code>docs/&lt;backend&gt;.md</code> 한 곳에만 적는다. 새 툴을 붙일 때는 어댑터 파일·자동 판정 한 줄·설치물 목록·가짜 바이너리 시험을 추가한다.</li>
   <li><strong>종료 코드</strong>가 스킬과의 계약이다. 특히 아래 세 값이 "옆 pane을 못 쓰면 내장 서브에이전트로 내려간다"를 가능하게 한다.</li>
 </ul>
@@ -389,6 +390,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 0.85rem; border-top: 
   </div>
 </div>
 <p class="fallback">③에서 종료 코드 10·11·12를 받으면 ①·②로 내려간다. 단 ①로 내려간 작업은 <strong>현재 세션 안에서 회수해야 한다</strong>. 내장 서브에이전트는 다음 세션이 승계할 수 없기 때문이다.</p>
+<p class="fallback">③ pane 세션에 <code>agent-send</code>를 쓰는 것은 첫 지시 1회뿐이다(2.6.0). 이후 worker 보고와 조정자 답은 모두 받은편지함 파일로 오간다. worker는 <code>inbox-send &lt;조정자 받은편지함&gt; "[worker &lt;이름&gt;] &lt;done|failed|question|blocked&gt; &lt;보고서&gt; &lt;한 줄&gt;"</code>, 조정자는 <code>worker-&lt;이름&gt;.log</code>로 답한다. 받는 쪽은 Monitor로 <code>inbox-watch</code>를 지켜본다.</p>
 <figcaption id="tiers-cap">그림 2. 실행 3단계. ③을 기본으로 두지 않는 이유는 pane 회수 지연(한 리뷰의 회수에 179분이 걸린 사례), 조사 중 정지 오판, 처음 보는 폴더의 신뢰 확인 화면에서 멈추는 문제다. 전환 당일 1회 관측에서 ① worker 2개는 기동부터 회수 커밋까지 25분이었다.</figcaption>
 </figure>
 
@@ -462,7 +464,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 0.85rem; border-top: 
 
 <ul>
   <li>출력 종류: <code>정지 후보</code>(working인데 진척 10분 이상) · <code>API 재시도 반복</code> · <code>권한·입력 대기</code> · <code>끝남</code> · <code>감시 불가</code>(UNVERIFIED — mtime으로 대신 추정하지 않는다).</li>
-  <li>이벤트는 후보일 뿐이다. 받으면 화면을 1회 보고, 재지시, 그래도 안 되면 재기동 순서로 처리한다. API 재시도는 환경 문제로 실패 횟수에 넣지 않는다.</li>
+  <li>이벤트는 후보일 뿐이다. 받으면 화면을 1회 보고, 재지시, 그래도 안 되면 재기동 순서로 처리한다. 재지시는 <code>agent-keys &lt;이름&gt; Escape</code> 뒤 worker 받은편지함에 <code>inbox-send</code>로 보낸다(입력창에는 아무것도 치지 않는다). API 재시도는 환경 문제로 실패 횟수에 넣지 않는다.</li>
   <li>별도로 worker 보고서의 <code>- 진행:</code> 줄을 20초 간격으로 읽어 진행이 바뀔 때마다 한 줄 보고한다. 진행 이벤트가 30분 넘게 없으면 그 사실을 보고한다(멈춤은 아니다).</li>
 </ul>
 
@@ -477,7 +479,8 @@ agent-orchestrator agent-send &lt;next&gt; "&lt;상태 파일&gt;과 &lt;인계 
 
 <ul>
   <li>프롬프트는 줄바꿈 없는 한 줄이다(줄바꿈은 중간 제출로 해석된다). 문서가 진본이고 프롬프트는 포인터다.</li>
-  <li>기동은 인계 시도당 1회. 응답을 잃으면 에이전트 목록에서 이름을 찾아 있으면 메시지만 다시 보낸다.</li>
+  <li>기동과 첫 지시는 인계 시도당 1회. 응답을 잃었거나 결과가 불명확해도 같은 입력창에 다시 보내지 않는다(2.6.0). <code>agent-status</code>·transcript로 착수를 1회 확인하고, 안 됐으면 그 탭을 닫아 <code>list --panes</code>에서 사라진 것을 본 뒤에만 새 탭·새 이름으로 다시 띄운다.</li>
+  <li><strong>받은편지함 동결</strong>(2.6.0): 첫 지시 전에 옛 조정자가 <code>coordinator.log</code> Monitor를 멈추고 처리한 마지막 번호를 <code>--ack</code>한 뒤 인계 문서에 "받은편지함 동결 · 마지막 ack n"을 적는다. 새 조정자는 같은 파일을 Monitor하고 <code>--pending</code>부터 처리한다.</li>
   <li><strong>부모 정리는 child가 한다.</strong> 이어받은 세션이 상태를 읽은 직후 부모 pane을 닫는다. 부모가 스스로 닫으면 실행 중인 명령이 끊길 수 있기 때문이다.</li>
   <li>진행 중인 worker가 남아 있으면 인계하지 않는다. 예외는 ③ pane으로 띄운 롤링 분해 planner뿐이며, 인계 문서에 pane·보고서 경로를 적고 child가 회수한다.</li>
   <li>오케스트레이션 툴 밖이면 자동 기동하지 않고 인계 문서와 다음 세션 시작 명령 한 줄을 사용자에게 준다.</li>
@@ -598,7 +601,7 @@ task-brief: docs/chain/_profile/task-brief.md   # worker 덧붙임 지시서
 <pre><code>authority: { local-commit: yes, push: wave, external-write: no, new-cost: no,
              escalation: [extra-rounds:1, carry-reversible, stop] }
 verify-full: "&lt;프로젝트 CLI&gt; test &lt; /dev/null"
-skill: auto-chain 2.5.0
+skill: auto-chain 2.6.0
 reviewer: codex-cli
 backend: herdr &lt;조정자 pane&gt;</code></pre>
 
@@ -670,11 +673,12 @@ backend: herdr &lt;조정자 pane&gt;</code></pre>
   <dt>인계</dt><dd>상태 파일과 인계 문서를 남기고 새 탭에 다음 조정자 세션을 기동하는 일. 부모 pane은 child가 닫는다.</dd>
   <dt>롤링 분해</dt><dd>최초 계획 뒤 마일스톤 task를 한 마일스톤 앞서 분해하는 방식. M<sub>n</sub>의 마지막 웨이브 기동 직후 M<sub>n+2</sub>를 분해한다.</dd>
   <dt>agent-orchestrator</dt><dd>터미널 오케스트레이션 툴을 감추는 명령. 동작 이름과 종료 코드가 계약이고, 툴별 차이는 어댑터가 맡는다.</dd>
+  <dt>받은편지함</dt><dd>세션 간 메시지를 담는 파일(2.6.0). 보내는 쪽은 <code>inbox-send</code>로 한 줄을 덧붙이고, 받는 쪽은 <code>inbox-watch</code>를 Monitor로 지켜보며 처리한 번호를 <code>--ack</code>한다. 조정자 받은편지함은 체인마다 고정 경로라 인계로 pane이 바뀌어도 보고가 새 조정자에게 간다.</dd>
   <dt>진행 보드</dt><dd>10줄 이내 고정 형식의 진행 요약. 마일스톤 착수, 웨이브 통합, 게이트 판정, 멈춤, 인계 직전에 낸다.</dd>
 </dl>
 
 <footer>
-  <p>근거 문서: auto-chain 스킬(<code>SKILL.md</code>, <code>references/profile.md</code>·<code>sol-review.md</code>·<code>pane-worker.md</code>·<code>planning.md</code>·<code>task-brief.md</code>), 에이전트 정의, agent-orchestrator 계약 문서와 어댑터 작성 계약, 2.3.0 전환 보고. 수치는 해당 문서에 기록된 운영 실측을 옮긴 것이며, 전환 당일 수치는 1회 관측이다. gira 사례의 내부 식별자·호스트·경로는 일반화했다.</p>
+  <p>근거 문서: auto-chain 스킬(<code>SKILL.md</code>, <code>references/profile.md</code>·<code>sol-review.md</code>·<code>pane-worker.md</code>·<code>planning.md</code>·<code>task-brief.md</code>), 에이전트 정의, agent-orchestrator 계약 문서와 어댑터 작성 계약, 2.3.0 전환 보고, 2.6.0 받은편지함 전환 계획. 수치는 해당 문서에 기록된 운영 실측을 옮긴 것이며, 전환 당일 수치는 1회 관측이다. gira 사례의 내부 식별자·호스트·경로는 일반화했다.</p>
 </footer>
 
 </main>
