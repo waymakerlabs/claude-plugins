@@ -508,8 +508,8 @@ L7="$IB/lk.log"
 # 살아 있는 소유자가 쥔 잠금 → 대기 초과 4, 기록 없음
 /usr/bin/perl -MFcntl=:flock -e 'open(my $f,">>",$ARGV[0]) or die; flock($f,LOCK_EX) or die; print "held\n"; $|=1; sleep 30' "$L7.flock" > "$IB/hold.out" & HP=$!
 waitfor "$IB/hold.out" held
-aoi AO_INBOX_LOCK_TRIES=10 -- inbox-send --raw "$L7" "blocked" > /dev/null 2>&1; c=$?
-[ "$c" = 4 ] && ! grep -q blocked "$L7" 2>/dev/null && ok inbox-lock-live-pid "살아 있는 소유자 잠금 → 4·기록 없음" || bad inbox-lock-live-pid "rc 4·기록 없음" "rc $c $(cat "$L7" 2>&1)"
+aoi AO_INBOX_LOCK_TRIES=10 -- inbox-send --raw "$L7" "blocked" > /dev/null 2> "$IB/lk.err"; c=$?
+[ "$c" = 4 ] && grep -q "잠금 대기 시간 초과" "$IB/lk.err" && ! grep -q blocked "$L7" 2>/dev/null && ok inbox-lock-live-pid "살아 있는 소유자 잠금 → 4·stderr 사유·기록 없음" || bad inbox-lock-live-pid "rc 4·기록 없음" "rc $c $(cat "$L7" 2>&1)"
 # 소유자가 강제 종료(KILL)되면 커널이 풀어 곧바로 기록된다 — 잔존 잠금 없음
 kill -9 "$HP" 2>/dev/null; wait "$HP" 2>/dev/null
 ao inbox-send --raw "$L7" "after-kill"; chk inbox-lock-dead-pid 0 unwatched

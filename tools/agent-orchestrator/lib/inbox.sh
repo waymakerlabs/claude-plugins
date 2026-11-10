@@ -61,7 +61,7 @@ AO_PERL=${AO_PERL:-/usr/bin/perl}
 _aoi_lock() {
   local F="$_AOI_LOG.flock" rc
   [ -x "$AO_PERL" ] || ao_die 4 "잠금에 쓸 perl 없음: $AO_PERL"
-  exec 9>>"$F" 2>/dev/null || ao_die 4 "잠금 파일 열기 실패: $F"
+  { exec 9>>"$F"; } 2>/dev/null || ao_die 4 "잠금 파일 열기 실패: $F"   # 묶음 밖 stderr는 그대로(exec 단독이면 2>/dev/null이 셸에 남는다)
   _AOI_LOCK=$F
   "$AO_PERL" -MFcntl=:flock -MTime::HiRes=sleep -e '
     open(my $f, ">&=", 9) or exit 4;
