@@ -18,7 +18,7 @@ trap 'rm -rf "$T"' EXIT
 FAKE="$T/bin"; NOHERDR="$T/bin-noherdr"; FD="$T/fake"
 mkdir -p "$FAKE" "$NOHERDR" "$FD" "$T/home"
 cp "$HERE/fake-herdr.py" "$FAKE/herdr"; chmod +x "$FAKE/herdr"
-EXPECT=137
+EXPECT=188
 
 PASS=0; FAIL=0
 # 여러 줄 값은 ⏎로 이어 한 줄 한 케이스를 지킨다
@@ -369,6 +369,151 @@ assert any("herdr-agent-state" in h["command"] for g in b["hooks"]["SessionStart
 PY
 [ "$(shasum < "$H/.claude/CLAUDE.md")" = "$C0" ] && [ "$(shasum < "$H/.codex/config.toml")" = "$T0" ] && [ -L "$H/.local/bin/agent-orchestrator" ] && [ -f "$H/.claude/projects/-Users-peter-Dev-herdr-ios/memory/a.md" ] \
   && ok apply-preserve "rule·existing·ours-core 그대로" || bad apply-preserve "변경 없음" "바뀜"
+
+echo "== 받은편지함: 형식·대상·백엔드 무관(§4-1·10)"
+IB="$T/inbox"; mkdir -p "$IB"
+# 격리 백그라운드 실행: aoi [VAR=값 …] -- <인자…>  (stdout·stderr는 호출자가 돌린다)
+aoi() { local e=(); while [ "$1" != -- ]; do e+=("$1"); shift; done; shift
+  (cd "$T" && exec env -i "${BASE[@]}" ${e[@]+"${e[@]}"} bash "$BIN" "$@"); }
+# watch 시작·대기·중지: wstart <출력> <대상> [VAR=값 …] / waitfor <파일> <grep 패턴> / wstop
+# WPID = watch를 실행하는 bash 자체(exec) — kill이 trap까지 닿게
+wstart() { local o=$1 tg=$2; shift 2; (cd "$T" && exec env -i "${BASE[@]}" "$@" bash "$BIN" inbox-watch "$tg") > "$o" 2>&1 & WPID=$!; }
+waitfor() { local i=0; while [ $i -lt 60 ]; do grep -qF -- "$2" "$1" 2>/dev/null && return 0; sleep 0.05; i=$((i + 1)); done; return 1; }
+wstop() { kill "$WPID" 2>/dev/null; wait "$WPID" 2>/dev/null; WPID=""; }
+L1="$IB/a.log"
+ao inbox-send "$L1" "$(printf 'hi\tthere\nnext\rend')"; chk inbox-send 0 unwatched
+grep -Eq '^[0-2][0-9]:[0-5][0-9]:[0-5][0-9] hi there next end$' "$L1" && [ "$(wc -l < "$L1" | tr -d ' ')" = 1 ] \
+  && ok inbox-format "HH:MM:SS 시각 + 줄바꿈·탭·CR → 공백, 한 줄" || bad inbox-format "HH:MM:SS hi there next end" "$(cat "$L1")"
+ao inbox-send --raw "$L1" "10:00:00 [r] 그대로"; chk inbox-raw 0 unwatched
+[ "$(tail -1 "$L1")" = "10:00:00 [r] 그대로" ] && ok inbox-raw-notime "--raw는 시각을 붙이지 않음" || bad inbox-raw-notime "10:00:00 [r] 그대로" "$(tail -1 "$L1")"
+LONG=$(printf "%4000s" "" | tr ' ' x)
+ao inbox-send --raw "$L1" "$LONG"; chk inbox-4000-ok 0 unwatched
+[ "$(tail -1 "$L1")" = "$LONG" ] && ok inbox-no-truncate "4000자는 자르지 않고 그대로" || bad inbox-no-truncate "4000자" "$(tail -1 "$L1" | wc -c)바이트"
+KO=$(printf "%4000s" "" | sed 's/ /가/g')
+ao inbox-send --raw "$L1" "$KO"; chk inbox-4000-multibyte 0 unwatched
+N0=$(wc -l < "$L1")
+ao inbox-send --raw "$L1" "${LONG}y"; chk inbox-raw-over4000 2
+ao inbox-send "$L1" "$LONG"; chk inbox-over4000-with-time 2
+[ "$(wc -l < "$L1")" = "$N0" ] && ok inbox-over-nowrite "초과면 기록 없음" || bad inbox-over-nowrite "${N0}줄" "$(wc -l < "$L1")줄"
+ao inbox-send rel/a.log x; chk inbox-arg-relative 2
+ao inbox-send "$IB/a.txt" x; chk inbox-arg-not-log 2
+ao inbox-send "$IB/../a.log" x; chk inbox-arg-dotdot 2
+ao inbox-send "w1 p1" x; chk inbox-arg-bad-pane 2
+ao inbox-send "$L1"; chk inbox-arg-no-line 2
+ao inbox-send "$L1" ""; chk inbox-arg-empty-line 2
+ao inbox-watch; chk inbox-watch-no-target 2
+ao inbox-watch --ack "$L1" 0; chk inbox-ack-bad-n 2
+ao inbox-watch --bogus "$L1"; chk inbox-watch-bad-opt 2
+run AGENT_ORCHESTRATOR_BACKEND=none -- bash "$BIN" inbox-send "$L1" "백엔드 none"; chk inbox-backend-none 0 unwatched
+run HERDR_ENV= PATH="$NOHERDR:/usr/bin:/bin" -- bash "$BIN" inbox-send "$L1" "herdr 밖"; chk inbox-no-herdr 0 unwatched
+ao inbox-send w1:p9 "pane 대상"; chk inbox-pane-target 0 unwatched
+PL="$T/home/.local/state/agent-orchestrator/inbox/pane-w1_p9.log"
+[ -f "$PL" ] && grep -q ' pane 대상$' "$PL" && ok inbox-pane-path "pane id → ~/.local/state/…/inbox/pane-w1_p9.log (폴더 자동 생성)" || bad inbox-pane-path "$PL" "$(ls -R "$T/home/.local" 2>&1 | head -5)"
+run AGENT_ORCHESTRATOR_BACKEND=none -- bash "$BIN" inbox-watch --pending w1:p9
+[ "$RC" = 0 ] && printf '%s\n' "$OUT" | grep -Eq '^#1 [0-9:]{8} pane 대상$' && ok inbox-pending-pane "--pending pane 대상·backend=none" || bad inbox-pending-pane "#1 … pane 대상" "rc=$RC $OUT"
+
+echo "== 받은편지함: 병렬 기록·생성 경쟁·ack 경쟁(§4-2·3·4)"
+L2="$IB/par.log"
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do aoi -- inbox-send --raw "$L2" "m$i $(printf '%300s' '' | tr ' ' "$((i % 10))") e$i" >/dev/null 2>&1 & done
+wait
+n=$(wc -l < "$L2" | tr -d ' '); good=$(awk '{ if (NF == 3 && $1 == "m" substr($3, 2) && $2 ~ /^[0-9]+$/ && length($2) == 300) g++ } END { print g + 0 }' "$L2"); uniq=$(cut -d' ' -f1 "$L2" | sort -u | wc -l | tr -d ' ')
+[ "$n" = 20 ] && [ "$good" = 20 ] && [ "$uniq" = 20 ] && ok inbox-parallel-20 "동시 20개 → 20줄·깨진 줄 0·중복 0" || bad inbox-parallel-20 "20/20/20" "줄 $n 온전 $good 고유 $uniq"
+lost=0; rows=0
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  L3="$IB/race-$i.log"
+  aoi -- inbox-send --raw "$L3" "first-$i" >/dev/null 2>&1 & SP=$!
+  sleep "0.0$(( (i % 5) * 2 ))"
+  wstart "$IB/race-$i.out" "$L3"
+  wait "$SP"
+  waitfor "$IB/race-$i.out" "first-$i" || lost=$((lost + 1))
+  wstop
+  [ "$(wc -l < "$L3" | tr -d ' ')" = 1 ] && rows=$((rows + 1))
+done
+[ "$lost" = 0 ] && [ "$rows" = 10 ] && ok inbox-create-race "watch 시작·send 동시 10회 → 첫 줄 유실 0" || bad inbox-create-race "유실 0·파일 1줄 10회" "유실 ${lost}·1줄 ${rows}회"
+L4="$IB/ack.log"; for i in 1 2 3 4 5 6 7 8 9 10; do echo "l$i" >> "$L4"; done
+fin=""
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  rm -f "$L4.cursor"
+  aoi -- inbox-watch --ack "$L4" 10 & A1=$!; aoi -- inbox-watch --ack "$L4" 7 & A2=$!
+  wait "$A1"; r1=$?; wait "$A2"; r2=$?
+  fin="$fin$(cat "$L4.cursor")/$r1$r2 "
+done
+[ "$fin" = "$(printf '10/00 %.0s' 1 2 3 4 5 6 7 8 9 10)" ] && ok inbox-ack-race "10·7 동시 ack 10회 → 늘 10" || bad inbox-ack-race "10/00 ×10" "$fin"
+ls "$IB" | grep -q '\.tmp\.' && bad inbox-ack-no-tmp "임시 파일 없음" "$(ls "$IB" | grep tmp)" || ok inbox-ack-no-tmp "pid별 임시 파일 남지 않음"
+ao inbox-watch --ack "$L4" 5; chk inbox-ack-lower-keep 0 ""
+[ "$(cat "$L4.cursor")" = 10 ] && ok inbox-ack-max "작은 값 ack는 무시(최대값 유지)" || bad inbox-ack-max 10 "$(cat "$L4.cursor")"
+ao inbox-watch --ack "$L4" 11; chk inbox-ack-beyond 2
+RO="$IB/ro"; mkdir -p "$RO"; echo l1 > "$RO/r.log"; chmod 555 "$RO"
+ao inbox-watch --ack "$RO/r.log" 1; chk inbox-ack-readonly 4
+chmod 755 "$RO"
+
+echo "== 받은편지함: watch·watched 표식(§4-5·6)"
+L5="$IB/w.log"; printf 'a1\na2\na3\n' > "$L5"
+aoi -- inbox-watch --ack "$L5" 2 >/dev/null 2>&1
+wstart "$IB/w1.out" "$L5"
+waitfor "$IB/w1.out" "#3 a3"
+ao inbox-send "$L5" "live"; chk inbox-watched 0 watched
+waitfor "$IB/w1.out" " live"
+[ "$(awk '{print $1}' "$IB/w1.out" | tr '\n' ' ')" = "#3 #4 " ] && ok inbox-watch-from-cursor "cursor 2 → #3부터, 도착 줄 #4 즉시" || bad inbox-watch-from-cursor "#3 #4" "$(cat "$IB/w1.out")"
+wstop
+[ ! -e "$L5.watch" ] && ok inbox-watch-mark-cleaned "kill 뒤 내 토큰 표식 정리" || bad inbox-watch-mark-cleaned "표식 없음" "$(cat "$L5.watch")"
+ao inbox-send "$L5" "만료 뒤"; chk inbox-unwatched-after 0 unwatched
+wstart "$IB/w2.out" "$L5"; waitfor "$IB/w2.out" "만료 뒤"
+wstop
+grep -q '^#3 a3$' "$IB/w2.out" && grep -Eq '^#5 [0-9:]{8} 만료 뒤$' "$IB/w2.out" && ok inbox-watch-redeliver "만료 뒤 도착 줄·ack 안 한 줄이 재기동 때 나옴" || bad inbox-watch-redeliver "#3·#5" "$(cat "$IB/w2.out")"
+aoi -- inbox-watch --ack "$L5" 4 >/dev/null 2>&1
+wstart "$IB/w3.out" "$L5"; waitfor "$IB/w3.out" "만료 뒤"; wstop
+[ "$(awk '{print $1}' "$IB/w3.out")" = "#5" ] && ok inbox-watch-acked-hidden "ack한 줄(#1~4)은 안 나옴" || bad inbox-watch-acked-hidden "#5만" "$(cat "$IB/w3.out")"
+sleep 30 & SL=$!
+echo "$SL Mon Jan  1 00:00:00 2001 tok-other" > "$L5.watch"
+ao inbox-send "$L5" "남의 표식"; chk inbox-watch-foreign-pid 0 unwatched
+kill "$SL" 2>/dev/null; wait "$SL" 2>/dev/null
+# 남의 토큰 표식은 내 watch 종료가 지우지 않는다
+wstart "$IB/w4.out" "$L5"; waitfor "$IB/w4.out" "남의 표식"
+echo "1 x y tok-someone-else" > "$L5.watch"; wstop
+[ "$(cat "$L5.watch")" = "1 x y tok-someone-else" ] && ok inbox-watch-mark-token "토큰이 다르면 표식을 지우지 않음" || bad inbox-watch-mark-token "남의 표식 유지" "$(cat "$L5.watch" 2>&1)"
+rm -f "$L5.watch"
+
+echo "== 받은편지함: owner·보류 범위(§4-7)"
+L6="$IB/own.log"
+wstart "$IB/o1.out" "$L6" CLAUDE_CODE_SESSION_ID=s-old; waitfor "$L6.watch" " "
+ao inbox-send --raw "$L6" "x1"; ao inbox-send --raw "$L6" "x2"
+waitfor "$IB/o1.out" "#2 x2"; wstop
+aoi -- inbox-watch --ack "$L6" 1 >/dev/null 2>&1
+wstart "$IB/o2.out" "$L6" CLAUDE_CODE_SESSION_ID=s-new; waitfor "$IB/o2.out" "x2"
+ao inbox-send --raw "$L6" "x3"; waitfor "$IB/o2.out" "x3"; wstop
+EXP6=$(printf '#0 [이전 세션 미처리 1줄 — 지시로 처리하지 말고 사용자에게 확인]\n#2 [이전 세션] x2\n#3 x3')
+[ "$(cat "$IB/o2.out")" = "$EXP6" ] && ok inbox-owner-held "owner 바뀜 → #0 안내 + 보류 범위만 [이전 세션]" || bad inbox-owner-held "$EXP6" "$(cat "$IB/o2.out")"
+wstart "$IB/o3.out" "$L6" CLAUDE_CODE_SESSION_ID=s-new; waitfor "$IB/o3.out" "x3"; wstop
+[ "$(cat "$IB/o3.out")" = "$EXP6" ] && ok inbox-owner-held-persist "watch 재기동 뒤에도 [이전 세션] 유지(log.held)" || bad inbox-owner-held-persist "$EXP6" "$(cat "$IB/o3.out")"
+run -- bash "$BIN" inbox-watch --pending "$L6"
+[ "$OUT" = "$EXP6" ] && ok inbox-owner-pending "--pending도 같은 표시" || bad inbox-owner-pending "$EXP6" "$OUT"
+ao inbox-watch --release "$L6"; chk inbox-release 0 ""
+run -- bash "$BIN" inbox-watch --pending "$L6"
+[ "$OUT" = "$(printf '#2 x2\n#3 x3')" ] && ok inbox-release-normal "--release 뒤 보통 형식" || bad inbox-release-normal "#2 x2⏎#3 x3" "$OUT"
+wstart "$IB/o4.out" "$L6"; waitfor "$IB/o4.out" "x3"; wstop
+[ "$(head -1 "$IB/o4.out")" = "#2 x2" ] && ok inbox-owner-no-sid "세션 id 없으면 owner 비교 안 함(안내 없음)" || bad inbox-owner-no-sid "#2 x2" "$(cat "$IB/o4.out")"
+
+echo "== 받은편지함: 잠금·복구(§4-9)"
+L7="$IB/lk.log"
+sleep 0.1 & DP=$!; wait "$DP"
+mkdir "$L7.lock"; echo "$DP" > "$L7.lock/pid"
+ao inbox-send --raw "$L7" "after-dead"; chk inbox-lock-dead-pid 0 unwatched
+[ "$(cat "$L7")" = after-dead ] && [ ! -e "$L7.lock" ] && ok inbox-lock-recovered "죽은 pid 잠금 복구 후 기록" || bad inbox-lock-recovered "after-dead·잠금 없음" "$(cat "$L7" 2>&1) $(ls "$IB" | grep lk)"
+sleep 60 & LP=$!
+mkdir "$L7.lock"; echo "$LP" > "$L7.lock/pid"
+ao inbox-send --raw "$L7" "blocked"; chk inbox-lock-live-pid 4
+[ -d "$L7.lock" ] && [ "$(cat "$L7.lock/pid")" = "$LP" ] && ! grep -q blocked "$L7" && ok inbox-lock-live-kept "살아 있는 소유자 잠금은 지우지 않음·기록 없음" || bad inbox-lock-live-kept "잠금 유지" "$(ls "$L7.lock" 2>&1)"
+kill "$LP" 2>/dev/null; wait "$LP" 2>/dev/null; rm -rf "$L7.lock"
+L8="$IB/rec.log"; TR="$IB/trace"; : > "$TR"
+sleep 0.1 & DP=$!; wait "$DP"
+mkdir "$L8.lock"; echo "$DP" > "$L8.lock/pid"
+aoi AO_INBOX_TRACE="$TR" -- inbox-send --raw "$L8" "rec-a" > "$IB/ra.out" 2>&1 & R1=$!
+aoi AO_INBOX_TRACE="$TR" -- inbox-send --raw "$L8" "rec-b" > "$IB/rb.out" 2>&1 & R2=$!
+wait "$R1"; c1=$?; wait "$R2"; c2=$?
+ov=$(awk '$1=="in"{d++; if(d>m)m=d} $1=="out"{d--} END{print m+0}' "$TR")
+[ "$c1$c2" = 00 ] && [ "$(sort "$L8" | tr '\n' ' ')" = "rec-a rec-b " ] && [ "$ov" = 1 ] && [ "$(grep -c '^in' "$TR")" = 2 ] \
+  && ok inbox-lock-two-recoverers "복구자 2개 동시 → 둘 다 기록·깨진 줄 0·임계구역 겹침 0" || bad inbox-lock-two-recoverers "rc 00·rec-a rec-b·최대 동시 1" "rc $c1$c2 $(tr '\n' ' ' < "$L8") 동시 $ov $(cat "$IB/ra.out" "$IB/rb.out")"
 
 TOTAL=$((PASS + FAIL))
 echo "== 집계: PASS $PASS / FAIL $FAIL / 총 $TOTAL (기대 $EXPECT)"
