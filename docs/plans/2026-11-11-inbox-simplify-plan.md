@@ -240,3 +240,10 @@ SessionStart 동기 출력은 뺀다. 6번의 "SessionStart면 cursor 기준"이
 | `test/run-tests.sh` 받은편지함 절 | 약 610 추가분 | 약 300 (51 + 유지 15 + 새 10, 70건 안팎) |
 
 합계: core 받은편지함 코드 1233줄 → 470줄 이하. S1 보고서에 `wc -l` 출력을 붙인다.
+
+## 10. 리뷰 반영 (codex Sol high 1회, BLOCK high 4 — 모두 반영, 이 절이 §3·§4·§8보다 우선)
+
+1. **깨움 중 TERM**(§3 9·11번): 깨움 출력 시작부터 exit 2까지 TERM을 무시한다(`trap '' TERM`). A가 `notified`를 쓰고 TERM으로 0이 되어 그 줄을 영영 놓치는 경우를 막는다. 시험 `inbox-wait-term-notify` 1건(정지 지점 1개만 남긴다: `notify-mid`).
+2. **`.pid`를 지우지 않는다**(§3 9·10·11번): 종료할 때 `wait/<키>.pid`를 지우지 않는다. 살아 있는지는 pid·lstart로 판정하므로 죽은 표식은 무시된다. 확인→삭제 사이에 후임 표식을 지우는 경합이 사라진다. 시험 `inbox-wait-stale-pid`를 이 뜻으로 바꾼다.
+3. **7000초 만료**(§3 10번): 구독 대상이 있으면 만료 때 exit 2로 깨운다. stderr는 한 줄 `[inbox] 대기 만료(재등록) — 새 메시지 없음. 할 일 없으면 아무 말 없이 쉬어라`. 다음 Stop에서 대기자가 다시 뜬다. 기존 판도 만료 뒤 대기자가 없던 빈틈이다. 시험 `inbox-wait-expire-rewake`(짧은 MAX → exit 2 → 새 대기자 → 새 줄 깨움).
+4. **배포 호환**(§4 마지막 행·§8): core `--status`를 **`inbox-wait 2` 그대로 둔다**(판 3 도입 안 함). 옛 0.1.0 래퍼가 새 core를 계속 부르고, 새 core는 같은 stdin·종료 코드 계약(0/2/4)을 지킨다. 옛 래퍼의 `--session-start`는 무동작 0. 그래서 열린 2.8.1 세션도 끊기지 않고, Monitor 안내 단계가 필요 없다. 래퍼·스킬·`spawn-pane-worker.sh`의 판정 문구도 바꾸지 않는다.
