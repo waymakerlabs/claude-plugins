@@ -38,6 +38,9 @@
 #   (jsonl = 정지 감시 입력. agent-transcript가 10이면 unsupported, 그 밖 실패면 unverified.
 #    effort는 요청값 그대로 — 실제 적용은 조정자가 화면 표시로 1회 확인한다.
 #    status=done|idle이면 빠른 완료 — 보고서를 바로 회수한다)
+#   (2.8.0) 끝에 ` parent_watch=none`이 붙으면 부모 pane의 받은편지함 감시(Monitor·훅 대기자)가 없다는 뜻이다.
+#    기동 전 `inbox-wait --status`가 `inbox-wait 2`일 때만 판정하며 stderr에 경고 한 줄을 낸다(기동은 계속).
+#    monitor|waiter이거나 판정 불가(옛 판)이면 칸이 없다. 부모는 none이면 Monitor inbox-watch를 켠다)
 # 실패: 비0 종료, stderr에 사유.
 #   2=인자·전제 3=이름 중복 4=배치(pane-open) 5=agent-start 6=첫 지시 실패·첫 지시 뒤 blocked/unknown·이중 기동
 #   10·11·12 = agent-orchestrator의 unsupported·no backend·adapter error를 **같은 코드 그대로** 전달
@@ -145,6 +148,21 @@ PY
   esac
 fi
 
+# 1-1. 부모 pane 받은편지함 감시 판정 (2.8.0) — pane-open 전. 경고만 내고 기동은 계속한다.
+# inbox-wait --status가 `inbox-wait 2`(훅 판)가 아니면 판정 불가이므로 칸도 경고도 없다(옛 판은 Monitor 경로).
+PARENT_WATCH=""
+ao_run inbox-wait --status; c=$?
+if [ "$c" = 0 ] && [ "$AO_OUT" = "inbox-wait 2" ]; then
+  ao_run inbox-watch --state "$MAIN"; c=$?
+  pw=$AO_OUT
+  [ "$c" = 0 ] || pw=none
+  case "$pw" in monitor|waiter) ;; *) pw=none ;; esac
+  if [ "$pw" = none ]; then
+    PARENT_WATCH=" parent_watch=none"
+    echo "spawn-pane-worker: 경고: 부모 pane $MAIN 받은편지함 감시 없음(parent_watch=none) — 부모는 Monitor inbox-watch를 켤 것" >&2
+  fi
+fi
+
 # 2. 배치 — pane-open (오른쪽 열·넘침 탭·이름 붙이기는 어댑터 내부)
 ao_run pane-open "$PANE_LABEL" --parent "$MAIN" --cwd "$PWD"; c=$?
 [ "$c" = 0 ] || fail 4 "$c" "pane-open 실패(기준 pane $MAIN)"
@@ -201,4 +219,4 @@ case "$c" in
 esac
 [ -n "$J" ] || J=unverified
 
-echo "OK name=$NAME pane=$P model=$MODEL effort=$EFFORT status=$st jsonl=$J"
+echo "OK name=$NAME pane=$P model=$MODEL effort=$EFFORT status=$st jsonl=$J$PARENT_WATCH"

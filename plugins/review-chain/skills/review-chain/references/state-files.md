@@ -33,7 +33,8 @@ w2:p4
 
 ## 받은편지함 · claims.tsv · shared-files
 
-- `inbox.log`(worker→OC), `workers/<name>/inbox.log`(OC→worker): 한 줄 = 메시지 하나(`<HH:MM:SS> [rc <chain-id>] …`, 형식은 `messages.md`). 줄은 덧붙이기만 하고 지우지 않는다. `<inbox>.cursor`는 처리한 마지막 줄 번호 한 줄이며 `rc-watch.sh --ack`만 올린다(되감지 않음). 처리 안 한 줄 = cursor 뒤 줄(`rc-watch.sh --pending <inbox>`).
+- `inbox.log`(worker→OC), `workers/<name>/inbox.log`(OC→worker): 한 줄 = 메시지 하나(`<HH:MM:SS> [rc <chain-id>] …`, 형식은 `messages.md`). 줄은 덧붙이기만 하고 지우지 않는다. `<inbox>.cursor`는 처리한 마지막 줄 번호 한 줄이며 `rc-watch.sh --ack`만 올린다(되감지 않음). 처리 안 한 줄 = cursor 뒤 줄(`rc-watch.sh --pending <inbox>`). 받는 쪽은 `rc-watch.sh --subscribe <inbox>`로 구독한다(0.2.0, 훅이 없는 도구는 `messages.md` §1 대체 문단).
+- **미감시 전송 기록(0.2.0)**: `rc-send.sh`·`rc-claim.sh`가 `inbox-send` stdout `unwatched`일 때 직접 남긴다. 형식은 `- 미감시 전송 <받은편지함 절대경로> <HH:MM>` 한 줄. worker→OC는 `workers/<name>/report.md`의 `- 진행:` 줄 아래(없으면 파일 끝), OC→worker는 `state.md`의 `## 미감시 전송` 절 끝(절이 없으면 파일 끝에 만든다). 재시도·알림은 없다.
 - `claims.tsv`: `이름<TAB>패턴<TAB>active|released<TAB>시각` 한 줄씩. **파일 범위의 진본**이다. state.md worker 표 `파일 범위` 칸은 `[범위]`·`[범위변경]` 기록을 보고 OC가 옮겨 적는 거울이라, 어긋나면 `rc-claim.sh --list <$RC>`가 맞다. 해제(`--release`)는 줄을 지우지 않고 `released`로 바꾼다.
 - `claims.lock/`: 선점 중 잠깐 있는 폴더. 오래 남아 있으면(스크립트 종료 6의 원인) OC가 선점 중인 프로세스가 없음을 확인한 뒤 지운다.
 - `shared-files`: 설정 `shared-files`를 한 줄 한 패턴으로 옮긴 파일. 선점 패턴이 걸리면 `rc-claim.sh`가 종료 5로 거부한다. 없으면 공용 파일 검사를 하지 않는다.
@@ -112,4 +113,4 @@ external-done: GIRA-12 댓글   # | skip
 
 ## report.md (worker가 쓴다)
 
-틀은 `worker-brief.md` §5. 절: `- 진행:` 한 줄 / `## 범위` / `## 완료` / `## 노트 초안` / `## 인계`(교체 때만).
+틀은 `worker-brief.md` §5. 절: `- 진행:` 한 줄(그 아래에 `- 미감시 전송 <받은편지함> <HH:MM>` 줄이 붙을 수 있다, 0.2.0) / `## 범위` / `## 완료` / `## 노트 초안` / `## 인계`(교체 때만).

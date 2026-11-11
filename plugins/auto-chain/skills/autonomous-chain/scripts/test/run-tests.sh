@@ -413,9 +413,9 @@ out=$(spawn sp-d high blocked); rc=$?
 out=$(spawn sp-e max working); rc=$?
 [ $rc = 2 ] && ok "${px}sp-badeffort" "effort max 거부 rc=2" || bad "${px}sp-badeffort" 2 "rc=$rc"
 # jsonl: transcript 파일이 있으면 그 경로, codex kind면 unsupported
-out=$(spawn sp-j high working)
+out=$(spawn sp-j high working); out=${out% parent_watch=none}   # 2.8.0: 실제 AO는 부모 대기자가 없으면 끝에 칸을 붙인다
 case "$out" in *" jsonl=$HOME/.claude/projects/-tmp-x/uuid-1.jsonl") ok "${px}sp-jsonl" "jsonl=agent-transcript 경로" ;; *) bad "${px}sp-jsonl" "jsonl=…/uuid-1.jsonl" "$out" ;; esac
-out=$(FAKE_KIND=codex spawn sp-k high working)
+out=$(FAKE_KIND=codex spawn sp-k high working); out=${out% parent_watch=none}
 case "$out" in *" jsonl=unsupported") ok "${px}sp-jsonl-unsupported" "transcript 10 → jsonl=unsupported" ;; *) bad "${px}sp-jsonl-unsupported" "jsonl=unsupported" "$out" ;; esac
 
 # F10 음성 대조(2.3.0 이전): 변형 대상은 실제 구현 위치인 어댑터 사본이다.
@@ -459,6 +459,38 @@ AGENT_ORCHESTRATOR="$FAKE/fake-ao" FAKE_AO_WHOAMI=w1:p7 FAKE_AO_RC=10 PERM_FLAGS
 grep -q -- '--parent w1:p7' "$FAKE_DIR/ao.log" && ok spc-whoami "5번째 인자 없으면 whoami가 기준" || bad spc-whoami "--parent w1:p7" "$(cat "$FAKE_DIR/ao.log")"
 AGENT_ORCHESTRATOR="$FAKE/fake-ao" PERM_FLAGS=x ROLE=none "$SP" sp-x sonnet high "$BR" > /dev/null 2>&1; rc=$?
 [ $rc = 2 ] && ok spc-noparent "기준 pane 없음 rc=2" || bad spc-noparent 2 "rc=$rc"
+
+# 2.8.0 부모 pane 받은편지함 감시 판정: 가짜 AO가 inbox-wait --status·inbox-watch --state에 답한다
+cat > "$FAKE/fake-ao2" <<'AO'
+#!/usr/bin/env bash
+echo "ao $*" >> "$FAKE_DIR/ao2.log"
+case "$1" in
+  inbox-wait) [ "${FAKE_AO_STATUS:-inbox-wait 2}" = fail ] && exit 4; echo "${FAKE_AO_STATUS:-inbox-wait 2}"; exit 0 ;;
+  inbox-watch) echo "${FAKE_AO_STATE:-none}"; exit 0 ;;
+  list) [ -f "$FAKE_DIR/ao2-started" ] && printf 'w1:p9\t%s\n' "$(cat "$FAKE_DIR/ao2-started")"; exit 0 ;;
+  pane-open) echo w1:p9; exit 0 ;;
+  agent-start) echo "$2" > "$FAKE_DIR/ao2-started"; exit 0 ;;
+  agent-send) exit 0 ;;
+  agent-status) echo working; exit 0 ;;
+  agent-transcript) echo /tmp/x.jsonl; exit 0 ;;
+esac
+exit 4
+AO
+chmod +x "$FAKE/fake-ao2"
+spawn2() {  # 환경 FAKE_AO_STATUS·FAKE_AO_STATE로 판정을 고른다
+  rm -f "$FAKE_DIR/ao2-started"; : > "$FAKE_DIR/ao2.log"
+  AGENT_ORCHESTRATOR="$FAKE/fake-ao2" PERM_FLAGS=x ROLE=none "$SP" sp-pw sonnet high "$BR" w1:p1 2> "$T/spawn.err"
+}
+out=$(FAKE_AO_STATUS="inbox-wait 2" FAKE_AO_STATE=none spawn2); rc=$?
+case "$out" in "OK name=sp-pw "*" parent_watch=none") w=1 ;; *) w=0 ;; esac
+[ $rc = 0 ] && [ $w = 1 ] && grep -q 'parent_watch=none' "$T/spawn.err" && grep -q 'inbox-watch --state w1:p1' "$FAKE_DIR/ao2.log" && grep -q '^ao agent-send ' "$FAKE_DIR/ao2.log" \
+  && ok spawn-parent-unhooked-warn "경고 + parent_watch=none + rc 0 + 기동 계속" || bad spawn-parent-unhooked-warn "경고·칸·rc0·기동" "rc=$rc out=$out err=$(cat "$T/spawn.err")"
+out=$(FAKE_AO_STATUS="inbox-wait 2" FAKE_AO_STATE=waiter spawn2); rc=$?
+case "$out" in "OK name=sp-pw "*"jsonl=/tmp/x.jsonl") w=1 ;; *) w=0 ;; esac
+[ $rc = 0 ] && [ $w = 1 ] && ! grep -q 'parent_watch' "$T/spawn.err" && ok spawn-parent-waiter-ok "waiter → 경고·칸 없음" || bad spawn-parent-waiter-ok "경고·칸 없음" "rc=$rc out=$out err=$(cat "$T/spawn.err")"
+out=$(FAKE_AO_STATUS=fail FAKE_AO_STATE=none spawn2); rc=$?
+case "$out" in *parent_watch*) w=1 ;; *) w=0 ;; esac
+[ $rc = 0 ] && [ $w = 0 ] && ! grep -q 'parent_watch' "$T/spawn.err" && ! grep -q 'inbox-watch' "$FAKE_DIR/ao2.log" && ok spawn-parent-oldao-silent "옛 판(status 실패) → 판정 안 함, 칸·경고 없음" || bad spawn-parent-oldao-silent "판정 불가 무음" "rc=$rc out=$out err=$(cat "$T/spawn.err")"
 
 echo "== 집계: PASS $PASS / FAIL $FAIL"
 [ "$FAIL" = 0 ]

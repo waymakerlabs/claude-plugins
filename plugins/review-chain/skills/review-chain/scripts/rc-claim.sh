@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# rc-claim.sh — worker 파일 범위 선점·충돌 판정 (0.1.2)
+# rc-claim.sh — worker 파일 범위 선점·충돌 판정 (0.1.2, 0.2.0 미감시 기록)
 #
 # 사용:
 #   rc-claim.sh <chain 폴더> <이름> <경로|glob> [...]   범위 선점(처음·확대 모두). 리포 루트 기준 경로
@@ -15,6 +15,8 @@
 # 동작: 잠금(claims.lock 폴더) → 판정 → 겹침 없음이면 기록하고 0. 겹치면 기록하지 않고
 #   OC 받은편지함(inbox.log)에 [충돌] 한 줄을 남기고 4. 공용 파일이면 5.
 #   [충돌] 줄은 `agent-orchestrator inbox-send --raw`로 덧붙인다(rc-send.sh 와 같은 잠금).
+#   (0.2.0) inbox-send stdout 이 unwatched(빈 값·이상값 포함)면 $RC/workers/<이름>/report.md 에
+#   `- 미감시 전송 <받은편지함> <HH:MM>` 한 줄을 덧붙인다(report.md 가 없으면 조용히 생략, 쓰기 실패는 경고만).
 #   환경: AGENT_ORCHESTRATOR=<실행 파일> (기본 ~/.local/bin/agent-orchestrator)
 #   이미 같은 worker가 같은 패턴을 쥐고 있으면 다시 쓰지 않는다(재실행 무해).
 # 종료 코드: 0 선점 / 2 인자 / 4 충돌(대기 — OC 답을 기다린다) / 5 공용 파일 / 6 잠금 실패
@@ -99,8 +101,27 @@ if [ -n "$HITS" ]; then
   AO=${AGENT_ORCHESTRATOR:-$HOME/.local/bin/agent-orchestrator}
   LINE=$(printf '%s [rc %s] [WO %s] [충돌] %s/workers/%s/report.md 선점 거부:%s' \
     "$(date +%H:%M:%S)" "$(basename "$RC")" "$NAME" "$RC" "$NAME" "$HITS")
-  "$AO" inbox-send --raw "$RC/inbox.log" "$LINE" >/dev/null \
-    || echo "rc-claim: 경고: 충돌 알림 기록 실패 ($RC/inbox.log) — OC에 직접 알릴 것" >&2
+  if W=$("$AO" inbox-send --raw "$RC/inbox.log" "$LINE"); then
+    W=$(printf '%s' "$W" | tr -d '[:space:]')
+    if [ "$W" != watched ]; then
+      # 미감시 전송 기록(0.2.0): 보고서 `- 진행:` 줄 아래(없으면 끝). 실패해도 경고만
+      F="$RC/workers/$NAME/report.md"
+      if [ -f "$F" ]; then
+        RC_REC="- 미감시 전송 $RC/inbox.log $(date +%H:%M)" awk 'BEGIN { rec = ENVIRON["RC_REC"] }
+          { L[NR] = $0 }
+          END {
+            at = 0
+            for (i = 1; i <= NR; i++) if (L[i] ~ /^- 진행:/) { at = i; break }
+            if (at) while (at < NR && L[at + 1] ~ /^- 미감시 전송 /) at++
+            for (i = 1; i <= NR; i++) { print L[i]; if (at && i == at) print rec }
+            if (!at) print rec
+          }' "$F" > "$F.tmp.$$" && mv "$F.tmp.$$" "$F" \
+          || { rm -f "$F.tmp.$$"; echo "rc-claim: 경고: 미감시 전송 기록 실패 ($F)" >&2; }
+      fi   # report.md 없으면 조용히 생략(stderr 를 이전과 똑같이 유지)
+    fi
+  else
+    echo "rc-claim: 경고: 충돌 알림 기록 실패 ($RC/inbox.log) — OC에 직접 알릴 것" >&2
+  fi
   echo "CONFLICT$HITS" >&2
   exit 4
 fi

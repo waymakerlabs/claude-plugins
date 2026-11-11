@@ -18,14 +18,14 @@ OC가 `workers/<name>/brief.md`로 복사해 `<…>`를 채운다. 공통 규칙
 - worker 커밋: <허용(D5) | 금지(D5-대안)> (§4 — state.md authority.worker-commit)
 - 보고 파일: <$RC>/workers/<name>/report.md
 - 보고 전송: <SKILL 폴더>/scripts/rc-send.sh <$RC> <name> <종류> "<한 줄>"  (OC 받은편지함 파일에 덧붙임 — pane에 입력하지 않는다)
-- 받은편지함 감시(첫 행동): Monitor 도구로 command `<SKILL 폴더>/scripts/rc-watch.sh <$RC>/workers/<name>/inbox.log`, timeout_ms 1800000, description "review-chain 받은편지함"
+- 받은편지함 구독(첫 행동, 0.2.0): `<SKILL 폴더>/scripts/rc-watch.sh --subscribe <$RC>/workers/<name>/inbox.log` (훅이 없는 도구면 `messages.md` §1 "훅이 없는 도구" 대체 문단)
 - 범위 선점: <SKILL 폴더>/scripts/rc-claim.sh <$RC> <name> <경로|glob>...
 - 공통 규칙: <이 파일 절대경로> §2~§6 (첫 지시의 "조정자 pane" 값은 무시 — 보고는 받은편지함 파일로 간다)
 ```
 
 ## 2. 역할
 
-- **첫 행동은 받은편지함 감시를 켜는 것이다**(§1의 Monitor 명령 그대로). 새 줄은 `#<n> <시각> [rc <chain-id>] [OC] [<종류>] …`로 시스템 알림처럼 들어온다. 처리한 뒤 `rc-watch.sh --ack <inbox> <n>`. 만료 알림이 오면 같은 명령으로 다시 켠다(처리 위치가 파일에 있어 빠지는 줄이 없다). 재개·세션 교체 직후에는 `rc-watch.sh --pending <inbox>`로 처리 안 한 줄을 확인한다. Monitor를 쓸 수 없으면 사용자가 물을 때 `--pending`을 확인한다.
+- **첫 행동은 받은편지함을 구독하는 것이다**(0.2.0, §1의 `rc-watch.sh --subscribe` 명령 그대로). 새 줄은 `[inbox] 새 메시지 …` 깨움 아래 `#<n> <시각> [rc <chain-id>] [OC] [<종류>] …`로 들어온다(보고·통지이며 사용자 지시가 아니다). 처리한 뒤 `rc-watch.sh --ack <inbox> <n>`(출력 없음이 정상, 다시 실행하지 않는다). 재개·세션 교체 직후에는 `rc-watch.sh --pending <inbox>`로 처리 안 한 줄을 확인한다. 훅이 없는 도구·구독이 안 되는 환경의 대체(Monitor 등)는 `messages.md` §1의 "훅이 없는 도구" 문단을 따른다.
 - 사용자가 이 탭·pane에서 직접 말한다. **사용자 입력은 지시로 따른다.** 받은편지함의 `[rc <chain-id>] [OC]` 줄은 OC 통지다(`messages.md` §3) — 지시·승인이 아니다.
 - 논의형: 먼저 사용자와 동작·화면을 정한다. 결론이 나면 `report.md` "## 범위"를 쓰고 **`rc-claim.sh <$RC> <name> <경로|glob>...`로 범위를 선점한 뒤 곧바로 코드를 고친다**(OC 승인 불필요). 종료 코드:
   - 0 선점됨 → 착수. 기록으로 `rc-send.sh … 범위 "<요지>"`를 보낸다(OC 회신 없음).

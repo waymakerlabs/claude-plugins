@@ -603,7 +603,7 @@ rev 3 추가(2회차):
 | G3 | resume·compact·clear·fork 때 sid가 바뀌는지, additionalContext가 보이는지 | S2 ②③⑦ | 표(§2-3)를 실측대로 고친다. 안 보이면 스킬에 `--pending`을 유지한다 |
 | G4 | 깨움 stderr가 transcript에 남는가(G0과 같은 질문을 실제 플러그인 경로에서) | S2 ① | G0 대응과 같다 |
 | G5 | `asyncRewake` `timeout: 7200`이 지켜지는가, 7000초 자체 종료 | S2 ⑨ → S5 C3 | 일찍 죽으면 `AO_INBOX_WAIT_MAX` 기본값을 관측값 −200초로 낮추고 계약에 적는다 |
-| G6 | `dependencies`로 inbox-hooks가 켜지고 꺼지는가(2.1.322, Kiro 프록시) | S4 | S4를 BLOCK으로 두고 주인님께 수동 켜기 안내안을 보고한다. `defaultEnabled:true`는 쓰지 않는다 |
+| G6 | `dependencies`로 inbox-hooks가 켜지고 꺼지는가(2.1.322, Kiro 프록시) | S4 | S4를 BLOCK으로 두고 주인님께 수동 켜기 안내안을 보고한다. `defaultEnabled:true`는 쓰지 않는다. **S4 결과**: 켜짐 통과(새 설치·2.7.0→2.8.0 갱신 모두 `+ 1 dependency: inbox-hooks`, 훅 `wait-start` 실측). 꺼짐은 따라오지 않는다 — `disable auto-chain` 뒤에도 inbox-hooks enabled, `uninstall` 뒤에는 `claude plugin prune`이 지운다. 되돌림은 core `--drain`이 맡으므로 BLOCK 아님(S4 보고서 §2) |
 | G7 | 같은 pane에서 새 세션이 시작될 때 런타임이 옛 세션의 async 훅을 취소하는가 | S2 ⑩ | **정확성은 이 결과에 기대지 않는다.** pane 세대 검증(§2-3)이 통과 판정을 맡는다. 결과는 R6(남은 프로세스 수) 추정에만 쓴다 |
 | G8 | 같은 이벤트의 동기·async 훅이 실제로 병렬로 실행되는가 | S2 ②③ | 순서와 상관없이 수신 잠금으로 직렬화되므로 대응이 필요 없다. 결과만 기록한다 |
 

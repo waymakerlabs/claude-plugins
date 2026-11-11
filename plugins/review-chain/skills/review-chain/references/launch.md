@@ -55,7 +55,7 @@ launcher는 체인 폴더·worktree·worker를 만들지 않는다. 대기열 �
 
 ## 4. 새 OC의 첫 행동
 
-1. SKILL §1-1~§1-6을 진행한다(§1-4 새 체인, 메모의 사실로 `state.md` frontmatter·`queue.md` 초기 항목을 채운다). §1-4의 `inbox.log`·`shared-files` 생성과 받은편지함 Monitor 시작도 여기서 한다(첫 worker 기동 전).
+1. SKILL §1-1~§1-6을 진행한다(§1-4 새 체인, 메모의 사실로 `state.md` frontmatter·`queue.md` 초기 항목을 채운다). §1-4의 `inbox.log`·`shared-files` 생성과 받은편지함 구독(`rc-watch.sh --subscribe $RC/inbox.log`, 0.2.0) 시작도 여기서 한다(첫 worker 기동 전).
 2. 메모의 "부모 닫기"가 허용이면 첫 착수 전에 `"$AO" close <부모 pane>`(실패는 무시). 금지면 닫지 않는다. launcher 탭에 다른 pane이 남아 있으면 탭은 닫히지 않는다.
 3. launcher는 부모 닫기를 이렇게 정한다: 같은 머신이고, launcher 탭에 살아 있는 worker pane·백그라운드 작업이 없고, 사용자가 남기라고 하지 않았으면 허용.
 4. 메모는 지우지 않는다(체인 폴더 `state.md` "## 결정"에 메모 경로 한 줄).

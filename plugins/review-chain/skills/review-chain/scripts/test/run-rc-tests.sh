@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run-rc-tests.sh — review-chain 스크립트(rc-send/rc-watch/rc-claim) 호환 시험 (0.1.4)
+# run-rc-tests.sh — review-chain 스크립트(rc-send/rc-watch/rc-claim) 호환 시험 (0.1.4, 0.2.0 감시 시험 추가)
 #
 # 사용:
 #   run-rc-tests.sh                      골든 대조 + 동시 기록 + 래퍼 시험
@@ -21,13 +21,20 @@ for l in en_US.UTF-8 ko_KR.UTF-8 C.UTF-8; do
 done
 TMP=$(mktemp -d "$(printf %s "${TMPDIR:-/tmp}" | sed 's#/*$##')/rc-tests.XXXXXX")   # inbox-send 는 경로의 // 를 거부한다
 trap 'rm -rf "$TMP"' EXIT
+# 실제 상태 폴더(~/.local/state/agent-orchestrator)를 건드리지 않는다 — 구독·known·이벤트 모두 임시 폴더로
+export AO_STATE_ROOT="$TMP/ao-state"; mkdir -p "$AO_STATE_ROOT"
+unset HERDR_PANE_ID CLAUDE_CODE_SESSION_ID
 PASS=0; FAIL=0
 ok()  { PASS=$((PASS + 1)); echo "ok   $1"; }
 bad() { FAIL=$((FAIL + 1)); echo "FAIL $1"; [ -n "${2:-}" ] && echo "$2" | sed 's/^/     /'; }
 
 # 시각·임시 경로를 고정 문자열로 바꾼다.
+# 0.2.0: 옛 골든(0.1.4)과 대조하려고 새로 생긴 두 가지만 지운다 — OK 줄 끝의 ` watch=…` 와
+#   "report.md/state.md 없음 — 미감시 전송 기록 생략" 경고 줄. 나머지는 옛 골든과 그대로 같아야 한다.
+#   새 동작 자체는 아래 신규 시험이 직접 확인한다.
 CUR_S=/nonexistent
-norm() { sed -e "s#$TMP#<TMP>#g" -e "s#$CUR_S#<SCRIPTS>#g" -e 's/[0-2][0-9]:[0-5][0-9]:[0-5][0-9]/HH:MM:SS/g'; }
+norm() { sed -E -e "s#$TMP#<TMP>#g" -e "s#$CUR_S#<SCRIPTS>#g" -e 's/[0-2][0-9]:[0-5][0-9]:[0-5][0-9]/HH:MM:SS/g' \
+  -e 's/^(OK box=.* kind=[^ ]*) watch=[a-z]*$/\1/' -e '/^rc-send: 경고: (report\.md|state\.md) 없음 — 미감시 전송 기록 생략/d'; }
 
 # run_case <출력 폴더> <이름> <스크립트 폴더> -- 명령... : stdout/stderr/종료코드/inbox 를 파일로
 cap() { # cap <out> <name> <inbox 파일들...> -- cmd...
@@ -108,7 +115,7 @@ CRC=$(mkchain "$TMP" rc-20260101-conc)
 "$SCRIPTS_DEFAULT/rc-claim.sh" "$CRC" alice src/ >/dev/null
 i=0
 while [ $i -lt 20 ]; do
-  "$SCRIPTS_DEFAULT/rc-send.sh" "$CRC" bob 질문 "동시 보내기 $i 끝" >/dev/null &
+  "$SCRIPTS_DEFAULT/rc-send.sh" "$CRC" bob 질문 "동시 보내기 $i 끝" >/dev/null 2>&1 &
   "$SCRIPTS_DEFAULT/rc-claim.sh" "$CRC" w$i src/x$i >/dev/null 2>&1 &
   i=$((i + 1))
 done
@@ -143,7 +150,7 @@ W="$SCRIPTS_DEFAULT/rc-watch.sh"
 "$W" --pending >/dev/null 2>&1; [ $? = 2 ] && ok "rc-watch --pending 인자 부족 → 2" || bad "rc-watch --pending 인자 부족"
 
 WRC=$(mkchain "$TMP" rc-20260101-watch); WB="$WRC/inbox.log"
-for n in 1 2 3; do "$SCRIPTS_DEFAULT/rc-send.sh" "$WRC" alice 질문 "줄 $n" >/dev/null; done
+for n in 1 2 3; do "$SCRIPTS_DEFAULT/rc-send.sh" "$WRC" alice 질문 "줄 $n" >/dev/null 2>&1; done
 P=$("$W" --pending "$WB")
 case "$P" in "#1 "*"줄 1"$'\n'"#2 "*"줄 2"$'\n'"#3 "*"줄 3") ok "rc-watch --pending 은 #n 접두로 전부 출력" ;; *) bad "rc-watch --pending" "$P" ;; esac
 "$W" --ack "$WB" 2; rc=$?
@@ -159,7 +166,7 @@ case "$P" in "#3 "*"줄 3") ok "rc-watch --pending 은 cursor 뒤만" ;; *) bad 
 # watch: cursor 뒤 줄부터 나오고, 켠 뒤 도착한 줄도 나온다
 "$W" "$WB" > "$TMP/watch.out" 2>"$TMP/watch.err" & WPID=$!; disown "$WPID" 2>/dev/null
 sleep 1.5
-"$SCRIPTS_DEFAULT/rc-send.sh" "$WRC" bob 완료 "줄 4" >/dev/null
+"$SCRIPTS_DEFAULT/rc-send.sh" "$WRC" bob 완료 "줄 4" >/dev/null 2>&1
 sleep 2.5
 kill "$WPID" 2>/dev/null; pkill -P "$WPID" 2>/dev/null; pkill -f "tail -n .* -F $WB" 2>/dev/null; sleep 0.2
 if grep -q "^#3 .*줄 3" "$TMP/watch.out" && grep -q "^#4 .*줄 4" "$TMP/watch.out" && ! grep -q "^#[12] " "$TMP/watch.out"; then
@@ -167,6 +174,106 @@ if grep -q "^#3 .*줄 3" "$TMP/watch.out" && grep -q "^#4 .*줄 4" "$TMP/watch.o
 else
   bad "rc-watch 감시" "out=$(cat "$TMP/watch.out") err=$(head -3 "$TMP/watch.err")"
 fi
+
+# ── 4b. 0.2.0 watch 필드·미감시 전송 기록·구독 (AO_STATE_ROOT 는 위에서 임시 폴더로 고정) ───
+# 가짜 AO: FAKE_W 를 stdout 으로, FAKE_ERR 를 stderr 로 내고 FAKE_RC 로 끝낸다.
+FAKE2="$TMP/fake-ao2"
+cat > "$FAKE2" <<'FAKEEND'
+#!/bin/sh
+[ -n "${FAKE_ERR:-}" ] && echo "$FAKE_ERR" >&2
+printf '%s' "${FAKE_W-}"
+[ -n "${FAKE_W-}" ] && echo
+exit "${FAKE_RC:-0}"
+FAKEEND
+chmod +x "$FAKE2"
+mkreport() { printf '# report\n- 상태: 진행\n- 진행: 2/5\n- 다음: 시험\n' > "$1/workers/$2/report.md"; }
+S="$SCRIPTS_DEFAULT"
+
+# rc-send-watch-field: 출력 끝이 watch=<watched|unwatched>, 빈 값·이상값은 unwatched
+WC=$(mkchain "$TMP" rc-20260101-wf); mkreport "$WC" alice
+O=$("$S/rc-send.sh" "$WC" alice 질문 "실제 AO" 2>/dev/null)
+case "$O" in "OK box=$WC/inbox.log kind=질문 watch=unwatched") ok "rc-send-watch-field 실제 AO(대기자 없음) → watch=unwatched" ;; *) bad "rc-send-watch-field 실제 AO" "$O" ;; esac
+O=$(AGENT_ORCHESTRATOR=$FAKE2 FAKE_W=watched "$S/rc-send.sh" "$WC" alice 질문 "가짜 watched" 2>/dev/null)
+case "$O" in "OK box=$WC/inbox.log kind=질문 watch=watched") ok "rc-send-watch-field 가짜 AO watched → watch=watched" ;; *) bad "rc-send-watch-field watched" "$O" ;; esac
+O=$(AGENT_ORCHESTRATOR=$FAKE2 FAKE_W= "$S/rc-send.sh" "$WC" alice 질문 "빈 값" 2>/dev/null)
+case "$O" in *" watch=unwatched") ok "rc-send-watch-field 빈 값 → unwatched" ;; *) bad "rc-send-watch-field 빈 값" "$O" ;; esac
+O=$(AGENT_ORCHESTRATOR=$FAKE2 FAKE_W=maybe "$S/rc-send.sh" "$WC" alice 질문 "이상값" 2>/dev/null)
+case "$O" in *" watch=unwatched") ok "rc-send-watch-field 이상값 → unwatched" ;; *) bad "rc-send-watch-field 이상값" "$O" ;; esac
+
+# rc-send-unwatched-record: worker→OC 는 report.md 의 '- 진행:' 아래, OC→worker 는 state.md '## 미감시 전송' 절 끝
+UC=$(mkchain "$TMP" rc-20260101-uw); mkreport "$UC" alice
+"$S/rc-send.sh" "$UC" alice 완료 "끝" >/dev/null 2>&1; rc=$?
+L=$(sed -n '4p' "$UC/workers/alice/report.md")
+case "$L" in "- 미감시 전송 $UC/inbox.log "[0-2][0-9]:[0-5][0-9]) [ "$rc" = 0 ] && ok "rc-send-unwatched-record worker→OC: '- 진행:' 바로 아래 기록" || bad "rc-send-unwatched-record rc" "rc=$rc" ;; *) bad "rc-send-unwatched-record worker→OC" "$(cat "$UC/workers/alice/report.md")" ;; esac
+[ "$(sed -n '3p' "$UC/workers/alice/report.md")" = "- 진행: 2/5" ] && [ "$(sed -n '5p' "$UC/workers/alice/report.md")" = "- 다음: 시험" ] \
+  && ok "rc-send-unwatched-record 기존 줄 보존" || bad "rc-send-unwatched-record 기존 줄" "$(cat "$UC/workers/alice/report.md")"
+"$S/rc-send.sh" "$UC" alice 질문 "둘째" >/dev/null 2>&1
+[ "$(grep -c '^- 미감시 전송 ' "$UC/workers/alice/report.md")" = 2 ] && [ "$(sed -n '5p' "$UC/workers/alice/report.md" | cut -c1-8)" = "- 미감시 전송" ] \
+  && ok "rc-send-unwatched-record 두 번째 기록은 첫 기록 아래" || bad "rc-send-unwatched-record 연속 기록" "$(cat "$UC/workers/alice/report.md")"
+printf '# report\n- 상태: 진행\n' > "$UC/workers/bob/report.md"
+"$S/rc-send.sh" "$UC" bob 완료 "끝" >/dev/null 2>&1
+[ "$(tail -n 1 "$UC/workers/bob/report.md" | cut -c1-8)" = "- 미감시 전송" ] && ok "rc-send-unwatched-record '- 진행:' 없으면 파일 끝" || bad "rc-send-unwatched-record 파일 끝" "$(cat "$UC/workers/bob/report.md")"
+rm -f "$UC/workers/alice/report.md"
+"$S/rc-send.sh" "$UC" alice 막힘 "report 없음" >/dev/null 2>"$TMP/se"; rc=$?
+[ "$rc" = 0 ] && [ ! -e "$UC/workers/alice/report.md" ] && grep -q "report.md 없음" "$TMP/se" && ok "rc-send-unwatched-record report.md 없으면 생략+경고(종료 0)" || bad "rc-send-unwatched-record report 없음" "rc=$rc $(cat "$TMP/se")"
+printf '# state\n## 큐\n- a\n## 미감시 전송\n- 미감시 전송 /x/y.log 09:00\n\n## 뒤 절\n- z\n' > "$UC/state.md"
+"$S/rc-send.sh" --to alice "$UC" 답 "o2w" >/dev/null 2>&1
+if [ "$(sed -n '6p' "$UC/state.md" | cut -c1-8)" = "- 미감시 전송" ] && [ "$(sed -n '5p' "$UC/state.md")" = "- 미감시 전송 /x/y.log 09:00" ] && [ "$(sed -n '9p' "$UC/state.md")" = "- z" ]; then
+  ok "rc-send-unwatched-record OC→worker: state.md 절 끝에 기록(뒤 절 보존)"
+else bad "rc-send-unwatched-record state.md" "$(cat "$UC/state.md")"; fi
+printf '# state\n- a\n' > "$UC/state.md"
+"$S/rc-send.sh" --to bob "$UC" 확인 "o2w2" >/dev/null 2>&1
+if [ "$(grep -c '^## 미감시 전송$' "$UC/state.md")" = 1 ] && [ "$(tail -n 1 "$UC/state.md" | cut -c1-8)" = "- 미감시 전송" ]; then
+  ok "rc-send-unwatched-record state.md 절이 없으면 파일 끝에 절 생성"
+else bad "rc-send-unwatched-record 절 생성" "$(cat "$UC/state.md")"; fi
+rm -f "$UC/state.md"
+"$S/rc-send.sh" --to bob "$UC" 확인 "state 없음" >/dev/null 2>"$TMP/se"; rc=$?
+[ "$rc" = 0 ] && grep -q "state.md 없음" "$TMP/se" && ok "rc-send-unwatched-record state.md 없으면 생략+경고(종료 0)" || bad "rc-send-unwatched-record state 없음" "rc=$rc $(cat "$TMP/se")"
+
+# rc-send-watched-norecord: watched 면 보낸 쪽 파일을 건드리지 않는다
+NC=$(mkchain "$TMP" rc-20260101-nr); mkreport "$NC" alice; printf '# state\n' > "$NC/state.md"
+cp "$NC/workers/alice/report.md" "$TMP/rep.before"; cp "$NC/state.md" "$TMP/st.before"
+AGENT_ORCHESTRATOR=$FAKE2 FAKE_W=watched "$S/rc-send.sh" "$NC" alice 완료 "w" >/dev/null 2>&1
+AGENT_ORCHESTRATOR=$FAKE2 FAKE_W=watched "$S/rc-send.sh" --to alice "$NC" 답 "w" >/dev/null 2>&1
+cmp -s "$NC/workers/alice/report.md" "$TMP/rep.before" && cmp -s "$NC/state.md" "$TMP/st.before" \
+  && ok "rc-send-watched-norecord watched 면 report.md·state.md 불변" || bad "rc-send-watched-norecord" "$(cat "$NC/workers/alice/report.md")"
+
+# rc-send-meta-warn-no-retry: AO 가 stderr 경고 + unwatched + 종료 0 → rc-send 종료 0, 재실행 안내 없음
+MC=$(mkchain "$TMP" rc-20260101-mw); mkreport "$MC" alice
+O=$(AGENT_ORCHESTRATOR=$FAKE2 FAKE_W=unwatched FAKE_ERR="inbox-send: 경고: 부가 기록 실패(events)" "$S/rc-send.sh" "$MC" alice 완료 "w" 2>"$TMP/se"); rc=$?
+if [ "$rc" = 0 ] && grep -q "부가 기록 실패(events)" "$TMP/se" && ! grep -q "다시\|재시도\|재실행" "$TMP/se" && ! printf '%s' "$O" | grep -q "다시\|재시도\|재실행"; then
+  ok "rc-send-meta-warn-no-retry AO 경고는 흘려보내고 종료 0·재실행 안내 없음"
+else bad "rc-send-meta-warn-no-retry" "rc=$rc out=$O err=$(cat "$TMP/se")"; fi
+
+# rc-claim-conflict-kept: 충돌 시 stderr CONFLICT…·종료 4·stdout 빈 출력
+KC=$(mkchain "$TMP" rc-20260101-kc); mkreport "$KC" bob
+"$S/rc-claim.sh" "$KC" alice src/ >/dev/null 2>&1
+O=$("$S/rc-claim.sh" "$KC" bob src/a.txt 2>"$TMP/se"); rc=$?
+if [ "$rc" = 4 ] && [ -z "$O" ] && [ "$(cat "$TMP/se")" = "CONFLICT src/a.txt↔alice:src/" ]; then
+  ok "rc-claim-conflict-kept 종료 4·stdout 빈 출력·stderr CONFLICT 한 줄만"
+else bad "rc-claim-conflict-kept" "rc=$rc out=$O err=$(cat "$TMP/se")"; fi
+
+# rc-claim-unwatched-record: unwatched 면 worker report.md 에 같은 형식 한 줄, watched 면 기록 없음
+case "$(sed -n '4p' "$KC/workers/bob/report.md")" in "- 미감시 전송 $KC/inbox.log "[0-2][0-9]:[0-5][0-9]) ok "rc-claim-unwatched-record report.md '- 진행:' 아래 기록" ;; *) bad "rc-claim-unwatched-record" "$(cat "$KC/workers/bob/report.md")" ;; esac
+mkreport "$KC" bob; cp "$KC/workers/bob/report.md" "$TMP/rep.before"
+O=$(AGENT_ORCHESTRATOR=$FAKE2 FAKE_W=watched "$S/rc-claim.sh" "$KC" bob src/b.txt 2>"$TMP/se"); rc=$?
+[ "$rc" = 4 ] && [ -z "$O" ] && cmp -s "$KC/workers/bob/report.md" "$TMP/rep.before" && ok "rc-claim-unwatched-record watched 면 기록 없음" || bad "rc-claim watched" "rc=$rc $(cat "$KC/workers/bob/report.md")"
+rm -f "$KC/workers/bob/report.md"
+"$S/rc-claim.sh" "$KC" bob src/c.txt >/dev/null 2>"$TMP/se"; rc=$?
+[ "$rc" = 4 ] && [ "$(cat "$TMP/se")" = "CONFLICT src/c.txt↔alice:src/" ] && ok "rc-claim-unwatched-record report.md 없으면 조용히 생략(stderr 이전과 동일)" || bad "rc-claim report 없음" "rc=$rc $(cat "$TMP/se")"
+
+# rc-watch-subscribe: --subscribe 뒤 --list 에 경로, --unsubscribe 뒤 사라짐 (AO_STATE_ROOT 임시 폴더, pane 없음)
+SC=$(mkchain "$TMP" rc-20260101-sub); SB="$SC/inbox.log"; SID=0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d
+env -u HERDR_PANE_ID CLAUDE_CODE_SESSION_ID=$SID "$W" --subscribe "$SB" >/dev/null 2>"$TMP/se"; rc=$?
+LST=$(env -u HERDR_PANE_ID CLAUDE_CODE_SESSION_ID=$SID "$AGENT_ORCHESTRATOR" inbox-subscribe --list 2>/dev/null)
+if [ "$rc" = 0 ] && printf '%s\n' "$LST" | cut -f1 | grep -qxF "$SB"; then ok "rc-watch-subscribe --subscribe → inbox-subscribe --list 에 경로"
+else bad "rc-watch-subscribe --subscribe" "rc=$rc list=$LST err=$(cat "$TMP/se")"; fi
+env -u HERDR_PANE_ID CLAUDE_CODE_SESSION_ID=$SID "$W" --unsubscribe "$SB" >/dev/null 2>"$TMP/se"; rc=$?
+LST=$(env -u HERDR_PANE_ID CLAUDE_CODE_SESSION_ID=$SID "$AGENT_ORCHESTRATOR" inbox-subscribe --list 2>/dev/null)
+if [ "$rc" = 0 ] && ! printf '%s\n' "$LST" | cut -f1 | grep -qxF "$SB"; then ok "rc-watch-subscribe --unsubscribe → list 에서 사라짐"
+else bad "rc-watch-subscribe --unsubscribe" "rc=$rc list=$LST err=$(cat "$TMP/se")"; fi
+"$W" --subscribe relative.log >/dev/null 2>&1; [ $? = 2 ] && ok "rc-watch-subscribe 상대 경로 → 2" || bad "rc-watch-subscribe 상대 경로"
+"$W" --unsubscribe >/dev/null 2>&1; [ $? = 2 ] && ok "rc-watch-subscribe 인자 부족 → 2" || bad "rc-watch-subscribe 인자 부족"
 
 # ── 5. 문서 점검: 실행 중 세션에 agent-send 를 허용하는 문장이 없다 ────────────────
 DOC_ROOT=$(cd "$HERE/../.." && pwd)

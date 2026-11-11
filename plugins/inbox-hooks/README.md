@@ -31,6 +31,8 @@ agent-orchestrator inbox-wait --drain     # hooks.off 생성 + 대기자 철회
 agent-orchestrator inbox-wait --undrain   # 다시 켜기
 ```
 
+플러그인 자체는 체인 플러그인을 꺼도 따라 꺼지지 않는다(Claude Code 2.1.322 실측, S4 보고서 §2). 체인 플러그인을 끈 머신에서 이것까지 끄려면 `claude plugin disable inbox-hooks@waymakerlabs-claude-plugins`, 체인 플러그인을 지웠다면 `claude plugin prune`이 남은 의존을 지운다.
+
 ## 시험
 
 ```bash
