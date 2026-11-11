@@ -54,3 +54,13 @@
 - shellcheck 미실행.
 - 실측은 셸로 훅 JSON을 넣은 것이다. 실제 Claude Code의 asyncRewake 전달은 S2 배포 때 확인한다.
 - 옛 2.8.1 core가 도는 세션과 새 core는 `wait/` 이름이 겹치지 않는다(`<sid>.pid` 대 `<키>.pid`). `--state`는 새 표식만 보므로 옛 대기자는 `none`으로 나온다(참고값).
+
+## 배포 (2026-11-11 23:30, 주인님 "묻지 말고 푸시·배포")
+
+- 완료 뒤 크로스체크: codex Sol high `git diff 36b780b..b3859a8` → **SHIP**(finding 0). 계획 리뷰는 BLOCK high 4 → §10으로 모두 반영.
+- main fast-forward `b3859a8` push. 판: auto-chain 2.9.0, review-chain 0.3.0, inbox-hooks 0.2.0.
+- office(이 맥): 2.8.1→2.9.0·0.2.0→0.3.0·0.1.0→0.2.0. `--status` `inbox-wait 2`. 스모크(설치 판) 대기자 exit 2·`#1 probe`·`ev=wake` 1·실제 상태 변경 0.
+- home-macmini: 같은 갱신, 마켓 HEAD `b3859a8`, 스모크 같은 결과, sweep LaunchAgent 0.
+- gsr-macbook: Tailscale offline(23:30, 잠자기 추정). 깨어나면 자동 갱신·스모크하는 백그라운드 스크립트 `/tmp/s5-c2/macbook-deploy.sh`(최대 12시간, 결과 `/tmp/s5-c2/macbook-deploy.result`). 마켓 자동 갱신(autoUpdate true)으로도 들어온다.
+- 스모크 스크립트의 확인 사건을 `wait-notify` → `wake`로 바꿨다(새 events.log 계약).
+- 실제 Claude 세션의 asyncRewake 깨움은 새 세션이 열려 대기자가 뜬 뒤 events.log `wake`로 확인한다(아직 미확인).
