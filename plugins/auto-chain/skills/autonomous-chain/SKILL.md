@@ -23,7 +23,7 @@ worker·planner·리뷰는 작업마다 아래 3단계 중 하나로 돌린다. 
 
 | 단계 | 쓰는 작업 | 실행 |
 |---|---|---|
-| ① 기본 | 웨이브 구현 task, BLOCK 수정 worker, 전수 점검, 짧은 탐색·조사, `chain-breaker`, Sol 장애 때 Opus 보조 검토 | `Agent`(`subagent_type: auto-chain:<역할>`, `run_in_background: true`, 같은 웨이브의 독립 task는 한 메시지에서 병렬). 결과는 보고서 파일, 반환은 한 줄 |
+| ① 기본 | 웨이브 구현 task, BLOCK 수정 worker, 전수 점검, 짧은 탐색·조사, `chain-breaker`, Sol 장애 때 Opus 보조 검토 | `Agent`(`subagent_type: auto-chain:<역할>`, `run_in_background: true`, 같은 웨이브의 독립 task는 한 메시지에서 병렬). 결과는 보고서 파일, 반환은 한 줄. (2.7.0) 짧은 탐색·조사는 `model: haiku`(§2 "탐색·조사") |
 | ② headless | Sol 검토·원인 조사(`review_view: headless`, 기본), `worker:opencode-<agent>` 같은 다른 CLI 실행 | `run_in_background` Bash로 `scripts/review-run.sh`(리뷰) 또는 `scripts/headless-run.sh`(비리뷰) + done 파일을 `scripts/review-wait.sh`로 대기 |
 | ③ pane | 최초 계획 `chain-planner-deep`(D2), 인계를 넘겨 살아야 하는 롤링 분해·다음 마일스톤 planner, 마일스톤 인계, 사용자가 지켜보며 끼어들 작업·작업 도중 조정자와 대화가 필요한 작업, `review_view: pane`의 리뷰 | `references/pane-worker.md` — `spawn-pane-worker.sh`·`pane-open`·`agent-start`·`agent-send`(새 세션 첫 지시 1회뿐)·`inbox-send`/`inbox-watch`(이후 모든 메시지) |
 
@@ -73,6 +73,7 @@ worker·planner·리뷰는 작업마다 아래 3단계 중 하나로 돌린다. 
 |---|---|---|---|
 | 계획 | `chain-planner` | Opus high | (1.7.0) 롤링 분해(§3-1), 계획 delta 수정·출시 검토 삽입 등 최초 계획 뒤의 planner 호출(되돌리기 쉬운 설계) |
 | 계획(깊이) | `chain-planner-deep` | Opus xhigh | (1.6.5) 체인의 최초 계획은 항상. 이후 호출은 스키마, 외부 계약, 동시성, 보안처럼 되돌리기 어려운 설계일 때 |
+| 탐색·조사 | 일반 `Agent`(`Explore`·`general-purpose`) | Haiku | (2.7.0) 읽기 전용 위치 탐색·grep·목록화·파일 몇 개의 사실 확인. ①의 `Agent`에 `model: haiku`. 결과는 조정자가 근거 파일로 대조한 뒤 쓴다. 판단·리뷰·구현·커밋으로 이어지는 일, pane worker에는 쓰지 않는다 |
 | 구현(작음) | `chain-worker` | Sonnet medium | (2.2.0) 문서·명세가 명확한 작은 구현(파일 몇 개, 판단 거의 없음). ①은 `Agent`의 `model: sonnet`·`effort: medium`, ③은 `spawn-pane-worker.sh`의 medium |
 | 구현 | `chain-worker` | Sonnet high | 명세가 있는 task (기본) |
 | 구현(판단) | `chain-worker-deep` | Opus high | 상태·동시성·권한 경계나 원인 조사가 핵심일 때, `chain-worker` 실패 후 재시도 |
