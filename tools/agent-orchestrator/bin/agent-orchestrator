@@ -35,6 +35,12 @@
 #   inbox-watch --ack <대상> <n>                    처리한 마지막 번호(현재보다 클 때만 갱신)
 #   inbox-watch --pending <대상>                    미처리 줄(여러 줄)을 내고 종료
 #   inbox-watch --release <대상>                    이전 세션 보류 범위([이전 세션]·#0 안내) 해제
+#   inbox-watch --state <대상>                      감시 판정 한 줄 monitor|waiter|none(참고용)
+#   inbox-subscribe [--pane <pane>|--session <sid>] <대상>   구독 등록(키 pane-…|sid-…). --unsubscribe = 해제(장벽)
+#   inbox-subscribe --list [--pane|--session …]      줄마다 <경로>\t<sid>\t<active|dormant>(여러 줄)
+#   inbox-wait                                      훅 전용(stdin 훅 JSON). 0 / 2 깨움(stderr) / 4 잠금·기록·JSON·인자 오류
+#   inbox-wait --status|--drain|--undrain|--session-start   "inbox-wait 2" / 철회 수 / 빈 출력 / (B2 자리)
+#                                                   구현 lib/inbox-wait.sh(계획 2026-11-11 §2-4·§2-5)
 #   받은편지함 종료 코드: 0 / 2 인자·대상 형식 / 4 기록·잠금·ack 실패
 #
 # 종료 코드: 0 성공 / 2 인자 오류 / 3 대상 없음·충돌 / 4 백엔드 실행 실패 / 5 에이전트 준비 안 됨
@@ -66,12 +72,22 @@ usage() { ao_die 2 "$*  (사용법: $AO_HOME/bin/agent-orchestrator 머리 주�
 
 # ── 0. 받은편지함 동작: 백엔드와 무관(herdr 밖·backend=none·백엔드 고장에서도 동작) → 여기서 처리하고 끝
 case "${1:-}" in
-  inbox-send|inbox-watch)
+  inbox-send|inbox-watch|inbox-subscribe|inbox-wait)
     [ -f "$AO_HOME/lib/inbox.sh" ] || ao_die 12 "lib/inbox.sh 없음: $AO_HOME/lib/inbox.sh"
     # shellcheck source=/dev/null
     . "$AO_HOME/lib/inbox.sh" || ao_die 12 "lib/inbox.sh 로딩 실패"
+    if [ "$1" = inbox-subscribe ] || [ "$1" = inbox-wait ]; then
+      [ -f "$AO_HOME/lib/inbox-wait.sh" ] || ao_die 12 "lib/inbox-wait.sh 없음"
+      # shellcheck source=/dev/null
+      . "$AO_HOME/lib/inbox-wait.sh" || ao_die 12 "lib/inbox-wait.sh 로딩 실패"
+    fi
     IOP=$1; shift
-    if [ "$IOP" = inbox-send ]; then ao_inbox_send "$@"; else ao_inbox_watch "$@"; fi
+    case "$IOP" in
+      inbox-send) ao_inbox_send "$@" ;;
+      inbox-watch) ao_inbox_watch "$@" ;;
+      inbox-subscribe) ao_inbox_subscribe "$@" ;;
+      *) ao_inbox_wait "$@" ;;
+    esac
     exit $? ;;
 esac
 
