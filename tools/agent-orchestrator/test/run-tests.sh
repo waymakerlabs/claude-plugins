@@ -20,7 +20,7 @@ mkdir -p "$FAKE" "$NOHERDR" "$FD" "$T/home"
 # 실제 상태 폴더 변경 검사(inbox-real-state-untouched)용: env -i 전에 진짜 HOME을 저장하고 기준 시각을 남긴다
 REAL_HOME=$HOME; touch "$T/stamp"
 cp "$HERE/fake-herdr.py" "$FAKE/herdr"; chmod +x "$FAKE/herdr"
-EXPECT=270
+EXPECT=271
 
 PASS=0; FAIL=0
 # 여러 줄 값은 ⏎로 이어 한 줄 한 케이스를 지킨다
@@ -804,7 +804,7 @@ snd "$LTD" "직접 TERM"; wfor "$W/td.mk" notify-mid; kill -TERM "$WP_td"; sleep
 [ "$c" = 2 ] && grep -qF '#1 직접 TERM' "$W/td.err" && grep -qF -- '--ack' "$W/td.err" && grep -qF $'\tpending\t' "$SI/wait/$NS.notified" && [ "$lf" = 1 ] \
   && ok inbox-wait-term-direct "notify-mid 중 TERM → 깨움 출력 완전·pending 행·2·수신 잠금 풀림" || bad inbox-wait-term-direct "2·pending·잠금 풀림" "rc=$c lf=$lf $(cat "$SI/wait/$NS.notified" 2>&1)"
 ns; LTL="$SB/tl.log"; sub "$NS" "$LTL"; wl tl "$NS" Stop; wfor "$W/tl.mk" registered; hold8 4; snd "$LTL" "잠금 대기"; sleep 0.6
-kill -TERM "$WP_tl"; wrc tl; c=$WRC; kill "$HP8"; wait "$HP8" 2>/dev/null
+kill -TERM "$WP_tl"; sleep 0.3; kill "$HP8"; wait "$HP8" 2>/dev/null; wrc tl; c=$WRC
 [ "$c" = 0 ] && [ "$(evw tl)" = term ] && [ ! -e "$LTL.waiters/$NS" ] && [ ! -e "$SI/wait/$NS.notified" ] && [ ! -s "$W/tl.err" ] \
   && ok inbox-wait-term-lockwait "수신 잠금 대기 중 TERM → 0·why=term·표식 정리·notified 변화 0" || bad inbox-wait-term-lockwait "0 term" "rc=$c $(evw tl)"
 ns; LNE="$SB/ne.log"; sub "$NS" "$LNE"; snd "$LNE" "증거 없음"; wl ne1 "$NS" Stop; wrc ne1
@@ -812,7 +812,7 @@ wl ne2 "$NS" UserPromptSubmit; wrc ne2; c=$WRC
 [ "$c" = 2 ] && grep -qF '[재통지]' "$W/ne2.err" && ! grep -F $'\tev=wait-delivered\t' "$SI/events.log" | grep -qF "sid=$NS" \
   && ok inbox-delivered-no-event "UserPromptSubmit 만으로 delivered 아님·재통지 대상 유지" || bad inbox-delivered-no-event "2 [재통지]" "rc=$c"
 ns; LGR="$SB/gr.log"; sub "$NS" "$LGR"; snd "$LGR" "유예 줄"; wl g1 "$NS" Stop; wrc g1
-wl g2 "$NS" UserPromptSubmit AO_INBOX_RENOTIFY_GRACE=2 AO_INBOX_WAIT_MAX=1; wrc g2; c2=$WRC
+wl g2 "$NS" UserPromptSubmit AO_INBOX_RENOTIFY_GRACE=6 AO_INBOX_WAIT_MAX=1; wrc g2; c2=$WRC
 tk=$(cut -f4 "$SI/wait/$NS.notified"); echo "Stop hook feedback: token=$tk" > "$W/g3.tr"
 wl g3 "$NS" Stop AO_INBOX_RENOTIFY_GRACE=1; wrc g3; c3=$WRC
 [ "$c2/$c3" = 0/0 ] && [ ! -s "$W/g2.err" ] && [ ! -s "$W/g3.err" ] && grep -F $'\tev=wait-delivered\t' "$SI/events.log" | grep -qF "tok=$tk" \
@@ -823,6 +823,11 @@ wl c2 "$NS" Stop; sleep 0.6; e=0; grep -qF registered "$W/c2.mk" 2>/dev/null && 
 wgo c1; wrc c1; wfor "$W/c2.mk" registered; sleep 0.3; pf=0; [ -f "$SI/wait/$NS.pid" ] && [ "$(awk '{print $1}' "$SI/wait/$NS.pid")" = "$WP_c2" ] && pf=1
 mk=0; [ -f "$LCR.waiters/$NS" ] && mk=1; snd "$LCR" "후임이 받음"; wrc c2; c=$WRC
 [ "$e/$pf/$mk/$c" = 0/1/1/2 ] && grep -qF '#1 후임이 받음' "$W/c2.err" && ok inbox-cleanup-locked "앞 대기자 종료 정리는 fd 8 안·후임 pid·표식 보존·후임이 깨움" || bad inbox-cleanup-locked "0/1/1/2" "$e/$pf/$mk/$c"
+# 크로스체크 S2 2회차 #1: 잠금 대기 중 TERM → 정리는 남이 fd 8 을 쥔 동안 잠금 구간에 들어가지 않는다
+ns; LTW="$SB/tw.log"; sub "$NS" "$LTW"; wl tw "$NS" Stop AO_INBOX_TEST_PAUSE=cleanup-locked:1; wfor "$W/tw.mk" registered
+hold8 4; snd "$LTW" "대기 중 TERM"; sleep 0.6; kill -TERM "$WP_tw"; sleep 0.8; e=0; grep -qF cleanup-locked "$W/tw.mk" && e=1
+kill "$HP8"; wait "$HP8" 2>/dev/null; wrc tw; c=$WRC
+[ "$e/$c" = 0/0 ] && [ "$(evw tw)" = term ] && [ ! -s "$W/tw.err" ] && ok inbox-cleanup-term-lockwait "잠금 대기 중 TERM → 남이 fd 8 쥔 동안 정리 구간 진입 0·0(term)" || bad inbox-cleanup-term-lockwait "0/0 term" "$e/$c $(evw tw)"
 # 크로스체크 S2 #2: 백슬래시가 든 경로도 notified 행을 찾는다(재통지 상한 22220)
 ns; LBS="$SB/b\tq.log"; sub "$NS" "$LBS"; snd "$LBS" "역슬래시 경로"
 rs=""; for k in 1 2 3 4; do wl bs$k "$NS" Stop; wrc bs$k; rs="$rs$WRC"; done
@@ -869,7 +874,8 @@ ns; sub "$NS" "$SB/ss0.log"; ss s0 "$NS" resume; c0=$SRC
 # 크로스체크 S2 #4: 긴 경로 대상 30개 → JSON 8192바이트 이하·해석 가능·--pending 안내
 ns; LP="$SB/$(printf 'x%.0s' $(seq 1 200))"; for k in $(seq 1 30); do sub "$NS" "$LP-$k.log"; snd "$LP-$k.log" "긴 대상 $k"; done
 ss sc "$NS" resume; c=$SRC; xs=$(jctx sc); j=$?; by=$(LC_ALL=C wc -c < "$W/sc.out" | tr -d ' ')
-[ "$c/$j" = 0/0 ] && [ "$by" -le 8192 ] && printf '%s' "$xs" | grep -qF -- '--pending' && ok inbox-ss-cap-8k "대상 30개·긴 경로 → ${by}바이트 JSON·해석 가능·--pending 안내" || bad inbox-ss-cap-8k "≤8192" "rc=$c j=$j ${by}B"
+lc=$(cd "$T" && env -i "${BASE2[@]}" bash "$BIN" inbox-subscribe --list --session "$NS" 2>/dev/null | grep -c .)
+[ "$c/$j/$lc" = 0/0/30 ] && [ "$by" -le 8192 ] && printf '%s' "$xs" | grep -qF -- "--list --session $NS" && printf '%s' "$xs" | grep -qF -- '--pending' && ok inbox-ss-cap-8k "대상 30개·긴 경로 → ${by}바이트 JSON·해석 가능·--pending 안내" || bad inbox-ss-cap-8k "≤8192·list 30" "rc=$c j=$j lc=$lc ${by}B"
 ns; PA=$NS; ns; PB=$NS; ns; PC=$NS; PK=pane-w7_p1; LRS="$SB/rs.log"
 sub "$PA" "$LRS" --pane w7:p1; g0=$(cat "$SI/subs/$PK.gen")
 ss r1 "$PB" resume HERDR_PANE_ID=w7:p1; l1=$(cat "$SI/subs/$PK"); g1=$(cat "$SI/subs/$PK.gen")
@@ -953,11 +959,11 @@ INBOX_OLD="
   inbox-wait-pid-reuse inbox-wait-other-sid inbox-wait-timeout inbox-wait-term-mark inbox-wait-fd9-free
   inbox-ev-lag-arrival inbox-sub-del-barrier inbox-sub-del-running inbox-sub-handover inbox-snapshot-atomic
   inbox-ctx-demote inbox-pane-gen-supersede inbox-pane-gen-notify-check inbox-pane-gen-only-sessionstart
-  inbox-pane-gen-no-issue inbox-wait-term-direct inbox-wait-term-lockwait inbox-delivered-no-event inbox-renotify-grace inbox-cleanup-locked inbox-path-backslash inbox-notify-record-fail inbox-ss-cap-8k
+  inbox-pane-gen-no-issue inbox-wait-term-direct inbox-wait-term-lockwait inbox-delivered-no-event inbox-renotify-grace inbox-cleanup-locked inbox-path-backslash inbox-notify-record-fail inbox-ss-cap-8k inbox-cleanup-term-lockwait
   inbox-delivered-ack inbox-off-before-register inbox-drain-after-register inbox-drain-notify-race inbox-undrain
 "
 miss=""; for nm in $INBOX_OLD; do grep -qxF "$nm" "$T/pass.names" || miss="$miss $nm"; done; nold=$(printf '%s\n' $INBOX_OLD | grep -c .)
-[ -z "$miss" ] && [ "$nold" = 121 ] && ok inbox-regress-all "기존 받은편지함 케이스 ${nold}개 모두 PASS 로 실행됨" || bad inbox-regress-all "121개 전부" "${nold}개, 누락:$miss"
+[ -z "$miss" ] && [ "$nold" = 122 ] && ok inbox-regress-all "기존 받은편지함 케이스 ${nold}개 모두 PASS 로 실행됨" || bad inbox-regress-all "122개 전부" "${nold}개, 누락:$miss"
 left=0; for f in "$SI"/wait/*.pid; do [ -f "$f" ] && _p=$(awk '{print $1}' "$f") && kill -0 "$_p" 2>/dev/null && left=$((left + 1)); done
 lw=$(ps -axo command | grep -F "$T" | grep -cF 'inbox-wait' )
 [ "$left/$lw" = 0/0 ] || echo "WARN 남은 대기자 pid $left·프로세스 $lw"

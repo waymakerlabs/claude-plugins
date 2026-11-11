@@ -149,6 +149,7 @@ ao_inbox_subscribe() {
 #    _aoiw_lock <fd> <파일> <시도 횟수(×0.05초)> → 0, 실패는 ao_die 4(stderr는 이미 /dev/null)
 _aoiw_lock() {
   local fd=$1 F=$2 rc r2
+  [ "$fd" = 8 ] && _W_L8=0   # 실제로 잡았을 때만 1(_AOI_LOCK8 은 잡기 전에도 설정된다)
   { eval "exec $fd>>\"\$F\""; } 2>/dev/null || ao_die 4 "잠금 파일 열기 실패: $F"
   eval "_AOI_LOCK$fd=\$F"
   "$AO_PERL" -MFcntl=:flock -MTime::HiRes=sleep -e '
@@ -163,7 +164,7 @@ _aoiw_lock() {
     break
   done
   _W_BG=""
-  [ "$rc" = 0 ] && return 0
+  if [ "$rc" = 0 ]; then [ "$fd" = 8 ] && _W_L8=1; return 0; fi
   _aoi_funlock "$fd"; ao_die 4 "잠금 실패(rc=$rc): $F"
 }
 _aoiw_l8() { mkdir -p "$AO_INBOX_DIR" 2>/dev/null || ao_die 4 "상태 폴더 생성 실패"; _aoiw_lock 8 "$AO_INBOX_DIR/recv.flock" 200; }
@@ -233,9 +234,10 @@ _aoiw_cleanup() {
   local rc=$? t
   [ -n "$_W_BG" ] && kill "$_W_BG" 2>/dev/null
   if [ "$_W_REG" = 1 ]; then
-    # 확인과 삭제 사이에 후임이 pid·표식을 바꾸지 못하게 fd 8 안에서 한다(이미 쥐었으면 그대로).
-    # 잠금을 못 잡으면 지우지 않는다 — 남은 pid·표식은 lstart 검사로 죽은 것으로 판정된다
-    if [ -n "${_AOI_LOCK8:-}" ] || AO_INBOX_LOCK_TRIES=40 _aoi_flock 8 "$AO_INBOX_DIR/recv.flock"; then
+    # 확인과 삭제 사이에 후임이 pid·표식을 바꾸지 못하게 fd 8 안에서 한다. 이미 쥐었으면(_W_L8=1 이고
+    # 아직 풀지 않음) 그대로, 아니면 새로 잡는다. _AOI_LOCK8 만으로는 판정하지 않는다 — 잠금 대기 중
+    # TERM 에서도 설정돼 있다(크로스체크 2회차 #1). 못 잡으면 지우지 않는다(lstart 검사로 죽은 것으로 판정)
+    if { [ "${_W_L8:-0}" = 1 ] && [ -n "${_AOI_LOCK8:-}" ]; } || AO_INBOX_LOCK_TRIES=40 _aoi_flock 8 "$AO_INBOX_DIR/recv.flock"; then
       _aoiw_pause cleanup-locked
       while IFS= read -r t; do [ -n "$t" ] && _aoiw_unmark "$t"; done <<< "$_W_TGTS"
       _aoiw_mine && rm -f "$_AOW_WAIT/$_W_SID.pid"
@@ -421,7 +423,10 @@ _aoiw_ss_out() {
     cap=$((cap - 1))
   done
   # 대상 머리만으로도 8KB를 넘는다: token 머리 + 대상 수 + --pending 안내만(크기 고정)
-  txt="$(printf '%s\n' "$_W_OUT" | head -1)"$'\n'"[inbox] 미처리 줄이 있는 대상 $(printf '%s\n' "$_W_C" | grep -c .)개 — 목록이 길어 줄였다. \"$ao\" inbox-subscribe --list 로 대상을 보고 \"$ao\" inbox-watch --pending <대상> 으로 읽어라"
+  # 대상은 sid 키와 pane 키 두 곳에 있을 수 있다(_aoiw_snap) — 둘 다 그대로 실행할 수 있는 명령으로 적는다
+  txt="$(printf '%s\n' "$_W_OUT" | head -1)"$'\n'"[inbox] 미처리 줄이 있는 대상 $(printf '%s\n' "$_W_C" | grep -c .)개 — 목록이 길어 줄였다. 대상 목록: \"$ao\" inbox-subscribe --list --session $_W_SID"
+  [ -n "$_W_PK" ] && txt="$txt , \"$ao\" inbox-subscribe --list --pane ${HERDR_PANE_ID} (pane 받은편지함 자체: \"$ao\" inbox-watch --pending ${HERDR_PANE_ID})"
+  txt="$txt"$'\n'"[inbox] 대상마다 \"$ao\" inbox-watch --pending <대상> 으로 읽고 --ack 하라"
   _W_JS=$(printf '%s' "$txt" | "$AO_PERL" -MJSON::PP -e 'local $/; my $t = <STDIN>; utf8::decode($t);
     print JSON::PP->new->utf8->canonical->encode({ hookSpecificOutput =>
       { hookEventName => "SessionStart", additionalContext => $t } })') || ao_die 4 "JSON 인코딩 실패"
