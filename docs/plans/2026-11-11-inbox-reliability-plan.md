@@ -172,7 +172,8 @@ agent-orchestrator inbox-wait --undrain        # hooks.off 제거(다시 켜기)
 3. **앞 대기자 정리**: 잠금 밖에서 기록해 둔 앞 대기자에 TERM을 보내고, 사라질 때까지 기다린다(최대 2초, 넘으면 lstart를 다시 확인한 뒤 KILL). 앞 대기자가 6번의 잠금 안에 있으면 그 통지는 내 등록보다 먼저 확정된 것이다. 내 등록 뒤에는 앞 대기자가 통지할 수 없다. fd 7을 놓는다.
 4. **전달 확인**(2회차 새 #2): 수신 잠금 안에서 `notified`의 `pending`·`ctx` 행마다 아래 둘 중 하나일 때만 `delivered`로 바꾼다. ① `transcript_path` 파일에 그 행의 token 문자열이 있다(G0·G4 실측 전제). ② cursor ≥ n(ack됨, 이 경우 행을 지운다). **훅 이벤트 이름(UserPromptSubmit·Stop 등)은 전달 증거로 쓰지 않는다.** 대기자를 다시 띄우는 계기일 뿐이다. G0에서 ①이 불가능하면 ②만 남는다.
 5. **폴링**: 1초(`AO_INBOX_WAIT_POLL`)마다 잠금 없이 대상 줄 수만 읽는다. 아래 중 하나면 6번으로 간다.
-   - 통지 후보가 있다: `n > cursor`이면서, `n > notified.n`이거나 그 행이 `pending`이고 재통지 횟수가 3 미만. (`ctx` 행은 async 대기자가 재통지하지 않는다 — §2-6.)
+   - 통지 후보가 있다: `n > cursor`이면서, `n > notified.n`이거나 그 행이 `pending`이고 재통지 횟수가 3 미만이며 **그 행 token의 시각 + `AO_INBOX_RENOTIFY_GRACE`(기본 15초)가 지났다**. (`ctx` 행은 async 대기자가 재통지하지 않는다 — §2-6.) 새 줄(`n > notified.n`) 통지는 유예와 무관하다. (S2 실측 반영: 깨움 stderr가 transcript에 기록되기 전에 다음 훅 대기자가 시작해 같은 줄을 곧바로 재통지했다 — S2 보고서 §3.)
+   - 재통지 후보로 6번에 들어가면, 통지 직전 같은 수신 잠금 안에서 4번의 전달 확인(`_aoiw_deliv`)을 **다시** 돌려 그 사이 transcript에 기록된 token을 `delivered`로 반영한다. 그 결과 후보가 남지 않으면 통지하지 않는다.
    - 10폴링마다 한 번씩 정기 검증한다(세대·토큰·`pane-gen`·`hooks.off`가 바뀌었으면 끝내기 위해).
 6. **통지 확정**(수신 잠금 fd 8 안, finding 4·2회차 새 #1):
    - `_aoi_recheck`로 다시 확인한다: 내 토큰이 `wait/<sid>.pid`와 같은가, 스냅샷의 대상마다 지금도 내 sid로 구독돼 있는가, 세대가 같은가, `pane-gen`의 gen·sid가 내 `issued`와 같은가(rev 4), `hooks.off`가 없는가.
@@ -269,11 +270,11 @@ ts=<epoch>  ev=<사건>  box=<표시 이름|->  [사건별 칸…]
 |---|---|---|
 | `send` | `n=<줄>` `arr=<도착 epoch>` `watch=<watched\|unwatched>` | inbox-send |
 | `wait-start` | `sid` `tok` `hook=<Stop\|StopFailure\|SessionStart\|UserPromptSubmit>` `targets=<수>` | inbox-wait |
-| `wait-notify` | `sid` `tok` `n=<알린 줄 최소>-<최대>` `arr=<가장 오래된 줄 도착 epoch>` `re=<0\|1>` | inbox-wait 6번 |
+| `wait-notify` | `sid` `tok` `n=<알린 줄 최소>-<최대>` `arr=<가장 오래된 줄 도착 epoch>` `re=<0\|1>` [`hook=SessionStart`] | inbox-wait 6번. `hook=SessionStart`는 동기 SessionStart 출력(§2-6)으로 알렸을 때만 붙는다 — async 통지와 구분하는 유일한 칸(S2 보고서 §5-6) |
 | `wait-delivered` | `sid` `tok=<통지한 token>` `n` | inbox-wait 3번 |
 | `wait-end` | `sid` `tok` `why=<superseded\|unsubscribed\|timeout\|term\|notify\|error:<사유>>` | inbox-wait 모든 종료 |
 | `ack` | `n` `sid` | inbox-watch --ack |
-| `sub` | `sid` `op=<add\|del\|move\|dormant>` `gen` | inbox-subscribe |
+| `sub` | `sid` `op=<add\|del\|move\|dormant>` `gen` [`from=<옛 sid>`] | inbox-subscribe, `inbox-wait --session-start`(resume 이어받기 `op=move from=`·휴면 `op=dormant`). `from=`은 SessionStart resume가 구독 줄의 sid를 바꿀 때만 붙는다 |
 | `backlog-open` | `bl=<경로 해시 8자>-<가장 작은 미처리 n>` `arr` `exact=<0\|1>` | sweep |
 | `backlog-close` | `bl` `age=<초>` `exact=<0\|1>` `ackts=<epoch>` | sweep(cursor가 그 n을 넘은 것을 본 때). `age = ackts − arr`. `ackts`는 `<log>.ackts`에서 **`from ≤ n ≤ to`인 범위 행**의 epoch다. 새 판 ack가 그 줄을 실제로 넘긴 시각이라는 증거가 있을 때만 쓴다. sweep이 관측한 시각은 쓰지 않는다(2회차 새 #10, 3회차 N3). 그 n을 덮는 범위 행이 없으면(옛 판 ack가 넘긴 줄 — 뒤의 새 ack 범위는 from이 그 n보다 크다) `age = 관측 시각 − arr`이고 `ackts=-`로 상한임을 표시한다 |
 | `sweep-alert` | `bl` `age` `sent=<1\|0>` | sweep |

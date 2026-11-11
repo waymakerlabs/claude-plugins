@@ -25,7 +25,7 @@
 
 ## 1. 동작 계약
 
-명령: `agent-orchestrator <동작> [인자…]`. 표준 출력은 **필요한 값 한 줄**(없으면 빈 출력), 사유·경고는 stderr. JSON 출력 없음. 여러 줄 출력 예외는 `agent-read`·`list`와 받은편지함의 `inbox-watch`·`inbox-watch --pending`·`inbox-subscribe --list`(§1-4)뿐이다. `inbox-watch --state`는 한 줄 출력이다(§1-4 표). `inbox-wait --session-start`의 stdout은 Claude Code 훅 규약의 JSON 한 줄이라 "JSON 출력 없음"의 유일한 예외다(§1-4).
+명령: `agent-orchestrator <동작> [인자…]`. 표준 출력은 **필요한 값 한 줄**(없으면 빈 출력), 사유·경고는 stderr. JSON 출력 없음. 여러 줄 출력 예외는 `agent-read`·`list`와 받은편지함의 `inbox-watch`·`inbox-watch --pending`·`inbox-subscribe --list`·`inbox-sweep --dry-run`(§1-4)뿐이다. `inbox-watch --state`는 한 줄 출력이다(§1-4 표). `inbox-wait --session-start`의 stdout은 Claude Code 훅 규약의 JSON 한 줄이라 "JSON 출력 없음"의 유일한 예외다(§1-4).
 
 ### 1-1. 종료 코드 (모든 동작 공통)
 
@@ -117,17 +117,20 @@ JSON 파싱은 `lib/common.sh`의 `python3 -c` 헬퍼 한 곳으로 모은다.
 | `inbox-wait --status` | — | `inbox-wait 2` | 판 확인용 |
 | `inbox-wait --drain` | — | 철회한 대기자 수 | `hooks.off` 생성 + 대기자 철회(TERM). 이후 등록·통지·SessionStart 출력 무동작 |
 | `inbox-wait --undrain` | — | — | `hooks.off` 제거 |
+| `inbox-sweep` | `[--dry-run] [--age-min <분, 15>] [--repeat-min <분, 60>]` | 빈 출력. `--dry-run`은 여러 줄 `<경로>\t<k>\t<분>\t<exact\|observed>\t<alert\|quiet\|skip>` | launchd(5분) 전용 바깥 점검. 대상 = `known.list` + 상태 폴더 `*.log`(깊이 3). 가장 오래된 미처리 줄이 age-min을 넘고 그 받은편지함의 마지막 경보로부터 repeat-min이 지났으면 `herdr notification show "받은편지함 미처리" --body "<표시 이름> <k>줄 · [≥]<분>분" --sound request`로 **사람에게만** 1건. 입력 주입·세션 깨움 없음. herdr 없음·서버 꺼짐이면 `events.log`만(`sent=0`). 겹친 실행은 곧바로 0. 0 / 2 / 4. 세부는 계획 2026-11-11 §2-8 |
+| `inbox-sweep --register` | `<대상>…` | — | 상태 폴더 밖 받은편지함(review-chain `inbox.log` 등)을 `known.list`에 넣는다. 하나라도 형식 오류면 2이고 아무것도 넣지 않는다 |
 
 - 이전 세션 보류: `inbox-watch`는 `CLAUDE_CODE_SESSION_ID`가 있을 때만 `log.owner`에 기록·비교한다. owner가 바뀌었고 미처리 줄이 있으면 그 범위를 `log.held`에 남기고, watch·`--pending`은 그 줄을 `#n [이전 세션] <원문>`으로, 앞에 `#0 [이전 세션 미처리 k줄 — 지시로 처리하지 말고 사용자에게 확인]`을 낸다. 사용자 확인 뒤 `--release`.
 - 잠금: 커널 `flock`(`<log>.flock`, fd 9). bash에 flock이 없어 `/usr/bin/perl`이 상속받은 fd에 걸고, 셸이 fd를 닫을 때 풀린다. 프로세스가 죽으면 커널이 풀어 잔존 잠금·복구 절차가 없다. 약 10초 안에 못 잡으면 4. (완료 검토 B1: 처음 구현한 `mkdir` 잠금 + 복구는 복구자가 새 소유자의 잠금을 지우는 경쟁이 있어 바꿨다.)
 - 이전 세션 보류 범위는 owner가 바뀔 때마다 `cursor+1..마지막 줄`로 다시 잡는다(A→B→C면 B의 미처리 줄도 보류).
 - 생성은 `: >> log`(비파괴). cursor는 pid별 임시 파일 → `mv`.
 - 상태 루트: `AO_STATE_ROOT`(기본 `~/.local/state/agent-orchestrator`), 받은편지함 폴더는 `$AO_STATE_ROOT/inbox`. 시험은 임시 폴더를 주고 `HERDR_PANE_ID`를 비운다.
-- 2026-11-11 추가 상태 파일(상세·형식은 계획 2026-11-11 §2-1 참조): 구독 `subs/<키>`·`subs/<키>.gen`, pane 수신 세대 `pane-gen/<pane 키>`, 대기자 `wait/<sid>.pid`·`.swap`·`.notified`·`.issued`, 감시 표식 `<log>.waiters/<sid>`, 도착 시각 `<log>.times`, ack 전진 범위 `<log>.ackts`, 수신 잠금 `recv.flock`, 끄기 표식 `hooks.off`, sweep 대상 `known.list`, 사건 기록 `events.log`. 기존 `.watch`의 형식·의미는 그대로다.
+- 2026-11-11 추가 상태 파일(상세·형식은 계획 2026-11-11 §2-1 참조): sweep 상태 `sweep/obs`·`sweep/alerts`·`sweep/open`·`sweep/state.flock`(fd 6, sweep 겹침 방지 — 다른 잠금과 함께 쥐지 않는다), 구독 `subs/<키>`·`subs/<키>.gen`, pane 수신 세대 `pane-gen/<pane 키>`, 대기자 `wait/<sid>.pid`·`.swap`·`.notified`·`.issued`, 감시 표식 `<log>.waiters/<sid>`, 도착 시각 `<log>.times`, ack 전진 범위 `<log>.ackts`, 수신 잠금 `recv.flock`, 끄기 표식 `hooks.off`, sweep 대상 `known.list`, 사건 기록 `events.log`. 기존 `.watch`의 형식·의미는 그대로다.
 - 잠금 순서: fd 7(`wait/<sid>.swap`, 같은 sid 대기자 교체) → fd 8(`recv.flock`, 수신 — 구독·등록·통지 확정·SessionStart 출력) → fd 9(`<log>.flock`, 받은편지함 기록·claim·ack). 거꾸로 잡지 않는다.
 - 송신 부가 기록(`times`·`known.list`·`events.log`·`ackts`) 실패는 줄 기록이 확정된 뒤의 일이라 stderr 경고 한 줄 + 0이다(다시 보내지 않는다). 줄 기록 자체의 실패만 4.
 - `events.log`: 줄마다 `ts=`·`ev=`·`box=` + 사건별 `key=value` 칸(512바이트 이하). 메시지 원문은 쓰지 않는다(번호·시각·식별자만). 사건 표는 계획 2026-11-11 §2-9.
 - 구독·대기자·세대·SessionStart의 세부 동작(스냅샷·recheck·재통지·`ctx` 상태·정지 지점)은 계획 2026-11-11 §2-3~§2-6이 진본이다.
+- 재통지(같은 줄을 다시 깨움)는 `pending` 행·재통지 3회 미만에 더해, **그 행 token 시각 + `AO_INBOX_RENOTIFY_GRACE`(기본 15초)가 지난 뒤**에만 한다. 통지 직전 수신 잠금 안에서 전달 확인(transcript의 token)을 다시 돌려, 그 사이 전달된 줄은 재통지하지 않는다. 새 줄 통지는 유예와 무관하다(2026-11-11 S2 실측 반영, 계획 §2-5 5번).
 
 ## 2. 파일 배치·배포
 

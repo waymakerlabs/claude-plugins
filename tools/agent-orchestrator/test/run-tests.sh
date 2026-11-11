@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run-tests.sh — agent-orchestrator S1·S2 계약 시험 (가짜 herdr, PATH 격리)
+# run-tests.sh — agent-orchestrator S1·S2·S3 계약 시험 (가짜 herdr, PATH 격리)
 #
 # 사용: tools/agent-orchestrator/test/run-tests.sh
 # 실제 herdr를 부르지 않는다. 모든 호출은 env -i PATH="$FAKE:/usr/bin:/bin" HOME="$T/home" 로 격리하고,
@@ -20,7 +20,7 @@ mkdir -p "$FAKE" "$NOHERDR" "$FD" "$T/home"
 # 실제 상태 폴더 변경 검사(inbox-real-state-untouched)용: env -i 전에 진짜 HOME을 저장하고 기준 시각을 남긴다
 REAL_HOME=$HOME; touch "$T/stamp"
 cp "$HERE/fake-herdr.py" "$FAKE/herdr"; chmod +x "$FAKE/herdr"
-EXPECT=271
+EXPECT=300
 
 PASS=0; FAIL=0
 # 여러 줄 값은 ⏎로 이어 한 줄 한 케이스를 지킨다
@@ -936,6 +936,133 @@ wl fa "$PA" SessionStart HERDR_PANE_ID=w6:p5 AO_INBOX_TEST_PAUSE=issue-wait:4; w
 ss fc "$PA" resume HERDR_PANE_ID=w6:p5; wgo fa; wfor "$W/fa.mk" registered; e2=$?; sleep 0.3; snd "$PLG" "F1 새 줄"; wrc fa; ca=$WRC; wrc fb; cb=$WRC
 [ "$i0/$e1/$e2/$ca/$cb" = "$PK	1/0/0/2/0" ] && grep -qF '#1 F1 새 줄' "$W/fa.err" && [ ! -s "$W/fb.err" ] && [ "$(evp fb)" = pane-superseded ] \
   && ok inbox-async-start-resume-stale-issue "옛 issued(gen 1) 남은 A resume: async 먼저 issue-wait → 동기 gen 3 발급 → 등록·A 깨움·B 통지 0 (delta F1)" || bad inbox-async-start-resume-stale-issue "1/0/0/2/0" "$i0/$e1/$e2/$ca/$cb $(evp fb)"
+echo "== 받은편지함: sweep(계획 2026-11-11 S3)"
+# 케이스마다 상태 루트를 따로(swn) — 앞 묶음이 남긴 받은편지함이 끼지 않게. 시각은 AO_INBOX_NOW 고정
+SWT="$T/sw"; mkdir -p "$SWT"; T0=1794358800; : > "$FD/calls.log"; rm -f "$FD/server-down"
+swn() { SWR="$SWT/$1"; SWI="$SWR/inbox"; mkdir -p "$SWI"; }
+sw() { local now=$1; shift; run2 AO_STATE_ROOT="$SWR" AO_INBOX_NOW="$now" -- bash "$BIN" inbox-sweep "$@"; }
+swsend() { (cd "$T" && exec env -i "${BASE2[@]}" AO_STATE_ROOT="$SWR" AO_INBOX_NOW="$1" bash "$BIN" inbox-send --raw "$2" "$3") > /dev/null 2>&1; }
+swack() { (cd "$T" && exec env -i "${BASE2[@]}" AO_STATE_ROOT="$SWR" AO_INBOX_NOW="$1" bash "$BIN" inbox-watch --ack "$2" "$3") > /dev/null 2>&1; }
+ncall() { grep -c 'notification show' "$FD/calls.log" | tr -d ' '; }
+sev() { grep -F $'\tev='"$1"$'\t' "$SWI/events.log" 2>/dev/null; }
+# dry-run 한 줄의 뒤 4칸(k·분·exact|observed·분류)
+dcls() { printf '%s\n' "$OUT" | P=$1 awk -F'\t' '$1 == ENVIRON["P"] { print $2 "/" $3 "/" $4 "/" $5 }'; }
+swn exact; B="$SWI/pane-w1_p1.log"; swsend "$T0" w1:p1 "첫 줄"
+sw $((T0 + 960)) --dry-run; d=$(dcls "$B"); c0=$(ncall); sw $((T0 + 960)); c1=$(ncall)
+[ "$d" = 1/16/exact/alert ] && [ "$RC" = 0 ] && [ $((c1 - c0)) = 1 ] && tail -1 "$FD/calls.log" | grep -qF -- '--sound request' \
+  && ok inbox-sweep-exact-age "times 10:00·지금 10:16 → exact·alert, notification show --sound request 1건" || bad inbox-sweep-exact-age "1/16/exact/alert 1건" "$d $((c1 - c0)) rc=$RC"
+swack $((T0 + 1000)) w1:p1 1; sw $((T0 + 1100))
+o=$(sev backlog-open | grep -o 'bl=[^	]*'); a=$(sev sweep-alert | grep -o 'bl=[^	]*'); cl=$(sev backlog-close | grep -o 'bl=[^	]*')
+[ -n "$o" ] && [ "$o" = "$a" ] && [ "$o" = "$cl" ] && sev backlog-close | grep -qF 'age=1000' && sev sweep-alert | grep -qF 'sent=1' \
+  && ok inbox-sweep-backlog-events "backlog-open·sweep-alert·backlog-close 의 bl 이 같고 age=1000(ack−도착)" || bad inbox-sweep-backlog-events "같은 bl·age=1000" "$o|$a|$cl"
+swn m14; B="$SWI/pane-w1_p1.log"; swsend "$T0" w1:p1 "줄"; c0=$(ncall)
+sw $((T0 + 840)) --dry-run; d=$(dcls "$B"); sw $((T0 + 840))
+[ "$d" = 1/14/exact/quiet ] && [ "$(ncall)" = "$c0" ] && ok inbox-sweep-14m "14분 → quiet·알림 0" || bad inbox-sweep-14m "1/14/exact/quiet" "$d"
+swn part; B="$SWI/pane-w1_p1.log"; swsend "$T0" w1:p1 A; swsend $((T0 + 840)) w1:p1 B; swack $((T0 + 900)) w1:p1 1; c0=$(ncall)
+sw $((T0 + 1200)) --dry-run; d=$(dcls "$B"); sw $((T0 + 1200))
+[ "$d" = 1/6/exact/quiet ] && [ "$(ncall)" = "$c0" ] && ok inbox-sweep-partial-ack "A·B 중 A만 ack → 남은 B(6분)로 재서 quiet" || bad inbox-sweep-partial-ack "1/6/exact/quiet" "$d"
+swn legacy; B="$SWI/pane-w2_p1.log"; printf 'legacy\n' > "$B"; c0=$(ncall)
+sw "$T0"; sw $((T0 + 60)) --dry-run; d1=$(dcls "$B"); sw $((T0 + 960)) --dry-run; d2=$(dcls "$B"); sw $((T0 + 960)); c1=$(ncall)
+[ "$d1" = 1/1/observed/quiet ] && [ "$d2" = 1/16/observed/alert ] && [ $((c1 - c0)) = 1 ] && tail -1 "$FD/calls.log" | grep -qF '≥16분' \
+  && ok inbox-sweep-legacy-backlog "times 없는 줄 → 첫 관측부터 observed, 16분 뒤 alert·본문 ≥" || bad inbox-sweep-legacy-backlog "observed quiet→alert ≥" "$d1 $d2 $(tail -1 "$FD/calls.log")"
+swn rep; B="$SWI/pane-w1_p1.log"; swsend "$T0" w1:p1 "줄"; sw $((T0 + 960)); c0=$(ncall)
+sw $((T0 + 2760)) --dry-run; d=$(dcls "$B"); sw $((T0 + 2760)); c1=$(ncall)
+[ "${d##*/}" = skip ] && [ "$c1" = "$c0" ] && ok inbox-sweep-repeat-30m "경보 30분 뒤 → skip·알림 0" || bad inbox-sweep-repeat-30m "skip 0" "$d $((c1 - c0))"
+sw $((T0 + 960 + 3660)); c2=$(ncall)
+[ $((c2 - c1)) = 1 ] && ok inbox-sweep-repeat-61m "경보 61분 뒤 → 1건" || bad inbox-sweep-repeat-61m 1 "$((c2 - c1))"
+swn keep; B="$SWI/pane-w1_p1.log"; swsend "$T0" w1:p1 "09:00"; sw $((T0 + 1200)); c0=$(ncall)
+swack $((T0 + 1500)) w1:p1 1; swsend $((T0 + 1800)) w1:p1 "09:30"
+sw $((T0 + 3000)) --dry-run; d=$(dcls "$B"); sw $((T0 + 3000)); c1=$(ncall); sw $((T0 + 4860)); c2=$(ncall)
+[ $((c0 > 0)) = 1 ] && [ "${d##*/}" = skip ] && [ "$c1" = "$c0" ] && [ $((c2 - c1)) = 1 ] && grep -qF "$B" "$SWI/sweep/alerts" \
+  && ok inbox-sweep-ack-keeps-alert "09:20 경보 → 09:25 완전 ack → 09:30 새 줄 → 09:50 skip, 10:21 alert(alerts 행 유지)" || bad inbox-sweep-ack-keeps-alert "skip 뒤 1건" "$d $((c1 - c0)) $((c2 - c1))"
+swn mid; B="$SWI/pane-w1_p1.log"
+m0=$(date -j -f '%Y-%m-%d %H:%M:%S' '2026-11-11 23:55:00' +%s); m1=$(date -j -f '%Y-%m-%d %H:%M:%S' '2026-11-12 00:12:00' +%s)
+swsend "$m0" w1:p1 "자정 전"; sw "$m1" --dry-run; d=$(dcls "$B")
+[ "$d" = 1/17/exact/alert ] && ok inbox-sweep-midnight "23:55 도착·다음 날 00:12 → 17분 alert" || bad inbox-sweep-midnight 1/17/exact/alert "$d"
+swn ext; RCX="$T/rc-ext/.review-chain/c1"; mkdir -p "$RCX"; XB="$RCX/inbox.log"; printf 'x\n' > "$XB"; UB="$T/rc-ext/other.log"; printf 'y\n' > "$UB"
+sw "$T0" --register "$XB"; r1=$RC; sw "$T0" --dry-run; d0=$(dcls "$XB")
+[ "$r1" = 0 ] && grep -qxF "$XB" "$SWI/known.list" && [ "${d0##*/}" = quiet ] && [ ! -e "$XB.times" ] \
+  && ok inbox-sweep-external-registered "--register 상태 폴더 밖 inbox.log(send 이력 없음) → 다음 sweep 대상" || bad inbox-sweep-external-registered "0·known·대상" "rc=$r1 d=$d0"
+[ -z "$(dcls "$UB")" ] && ok inbox-sweep-external-unregistered "등록 안 된 외부 경로 → 대상 아님(전환 절차 필요의 대조군)" || bad inbox-sweep-external-unregistered "대상 아님" "$(dcls "$UB")"
+sw "$T0" --register relative.log; chk inbox-sweep-register-bad 2
+sw "$T0"; printf '비밀원문줄\n' >> "$XB"; c0=$(ncall); sw $((T0 + 960)); c1=$(ncall); body=$(grep 'notification show' "$FD/calls.log" | tail -1)
+[ $((c1 - c0)) = 1 ] && ! printf '%s' "$body" | grep -qF "$T" && ! printf '%s' "$body" | grep -qF '비밀원문' && printf '%s' "$body" | grep -qF -- '--body c1/inbox ' \
+  && ok inbox-sweep-body "--body 에 홈·임시 경로·원문 없음, 표시 이름 c1/inbox" || bad inbox-sweep-body "c1/inbox, 경로·원문 없음" "$body"
+swn noh; B="$SWI/pane-w1_p1.log"; swsend "$T0" w1:p1 "줄"
+run2 AO_STATE_ROOT="$SWR" AO_INBOX_NOW=$((T0 + 960)) PATH="$NOHERDR:/usr/bin:/bin" -- bash "$BIN" inbox-sweep; r1=$RC
+touch "$FD/server-down"; sw $((T0 + 970)); r2=$RC; rm -f "$FD/server-down"
+[ "$r1/$r2" = 0/0 ] && [ "$(sev sweep-alert | grep -c 'sent=0')" = 2 ] && [ ! -s "$SWI/sweep/alerts" ] \
+  && ok inbox-sweep-no-herdr "herdr 없음·서버 꺼짐 → 0, sweep-alert sent=0, alerts 변화 없음" || bad inbox-sweep-no-herdr "0/0 sent=0×2" "$r1/$r2 $(sev sweep-alert)"
+inj=$(grep -cE 'agent (prompt|send)|pane (send|run)|keys' "$FD/calls.log"); other=$(grep -cvE '^herdr (status server|notification show)' "$FD/calls.log")
+[ "$inj/$other" = 0/0 ] && ok inbox-sweep-no-inject "sweep 묶음의 herdr 호출은 status·notification 뿐(주입 0)" || bad inbox-sweep-no-inject 0/0 "$inj/$other"
+swn dry; swsend "$T0" w1:p1 "줄"; swsend "$T0" w1:p2 "줄"; c0=$(ncall); sw $((T0 + 960)) --dry-run
+nf=$(printf '%s\n' "$OUT" | awk -F'\t' 'NF != 5' | wc -l | tr -d ' '); nl=$(printf '%s\n' "$OUT" | grep -c .)
+[ "$RC/$nf/$nl" = 0/0/2 ] && [ "$(ncall)" = "$c0" ] && [ ! -e "$SWI/sweep" ] && [ ! -e "$SWI/events.log.x" ] && [ "$(grep -c . "$SWI/events.log")" = 2 ] \
+  && ok inbox-sweep-dry-run "dry-run → 줄마다 탭 5칸·알림 0·sweep 상태·events 기록 0" || bad inbox-sweep-dry-run "0/0/2" "$RC/$nf/$nl $(ls "$SWI")"
+swn ovl; swsend "$T0" w1:p1 "줄"; c0=$(ncall)
+(cd "$T" && exec env -i "${BASE2[@]}" AO_STATE_ROOT="$SWR" AO_INBOX_NOW=$((T0 + 960)) AO_SWEEP_TEST_HOLD=1 bash "$BIN" inbox-sweep) & q1=$!
+sleep 0.3; sw $((T0 + 960)); r2=$RC; wait "$q1"; r1=$?
+[ "$r1/$r2" = 0/0 ] && [ $(($(ncall) - c0)) = 1 ] && ok inbox-sweep-overlap "동시 2회(앞이 잠금 쥠) → 둘 다 0·알림 1건" || bad inbox-sweep-overlap "0/0 1건" "$r1/$r2 $(($(ncall) - c0))"
+swn rot; dd if=/dev/zero of="$SWI/events.log" bs=1048576 count=10 2>/dev/null; printf 'x\n' >> "$SWI/events.log"; sz0=$(wc -c < "$SWI/events.log" | tr -d ' ')
+sw "$T0"; sz1=$(wc -c < "$SWI/events.log.$T0" 2>/dev/null | tr -d ' ')
+[ "$RC" = 0 ] && [ "$sz1" = "$sz0" ] && [ -f "$SWI/events.log" ] && [ "$(wc -c < "$SWI/events.log" | tr -d ' ')" -lt 1000 ] \
+  && ok inbox-ev-rotate "10MB 초과 → events.log.<epoch> 로 옮김(크기 그대로)·새 파일·삭제 0" || bad inbox-ev-rotate "옮김 $sz0" "rc=$RC ${sz1:-없음}"
+rm -f "$SWI/events.log.$T0"
+swn akt; B="$SWI/pane-w1_p1.log"; swsend "$T0" w1:p1 "줄"; sw $((T0 + 300)); swack $((T0 + 840)) w1:p1 1; sw $((T0 + 1200))
+cl=$(sev backlog-close)
+printf '%s' "$cl" | grep -qF 'age=840' && printf '%s' "$cl" | grep -qF 'exact=1' && printf '%s' "$cl" | grep -qF "ackts=$((T0 + 840))" \
+  && ok inbox-sweep-ackts-age "도착 10:00·ackts 10:14·관측 10:20 → backlog-close age=840 exact=1" || bad inbox-sweep-ackts-age "age=840 exact=1" "$cl"
+swn nak; B="$SWI/pane-w1_p1.log"; swsend "$T0" w1:p1 "줄"; sw $((T0 + 300)); echo 1 > "$B.cursor"; sw $((T0 + 1200)); cl=$(sev backlog-close)
+printf '%s' "$cl" | grep -qF 'age=1200' && printf '%s' "$cl" | grep -qF 'ackts=-' \
+  && ok inbox-sweep-no-ackts "옛 판 ack(cursor 만) → age=관측−도착·ackts=-" || bad inbox-sweep-no-ackts "age=1200 ackts=-" "$cl"
+swn onw; B="$SWI/pane-w1_p1.log"; swsend "$T0" w1:p1 "#1"; sw $((T0 + 300)); echo 1 > "$B.cursor"; swsend $((T0 + 1200)) w1:p1 "#2"
+swack $((T0 + 1500)) w1:p1 2; sw $((T0 + 1800)); cl=$(sev backlog-close | head -1)
+[ "$(tail -1 "$B.ackts")" = "2	2	$((T0 + 1500))" ] && printf '%s' "$cl" | grep -qF 'ackts=-' && printf '%s' "$cl" | grep -qF 'age=1800' \
+  && ok inbox-sweep-old-then-new-ack "#1 옛 판 ack → #2 새 판 ack(2⇥2) → #1 close 는 ackts=-·age=관측−도착(10:25 로 확정 안 함)" || bad inbox-sweep-old-then-new-ack "ackts=- age=1800" "$cl"
+swn tmiss; B="$SWI/pane-w1_p1.log"; swsend "$T0" w1:p1 "#1"; swack $((T0 + 60)) w1:p1 1; printf 'times 없는 #2\n' >> "$B"
+sw $((T0 + 600)); sw $((T0 + 900)) --dry-run; d1=$(dcls "$B"); sw $((T0 + 1560)) --dry-run; d2=$(dcls "$B")
+[ "$d1" = 1/5/observed/quiet ] && [ "$d2" = 1/16/observed/alert ] \
+  && ok inbox-sweep-times-missing "times 행이 빠진 줄 → 관측 기반으로 재고 멈추지 않음(5분 quiet → 16분 alert)" || bad inbox-sweep-times-missing "observed 5→16" "$d1 $d2"
+# launchd 설치 스크립트: 격리 HOME + 가짜 launchctl(호출 기록, bootstrap/bootout 으로 등록 표식)
+IS="$AO/launchd/install-sweep.sh"; FLC="$T/fake-launchctl"; LCL="$T/launchctl.calls"
+cat > "$FLC" <<'SH'
+#!/bin/sh
+echo "$*" >> "$LCL"
+case "$1" in
+  print) [ -e "$LCL.loaded" ] ;;
+  bootstrap) : > "$LCL.loaded" ;;
+  bootout) rm -f "$LCL.loaded" ;;
+esac
+SH
+chmod +x "$FLC"; : > "$LCL"
+isw() { run HOME="$HS" AO_LAUNCHCTL="$FLC" LCL="$LCL" AO_TS=20261111-000000 -- bash "$IS" "$@"; }
+HS="$T/hs"; mkdir -p "$HS/Library/LaunchAgents"; PL="$HS/Library/LaunchAgents/kr.waymakerlabs.agent-orchestrator.inbox-sweep.plist"
+plutil -lint "$AO/launchd/kr.waymakerlabs.agent-orchestrator.inbox-sweep.plist" >/dev/null 2>&1 && ok inbox-sweep-plist-lint "plist 틀 plutil -lint 통과" || bad inbox-sweep-plist-lint OK "실패"
+s0=$(snap "$HS"); isw; s1=$(snap "$HS")
+[ "$RC" = 0 ] && [ "$s0" = "$s1" ] && printf '%s' "$OUT" | grep -qF "할 일	$FLC bootstrap gui/$(id -u) $PL" && printf '%s' "$OUT" | grep -qF "<string>$HS/.local/bin/agent-orchestrator</string>" \
+  && ! grep -qv '^print ' "$LCL" && ok inbox-sweep-install-dry "기본 실행 = dry-run: HOME 지문 그대로·bootstrap 명령·__HOME__ 치환 출력·launchctl 은 print 만" || bad inbox-sweep-install-dry "rc 0·지문 같음" "rc=$RC $(head -3 <<< "$OUT") $(cat "$LCL")"
+isw --apply; r1=$RC; isw --apply; r2=$RC; o2=$OUT
+[ "$r1/$r2" = 0/0 ] && plutil -lint "$PL" >/dev/null 2>&1 && ! grep -qF __HOME__ "$PL" && [ "$(grep -c '^bootstrap ' "$LCL")" = 1 ] && printf '%s' "$o2" | grep -q '^유지' \
+  && ok inbox-sweep-install-apply "--apply → plist(lint 통과·치환)·bootstrap 1번, 두 번째는 유지(멱등)" || bad inbox-sweep-install-apply "0/0 bootstrap 1" "$r1/$r2 $(cat "$LCL")"
+echo '<plist/>' > "$PL.x"; cp "$PL" "$PL.keep"; echo '<!-- 다름 -->' >> "$PL"; isw --apply; r3=$RC; mv "$PL.keep" "$PL"; rm -f "$PL.x"
+[ "$r3" = 3 ] && ok inbox-sweep-install-conflict "다른 내용 plist 가 있으면 --apply 3(덮어쓰지 않음)" || bad inbox-sweep-install-conflict 3 "$r3"
+isw --uninstall; r4=$RC
+[ "$r4" = 0 ] && [ ! -e "$PL" ] && [ -f "$HS/.claude/archive/agent-orchestrator/inbox-sweep-20261111-000000/${PL##*/}" ] && grep -q '^bootout ' "$LCL" \
+  && ok inbox-sweep-uninstall-archive "--uninstall → bootout·plist 는 archive 로 이동(삭제 아님)" || bad inbox-sweep-uninstall-archive "보관" "rc=$r4 $(ls -R "$HS/.claude" 2>&1 | head -5)"
+# manifest: 새 inbox-sweep.manifest 가 있어도 --check herdr 출력·종료 코드는 그 파일이 없는 사본과 같다
+R2="$T/repo2"; cp -R "$R" "$R2"; rm -f "$R2/tools/agent-orchestrator/manifests/inbox-sweep.manifest"
+cp "$AO/manifests/inbox-sweep.manifest" "$R/tools/agent-orchestrator/manifests/" 2>/dev/null
+H4="$T/h4"; mkdir -p "$H4"
+run HOME="$H4" -- bash "$R/tools/agent-orchestrator/install.sh" --check herdr; c1="$RC|$OUT"
+run HOME="$H4" -- bash "$R2/tools/agent-orchestrator/install.sh" --check herdr; c2="$RC|$OUT"
+[ -f "$R/tools/agent-orchestrator/manifests/inbox-sweep.manifest" ] && [ "$c1" = "$c2" ] \
+  && ok inbox-check-herdr-unchanged "inbox-sweep.manifest 유무와 무관하게 --check herdr 출력·종료 코드 같음" || bad inbox-check-herdr-unchanged "같음" "$(diff <(echo "$c1") <(echo "$c2") | head -4)"
+H5="$T/h5"; mkdir -p "$H5"; run HOME="$H5" AGENT_ORCHESTRATOR_LINK_TARGET="$R/tools/agent-orchestrator/bin/agent-orchestrator" -- bash "$R/tools/agent-orchestrator/install.sh" herdr
+run HOME="$H5" -- bash "$R/tools/agent-orchestrator/install.sh" --check inbox-sweep; m1=$RC; o1=$OUT
+mkdir -p "$H5/Library/LaunchAgents"; : > "$H5/Library/LaunchAgents/kr.waymakerlabs.agent-orchestrator.inbox-sweep.plist"
+run HOME="$H5" -- bash "$R/tools/agent-orchestrator/install.sh" --check inbox-sweep; m2=$RC; o2=$OUT
+[ "$m1/$m2" = 1/0 ] && printf '%s' "$o1" | grep -q '^없음	doc	ours-core	~/Library/LaunchAgents/' && printf '%s' "$o2" | grep -q '^있음	doc	ours-core	~/Library/LaunchAgents/' \
+  && printf '%s' "$o2" | grep -q '^== inbox-sweep: 필수 1/1 있음' && ok inbox-check-sweep-doc "plist 없음 → 없음·1 / 있음 → 있음·0 (kind doc)" || bad inbox-check-sweep-doc "1/0" "$m1/$m2 $(grep inbox-sweep <<< "$o1")"
 # 기존 받은편지함 케이스(B1까지 116개) 이름 — 하나라도 PASS로 실행되지 않으면 FAIL
 INBOX_OLD="
   inbox-send inbox-format inbox-raw inbox-raw-notime inbox-4000-ok inbox-no-truncate inbox-4000-multibyte
@@ -971,7 +1098,7 @@ lw=$(ps -axo command | grep -F "$T" | grep -cF 'inbox-wait' )
 #   다른 세션이 실제로 쓰는 받은편지함(*.log·.cursor·.owner·.flock 등)은 시험과 무관하게 바뀌므로 세지 않는다
 RS="$REAL_HOME/.local/state/agent-orchestrator"; touched=""
 if [ -d "$RS" ]; then
-  touched=$(find "$RS" -newer "$T/stamp" 2>/dev/null | grep -E '/(events\.log|known\.list|recv\.flock|hooks\.off)$|/(subs|wait|pane-gen)(/|$)|\.(times|ackts)$|\.waiters(/|$)')
+  touched=$(find "$RS" -newer "$T/stamp" 2>/dev/null | grep -E '/(events\.log|known\.list|recv\.flock|hooks\.off)$|/(subs|wait|pane-gen|sweep)(/|$)|\.(times|ackts)$|\.waiters(/|$)')
 fi
 [ -z "$touched" ] && ok inbox-real-state-untouched "실제 $RS 에 시험 상태 이름 변경 0" || bad inbox-real-state-untouched "0" "$touched"
 TOTAL=$((PASS + FAIL))
