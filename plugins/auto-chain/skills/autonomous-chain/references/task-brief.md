@@ -10,7 +10,7 @@
 
 ### 1-1. pane worker (③, 2.0.0 · 2.3.0 갱신)
 
-지시서에 "조정자 pane: `<pane id>`"가 있으면 옆 pane에서 도는 ③ worker다(`references/pane-worker.md`). 아래를 더 지킨다. ① `Agent` 서브에이전트 worker는 메시지를 보내지 않고 §7 반환 한 줄로 끝낸다(완료 알림이 조정자에게 간다).
+지시서에 "조정자 pane: `<pane id>`"가 있으면 옆 pane에서 도는 ③ worker다(`references/pane-worker.md`). 아래를 더 지킨다. ① `Agent` 서브에이전트 worker는 질문·정지 메시지를 보내지 않고, 끝날 때 §7의 완료 한 줄만 보낸 뒤 반환한다(2.8.1).
 
 - 조정자에게는 **세 경우에만** 한 줄을 보낸다. 그 밖의 진행은 보고서 `- 진행:` 줄로만 알린다(조정자 맥락 절약).
   ```bash
@@ -97,3 +97,5 @@
 ```text
 <보고서 경로> — <DONE|PARTIAL|BLOCKED> <한 줄 요약>
 ```
+
+- (2.8.1) **① `Agent` worker도 반환 직전에 완료 한 줄을 보낸다.** 지시서에 조정자 받은편지함 경로가 있으면 보고서를 `- 진행: 완료`로 바꾼 **뒤에** `"${AGENT_ORCHESTRATOR:-$HOME/.local/bin/agent-orchestrator}" inbox-send <그 경로> "[worker <task-id>] <done|failed> <보고서 경로> <반환 줄과 같은 한 줄>"`을 한 번 실행하고 반환한다(DONE·PARTIAL은 `done`, BLOCKED는 `failed`). 실패(2·4)해도 다시 시도하지 않고 그대로 반환한다. `unwatched`면 보고서 `- 진행:` 아래에 `미감시 전송 <받은편지함> <HH:MM>` 한 줄. 근거: 2026-11-11 gira-backlog-night에서 백그라운드 `Agent` 완료 알림이 조정자에게 닿지 않아 4시간 회수가 멈췄다. 받은편지함 줄은 조정자의 훅 대기자가 따로 깨운다.

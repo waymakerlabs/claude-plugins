@@ -16,6 +16,7 @@
 
 ## 핵심 규칙
 
+- (2.8.1) 완료 알림 유실 대비: ① `Agent` worker도 반환 직전 조정자 받은편지함에 `[worker <task-id>] done|failed <보고서>` 한 줄을 보내고, 조정자는 완료 알림·받은편지함 줄·진행 감시 `완료` 중 먼저 온 것으로 회수합니다. 진행 감시 스크립트는 고쳐 쓰지 않고, 다시 띄운 직후 각 보고서 `- 진행:` 줄을 직접 읽어 이미 끝난 task를 회수합니다(2026-11-11 회수 지연 4시간·1시간 20분 사례).
 - (2.8.0) 받은편지함 감시를 Monitor에서 `inbox-hooks` 구독으로 바꿨습니다. 받는 쪽은 받은편지함이 정해진 직후 `agent-orchestrator inbox-subscribe <받은편지함>`을 한 번 하고(조정자는 상태 파일을 만든 직후), 새 줄이 오면 쉬는 세션이 훅으로 깨어납니다. `inbox-hooks`는 dependency라 auto-chain과 함께 자동 설치·켜집니다. 인계 순서는 처리 동결 → 진행 중 처리 종료 → 실제로 처리한 마지막 번호까지만 `--ack` → `inbox-subscribe --unsubscribe` → 인계 문서 기록 순서이고, `inbox-send`가 `unwatched`를 내면 보고서·상태 파일에 `미감시 전송` 한 줄을 남깁니다. `spawn-pane-worker.sh`는 부모 pane에 감시가 없으면 경고와 `parent_watch=none`을 냅니다(기동은 계속). Codex·OpenCode·kiro-cli처럼 훅이 없는 도구는 Monitor `inbox-watch`를 그대로 씁니다.
 - (2.7.0) 짧은 탐색·조사 서브에이전트는 Haiku: 읽기 전용 위치 탐색·grep·목록화·사실 확인은 `Agent`에 `model: haiku`로 돌리고, 결과는 조정자가 근거 파일로 대조합니다. 구현·리뷰·판단 단계와 pane worker는 그대로(sonnet/opus)입니다. 계기: Haiku 5.5 사용 가능, 전역 CLAUDE.md의 "haiku: 위치 탐색·grep·목록화" 기준과 맞춤.
 - (2.6.0) 세션 간 메시지는 받은편지함으로: 이미 첫 지시를 받은 세션의 입력창에는 아무것도 쳐 넣지 않습니다. worker↔조정자·조정자↔부모 세션 메시지는 `agent-orchestrator inbox-send`로 파일에 덧붙이고 받는 쪽이 `inbox-watch` Monitor로 읽습니다(조정자 받은편지함은 체인 고정 경로라 인계로 pane이 바뀌어도 같음). `agent-send`는 새 세션 첫 지시 시도 1회뿐이고, 실패·불명확해도 재전송하지 않습니다(pane close 확인 뒤 새 pane으로). 인계 때 옛 조정자는 받은편지함을 동결(Monitor 중지·ack·인계 문서 기록)한 뒤 다음 조정자를 엽니다. 계기: office gira에서 마일스톤 조정자가 부모 세션 입력창에 답을 넣었습니다.
