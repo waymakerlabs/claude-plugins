@@ -90,8 +90,10 @@ _aoi_funlock() {
   local fd=$1 cur
   eval "cur=\${_AOI_LOCK$fd:-}"
   [ -n "$cur" ] || return 0
-  eval "exec $fd>&-"
+  # 변수를 먼저 비운다: 닫은 뒤·비우기 전 TERM 이면 정리가 "쥐고 있다"로 오판해 잠금 없이 지운다
+  # (크로스체크 3회차 #1). 비운 뒤·닫기 전 TERM 은 정리가 fd 를 다시 열어 새로 잡으므로 안전하다
   eval "_AOI_LOCK$fd="
+  eval "exec $fd>&-"
 }
 # 받은편지함 기록 잠금(fd 9, <log>.flock). 실패 4(기존 동작)
 _aoi_lock() {
