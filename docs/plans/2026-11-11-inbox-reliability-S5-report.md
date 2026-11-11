@@ -98,3 +98,25 @@ ev=wait-notify  sid=cccccccc-…-000000000003  n=1-1  arr=1794384887  re=0
 1. ① `Agent` worker도 끝낼 때 조정자 받은편지함에 `inbox-send … done <보고서>` 한 줄을 보낸다. 2.8.0 조정자는 `coordinator.log`를 구독하므로 완료 알림이 빠져도 훅 대기자가 깨운다. task-brief.md §7·SKILL.md 「세션 간 메시지」 문구 변경이며 합의 결정 §3과 충돌하지 않는다. 남는 구멍: 조정자가 쉬지 않고 다른 일을 하는 중이면 깨움은 턴이 끝날 때 온다(지연은 턴 길이).
 2. 진행 감시 절에 "재기동 직후 각 보고서 `- 진행:` 줄을 직접 읽어 확인하고, 표준 스크립트를 고쳐 쓰지 않는다"를 추가한다.
 3. 진행 감시가 `- 진행: 완료`를 알렸는데 worker 반환이 없으면, 반환을 기다리지 말고 보고서로 회수한다(500행 "완료 판정은 반환"의 예외로 명시).
+
+## 9. auto-chain 2.8.1 반영과 세 머신 적용 (주인님 go, 2026-11-11 17:25~17:31)
+
+§8 제안 1~3을 반영했다(커밋 `98f14c0`, main fast-forward·push).
+
+- `task-brief.md` §1-1·§7: ① `Agent` worker도 `- 진행: 완료` 뒤 조정자 받은편지함에 `[worker <task-id>] done|failed <보고서> <한 줄>`을 한 번 보내고 반환. 실패해도 재시도 없음, `unwatched`면 기록 한 줄.
+- `SKILL.md`: 지시서 항목에 조정자 받은편지함 경로 추가. 회수는 완료 알림·받은편지함 줄·진행 감시 `완료` 중 먼저 온 것. 감시가 `완료`를 알렸는데 반환이 없으면 보고서로 회수. 진행 감시 스크립트를 고쳐 쓰지 말 것, 다시 띄운 직후 각 보고서 `- 진행:` 줄을 직접 읽을 것.
+- worker 에이전트 3개(`chain-worker`·`-deep`·`-xhigh`)에 같은 한 줄. README·plugin.json·marketplace.json 2.8.1.
+- 시험: auto-chain `run-tests.sh` PASS 91 / FAIL 0. `claude plugin validate plugins/auto-chain` 통과.
+
+세 머신 적용(`claude plugin marketplace update` → `claude plugin update`):
+
+| 머신 | 마켓 HEAD | auto-chain | review-chain | inbox-hooks | C1 `--status` | C2 스모크(설치 판) |
+|---|---|---|---|---|---|---|
+| office(이 맥, GSR M4Pro Macmini) | `98f14c0` | 2.8.1 | 0.2.0 | 0.1.0 | `inbox-wait 2` rc 0 | 통과(17:22) |
+| home-macmini | `98f14c0` | 2.7.0→2.8.1(+inbox-hooks) | 0.1.4→0.2.0 | 0.1.0 | `inbox-wait 2` rc 0 | 통과(17:30, exit 2·`#1`·`wait-notify` 1·실제 상태 변경 0) |
+| gsr-macbook(맥북프로 M5 Max) | `98f14c0` | 2.7.0→2.8.1(+inbox-hooks) | 0.1.4→0.2.0 | 0.1.0 | `inbox-wait 2` rc 0 | 통과(17:30, 같음) |
+
+- 세 머신 모두 `settings.json`에 `inbox-hooks@…: true`(dependency 설치가 켬, G6 동작. 내가 settings를 직접 고치지 않았다).
+- **C1·C2 세 머신 충족.** 병합 조건 C1~C4·C6 모두 충족.
+- 적용은 새 세션부터다(CLI가 "Restart to apply changes"). 지금 열린 세션·진행 중 체인은 옛 스킬로 계속 돈다. 두 체인(gira-backlog-night·grit-portal)은 다음 인계 때 2.8.1로 바뀐다.
+- 다음: 1주 관찰(계획 S5 "확인").
