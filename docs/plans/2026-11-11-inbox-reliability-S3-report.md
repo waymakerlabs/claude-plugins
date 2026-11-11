@@ -7,7 +7,7 @@
 - 계약 반영(S2 미룬 것 2건): 계획 §2-5 5번에 재통지 유예(`AO_INBOX_RENOTIFY_GRACE`, 기본 15초)와 통지 직전 `_aoiw_deliv` 재확인, 계약 진본 §1-4에 같은 내용. 계획 §2-9 표에 `wait-notify … [hook=SessionStart]`·`sub … [from=<옛 sid>]` 칸.
 - 새 `lib/inbox-sweep.sh`, `bin/agent-orchestrator` 분기, launchd plist 틀, `launchd/install-sweep.sh`(기본 dry-run), `manifests/inbox-sweep.manifest`(kind `doc`), 가짜 herdr `notification show`. 계약 진본 §1-4에 `inbox-sweep`·`--register` 행.
 - 커밋 `5189cea`(push 안 함).
-- launchd `--apply`: **주인님 go 대기**(§4).
+- launchd: **설치하지 않는다**(§7, 주인님 결정). 코드는 리포에 남긴다.
 
 ## 2. 자동 시험
 
@@ -58,12 +58,19 @@
 ## 5. 남은 위험
 
 - **같은 inode·같은 첫 줄로 예전 줄 수 이상 다시 쓰인 받은편지함**은 잘림으로 못 알아본다(3회차 리뷰어도 비차단 한계로 기록). 받은편지함은 append 전용이라 정상 경로에서는 생기지 않는다. 생기면 observed 나이가 하한이 아니게 될 수 있다.
-- **launchd 실제 경로 미확인**: `--apply`·launchd 경유 알림은 주인님 go 대기(§6). 그 전까지 이 맥에는 sweep이 돌지 않는다.
+- **launchd 미설치**(§7): R1(깨운 턴 중단 뒤 무입력)·R2(7000초 만료 뒤 쉬는 세션)에 들어온 메시지는 사람이 볼 때까지 남는다. 크기는 S5에서 events.log로 잰다.
 - **~/.local/bin 판**: 링크가 마켓플레이스 사본(옛 판)을 가리켜 `inbox-sweep`을 모른다(실측 rc=2). push로 사본이 갱신되기 전 `--apply`만 하면 5분마다 rc=2로 끝나고 `launchd.err`에 한 줄씩 쌓인다.
 - herdr 알림 표시 자체(화면에 뜨는가)는 가짜 herdr로만 시험했다 — launchd 실측에서 확인한다(UNVERIFIED).
 - shellcheck 없음(미실행).
 
 ## 6. 미결·다음 할 일
 
-- **주인님 go 대기**: (a) `install-sweep.sh --apply`, (b) S1~S3 push(마켓 사본 갱신 → 링크가 새 판), (c) `~/.local/bin` 교체. go 뒤 계획 S3 종료 조건의 launchd 경유 실제 알림 확인(`/tmp/ao-sweep-probe/x.log` 등록 → 다음 주기 `sweep-alert sent=1`·화면 알림 → ack·등록 해제)과 외부 받은편지함 전환 절차(`find ~/Dev -maxdepth 6 -path '*/.review-chain/*/inbox.log'` → `--register`).
+- ~~launchd 설치·실측·외부 받은편지함 등록~~ — §7 결정으로 하지 않는다.
 - **⑨ G5 통과**(15:58 확인): `why=timeout`이 시작 뒤 7001초(7000±5 안). S2 보고서 §4 ⑨ 줄에 옮겼다. S5 병합 조건 C3 충족. 시험 pane `w3:p64`는 이 세션 지시(닫지 말 것)에 따라 열어 둔다.
+
+## 7. 주인님 결정 (2026-11-11, S3 마감 때)
+
+**2026-11-11 주인님 결정(S3 마감 때)**: sweep 알림을 쓰지 않는다 — "메시지가 남아 있어도 따로 알릴 필요 없다". 이 방식(훅 대기자)이 안 되면 완전히 다른 방법으로 간다. 그래서 launchd는 설치하지 않고, `inbox-sweep`·`install-sweep.sh` 코드는 리포에 남긴다(필요해지면 `install-sweep.sh --apply` 한 번으로 켠다). 합의 결정 ②를 이것으로 바꾼다.
+
+- 바뀐 문서: 계획 §3 S3 머리 인용·§3 S5 C5 삭제·병합 뒤 4번·§5-2 R1·§2-9 지표 사후 계산 줄.
+- S5 판정 기준은 그대로다: 1주 동안 "사람이 물어서 발견한 미처리" 0건, 두 체인 모두 새 방식 인계 1회 이상. 이것이 깨지면 이 방식은 실패로 보고 다른 방법을 찾는다.

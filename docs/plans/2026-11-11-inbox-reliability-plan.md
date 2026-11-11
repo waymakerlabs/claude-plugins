@@ -281,6 +281,7 @@ ts=<epoch>  ev=<사건>  box=<표시 이름|->  [사건별 칸…]
 
 **지표의 분자·분모**:
 - **깨움 지연** = `wait-notify.ts − arr`(도착 기준). 대기자가 멈췄다가 늦게 발견한 경우도 포함된다(rev 1의 관측 기준 lag 폐기). 분포는 p50·p90·최대.
+- (2026-11-11 결정 뒤) sweep을 설치하지 않으므로 backlog 사건이 없다. S5는 같은 지표를 `send`(n·arr)와 `ack`(n·ts)의 짝, 기간 끝 cursor로 사후 계산한다(ack 시각 − 도착 시각 > 900초인 줄, 기간 끝에 900초 넘게 남은 줄).
 - **15분 초과 미처리 건수** = `backlog-close.age > 900`인 backlog 수 + 기간 끝에 열린 채 900초가 넘은 backlog 수. 경보 횟수가 아니라 backlog 단위로 센다. `exact=0`(도착 시각이 관측 기반, 하한)이나 `ackts=-`(종료 시각이 관측 기반, 상한)인 건은 따로 집계해 정확한 건과 섞지 않는다.
 - **전달률** = `wait-delivered` 수 / `wait-notify` 수.
 - **대기자 공백** = 세션마다 `wait-end`(모든 why)와 다음 `wait-start` 사이의 구간. 단 `why=notify` 뒤 구간은 "깨운 턴 처리 중"으로 따로 집계한다. 공백 중 도착한 `send`의 수도 센다.
@@ -491,7 +492,9 @@ rev 3 추가(2회차):
 
 **외부 받은편지함 전환 절차(finding 10)**: sweep 설치 직후 한 번, 진행 중인 review-chain 체인마다 `inbox-sweep --register <리포>/.review-chain/<id>/inbox.log`와 `workers/*/inbox.log`를 실행한다. 대상 목록은 `find ~/Dev -path '*/.review-chain/*/inbox.log' -maxdepth 6`로 만든다(읽기만). auto-chain 받은편지함은 상태 폴더 안이라 자동으로 대상이다.
 
-종료 조건: 시험 통과·총계 대조, `plutil -lint` 통과. 이 맥에서 `install-sweep.sh` dry-run 출력을 주인님께 보이고 **go를 받은 뒤** `--apply`를 실행한다. 그다음 `launchctl print gui/<uid>/kr.waymakerlabs.agent-orchestrator.inbox-sweep`로 등록을 확인한다. **launchd 경유 실제 알림 확인**(finding 11 뒷부분): `known.list`에 `/tmp/ao-sweep-probe/x.log`를 등록하고, `times`에 도착 시각을 20분 전으로 적은 시험 줄 1개를 둔다. 다음 launchd 주기(5분 안)에 화면 알림이 뜨고 `sweep-alert sent=1`이 생기는지 본다. 끝나면 cursor를 ack해 닫고 등록을 지운다. office·home 설치는 S5 체크리스트다.
+> **2026-11-11 주인님 결정(S3 마감 때)**: sweep 알림을 쓰지 않는다 — "메시지가 남아 있어도 따로 알릴 필요 없다". 이 방식(훅 대기자)이 안 되면 완전히 다른 방법으로 간다. 그래서 launchd는 설치하지 않고, `inbox-sweep`·`install-sweep.sh` 코드는 리포에 남긴다(필요해지면 `install-sweep.sh --apply` 한 번으로 켠다). 합의 결정 ②를 이것으로 바꾼다. 아래 종료 조건의 `--apply`·launchd 실측·외부 받은편지함 등록은 하지 않는다.
+
+종료 조건(원래): 시험 통과·총계 대조, `plutil -lint` 통과. 이 맥에서 `install-sweep.sh` dry-run 출력을 주인님께 보이고 **go를 받은 뒤** `--apply`를 실행한다. 그다음 `launchctl print gui/<uid>/kr.waymakerlabs.agent-orchestrator.inbox-sweep`로 등록을 확인한다. **launchd 경유 실제 알림 확인**(finding 11 뒷부분): `known.list`에 `/tmp/ao-sweep-probe/x.log`를 등록하고, `times`에 도착 시각을 20분 전으로 적은 시험 줄 1개를 둔다. 다음 launchd 주기(5분 안)에 화면 알림이 뜨고 `sweep-alert sent=1`이 생기는지 본다. 끝나면 cursor를 ack해 닫고 등록을 지운다. office·home 설치는 S5 체크리스트다.
 되돌리기: `install-sweep.sh --uninstall`, 코드는 `git revert`.
 
 ### S4. 스킬 문구 교체·판 올림 (브랜치 `feat/inbox-hooks`)
@@ -542,14 +545,14 @@ rev 3 추가(2회차):
 | C2 | 세 머신에서 실제 훅 입력으로 동작 | 머신마다 아래 스모크를 실행한다. `S=$(mktemp -d)`. 모든 호출에 `env -u HERDR_PANE_ID AO_STATE_ROOT=$S/state HOME=$S`를 붙인다(2회차 새 #8). 순서: `inbox-subscribe --session <시험 uuid> $S/x.log` → `printf '{"session_id":"<uuid>","hook_event_name":"Stop","transcript_path":"%s"}' $S/t.jsonl \| "$AO" inbox-wait &` → `inbox-send $S/x.log probe` → 대기자 exit **2**, stderr에 `#1`, `$S/state/inbox/events.log`에 `wait-notify`. 앞뒤로 실제 `~/.local/state/agent-orchestrator`의 `find -newer` 결과 변경 0 |
 | C3 | 7000초 자체 종료(S2 ⑨, G5) | 결과가 S2 보고서에 있다. 없으면 병합하지 않는다 |
 | C4 | G1~G4·G6 결과 | S2·S4 보고서에 통과 또는 대응 적용이 적혀 있다 |
-| C5 | 이 맥 sweep 설치·launchd 알림 확인 | S3 종료 조건 |
+| ~~C5~~ | ~~이 맥 sweep 설치·launchd 알림 확인~~ | **뺐다**(2026-11-11 결정, §3 S3 머리 인용) |
 | C6 | 되돌림 리허설 | §4-3 단계 B+C·D를 시험 세션 하나에서 한 번 실행해 대기자 철회와 Monitor 복귀를 확인한다 |
 
 **병합 뒤 순서**:
 1. 병합·push → 세 머신 자동 갱신 → `installed_plugins.json`에서 auto-chain 2.8.0·review-chain 0.2.0·inbox-hooks 0.1.0을 실측한다.
 2. **진행 중 체인은 바로 바꾸지 않는다.** gira-defect-night·grit-portal은 다음 인계 때 새 조정자가 새 스킬로 `inbox-subscribe`한다. 그 전까지 옛 조정자는 Monitor로 계속 받는다. 옛 Monitor와 새 대기자가 같은 받은편지함을 함께 들으면(새 세션이 같은 파일을 subscribe한 경우) 같은 줄이 두 번 보일 수 있다. 처리한 `#n`은 `--ack`만 한다는 기존 규칙으로 견딘다. 이 경우는 인계 순서(§2-10 1~4: 동결·처리분만 ack·Monitor TaskStop/구독 해제)가 막는다.
 3. **활성 부모 세션**: 체인을 띄운 부모 `[OC]`가 inbox-hooks 이전에 열린 세션이면 대기자가 없다. S4 부모 문구대로 `none`이면 Monitor를 유지한다. 전환 확인 표에 부모 행을 따로 둔다.
-4. office·home의 sweep 설치는 머신마다 dry-run → 주인님 go → `--apply` → 외부 받은편지함 `--register`(S3 전환 절차).
+4. ~~office·home의 sweep 설치~~ — 하지 않는다(2026-11-11 결정).
 
 **확인**(1주 관찰, 결과는 `docs/plans/2026-11-11-inbox-reliability-S5-report.md`):
 - 체인마다: 새 조정자 `sub op=add` → `wait-start` → `wait-notify` → `wait-delivered`가 한 번 이상.
@@ -608,7 +611,7 @@ rev 3 추가(2회차):
 
 | # | 항목 | 대응 |
 |---|---|---|
-| R1 | 깨운 턴을 사용자가 중단한 뒤 사람이 아무것도 하지 않는 구간 | 훅 이벤트가 없어 대기자를 띄울 수 없다. sweep이 15분 뒤 사람에게 알린다. `events.log` 공백 지표로 크기를 잰다 |
+| R1 | 깨운 턴을 사용자가 중단한 뒤 사람이 아무것도 하지 않는 구간 | 훅 이벤트가 없어 대기자를 띄울 수 없다. **알림 없음**(2026-11-11 결정) — `events.log` 공백 지표로 크기만 재고 S5 판정에 쓴다 |
 | R2 | 대기자 만료(7000초) 뒤 쉬는 세션 | 같다. 필요하면 세션 안 CronCreate 주기 턴을 별도로 검토한다(이번 범위 밖) |
 | R3 | 훅이 없는 도구(Codex·OpenCode·kiro-cli) | `inbox-watch` Monitor를 그대로 둔다. S4 대체 문단. sweep이 알린다 |
 | R4 | 진행 중 체인(gira-defect-night·grit-portal) | 다음 인계 때만 새 방식으로 바꾼다. 같은 cursor를 공유해 섞여도 줄이 빠지지 않는다 |
