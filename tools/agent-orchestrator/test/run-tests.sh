@@ -20,7 +20,7 @@ mkdir -p "$FAKE" "$NOHERDR" "$FD" "$T/home"
 # 실제 상태 폴더 변경 검사(inbox-real-state-untouched)용: env -i 전에 진짜 HOME을 저장하고 기준 시각을 남긴다
 REAL_HOME=$HOME; touch "$T/stamp"
 cp "$HERE/fake-herdr.py" "$FAKE/herdr"; chmod +x "$FAKE/herdr"
-EXPECT=304
+EXPECT=306
 
 PASS=0; FAIL=0
 # 여러 줄 값은 ⏎로 이어 한 줄 한 케이스를 지킨다
@@ -1080,6 +1080,16 @@ isw --apply; echo 'v1' > "$T/v1.mark"; cp "$PL" "$T/pl.v1"; isw --uninstall; isw
 AD="$HS/.claude/archive/agent-orchestrator"; na=$(find "$AD" -name '*.plist' | wc -l | tr -d ' ')
 [ "$r5" = 0 ] && [ "$na" = 3 ] && [ -d "$AD/inbox-sweep-20261111-000000.1" ] && [ -d "$AD/inbox-sweep-20261111-000000.2" ] \
   && ok inbox-sweep-uninstall-no-clobber "같은 AO_TS 로 보관 세 번 → 보관본 3개(.1·.2 접미), 덮어쓰기 0" || bad inbox-sweep-uninstall-no-clobber "3개" "rc=$r5 $na $(ls "$AD")"
+# 크로스체크 S3 2회차 회귀 시험
+swn trunc2; B="$SWI/pane-w2_p8.log"; echo "옛1" > "$B"; sw "$T0"; for i in 2 3 4 5 6 7 8 9 10; do echo "옛$i" >> "$B"; done; sw $((T0 + 100))
+i0=$(stat -f %i "$B"); : > "$B"; echo "새 줄" >> "$B"; i1=$(stat -f %i "$B")
+sw $((T0 + 1200)) --dry-run; d=$(dcls "$B"); sw $((T0 + 1200)); cl=$(sev backlog-close)
+[ "$i0" = "$i1" ] && [ "$d" = 1/0/observed/quiet ] && printf '%s' "$cl" | grep -qF 'reset=1' && ! awk -F'\t' '$3 + 0 < '"$((T0 + 1200))" "$SWI/sweep/obs" | grep -qF "$B" \
+  && ok inbox-sweep-truncated-same-inode "같은 inode 에서 10줄→1줄(obs hi=1·10) → 옛 obs 전부 버림·0분 quiet·backlog reset=1" || bad inbox-sweep-truncated-same-inode "같은 inode 1/0/observed/quiet reset" "$i0=$i1 $d | $cl | $(cat "$SWI/sweep/obs")"
+swn old5; B="$SWI/pane-w1_p1.log"; swsend "$T0" w1:p1 "줄"; mkdir -p "$SWI/sweep"; printf '%s\tbl-old\t1\t%s\t1\n' "$B" "$T0" > "$SWI/sweep/open"
+swack $((T0 + 840)) w1:p1 1; sw $((T0 + 1200)); cl=$(sev backlog-close); no=$(sev backlog-open | wc -l | tr -d ' ')
+printf '%s' "$cl" | grep -qF 'bl=bl-old' && printf '%s' "$cl" | grep -qF 'age=840' && ! printf '%s' "$cl" | grep -qF reset && [ "$no" = 0 ] \
+  && ok inbox-sweep-open-legacy-row "inode 칸 없는 옛 5칸 open 행 → reset 아님·ackts 로 age=840 닫음·새 open 0" || bad inbox-sweep-open-legacy-row "age=840 reset 없음 open 0" "$cl | open $no"
 # 기존 받은편지함 케이스(B1까지 116개) 이름 — 하나라도 PASS로 실행되지 않으면 FAIL
 INBOX_OLD="
   inbox-send inbox-format inbox-raw inbox-raw-notime inbox-4000-ok inbox-no-truncate inbox-4000-multibyte

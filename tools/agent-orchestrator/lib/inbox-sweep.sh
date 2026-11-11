@@ -14,6 +14,7 @@
 #   (미처리 줄이 있는 받은편지함만). 잠금도 잡지 않는다(읽기 전용).
 # 종료 0 / 2 인자 / 4 상태 파일 기록 실패. 겹친 실행(fd 6 sweep/state.flock 을 곧바로 못 잡음)은 0.
 # 상태(sweep/): obs "<경로>\t<hi>\t<관측>\t<inode>" · alerts "<경로>\t<epoch>\t<bl>" · open "<경로>\t<bl>\t<n>\t<arr>\t<exact>\t<inode>"
+#   · seen "<경로>\t<줄 수>\t<inode>\t<첫 줄 해시>"(잘림·교체 판정)
 # events: backlog-open·backlog-close·sweep-alert(계획 §2-9). events.log 가 AO_INBOX_EV_MAX(바이트, 기본 10MB)를
 #   넘으면 events.log.<epoch> 로 옮기고 새 파일을 연다(삭제 없음).
 # 시험 전용: AO_INBOX_NOW(epoch 고정), AO_SWEEP_HERDR_TIMEOUT(초, 기본 10 — herdr 호출 상한),
@@ -92,15 +93,29 @@ _aos_rotate() {
 
 # ── sweep/obs: 받은편지함마다 "<경로>\t<그때 줄 수 hi>\t<관측 epoch>" 행을 줄 수가 늘 때 덧붙인다(times 에
 #    행이 빠진 줄이 새로 생겼을 때만). 줄 m 의 첫 관측 = hi ≥ m 인 첫 행의 epoch. cursor ≥ hi 인 행은 지운다.
-#    행 끝 칸은 받은편지함 파일의 inode 다. inode 가 다르거나 hi > 지금 줄 수(파일이 잘림·교체)인 행은 옛 파일의
-#    관측이라 쓰지 않고 지운다(크로스체크 S3 1회차 #2 — 잘린 뒤 새 줄에 옛 관측 시각을 쓰면 하한이 깨진다).
+#    행 끝 칸은 받은편지함 파일의 inode 다(다른 inode 의 행은 쓰지 않는다).
+# ── 잘림·교체 판정(크로스체크 S3 1·2회차 #2): sweep/seen "<경로>\t<지난 줄 수>\t<inode>\t<첫 줄 해시>".
+#    inode 가 다르거나, 줄 수가 줄었거나, 첫 줄이 바뀌었으면 그 받은편지함의 옛 관측(obs 전 행)과 열린 backlog 는
+#    옛 파일의 것이다 → obs 를 모두 버리고 backlog 는 reset=1 로 닫는다. 잘린 뒤 새 줄에 옛 관측 시각을 쓰면
+#    "실제 나이의 하한"이 깨지기 때문이다. seen 행이 없으면(첫 점검·옛 상태) 잘림으로 보지 않는다.
+#    남은 한계: 같은 inode 에서 잘린 뒤 같은 첫 줄로 시작해 예전 줄 수 이상으로 다시 채워지면 알 수 없다.
 _aos_ino() { stat -f %i "$1" 2>/dev/null || echo 0; }
+_aos_h1() { head -1 "$1" 2>/dev/null | shasum | cut -c1-12; }
+# _aos_reset <경로> <줄 수> <inode> <첫 줄 해시> → 0 잘림·교체 / 1 아님
+_aos_reset() {
+  local st ot oi oh
+  st=$(_aos_get "$_AOS_D/seen" "$1"); [ -n "$st" ] || return 1
+  IFS=$'\t' read -r ot oi oh <<< "$st"
+  [ "$oi" != "$3" ] || [ "${ot:-0}" -gt "$2" ] || { [ "${ot:-0}" -gt 0 ] && [ "$oh" != "$4" ]; }
+}
 _aos_obs_first() {   # <경로> <m> <inode> <줄 수> → epoch 또는 빈 출력
   [ -f "$_AOS_D/obs" ] || return 0
   P=$1 awk -F'\t' -v m="$2" -v ino="$3" -v tot="$4" '$1 == ENVIRON["P"] && $4 == ino && $2 + 0 <= tot + 0 && $2 + 0 >= m + 0 { print $3; exit }' "$_AOS_D/obs" 2>/dev/null
 }
-_aos_obs_update() {  # <경로> <cursor> <줄 수> <inode>
-  local p=$1 c=$2 total=$3 ino=$4 F="$_AOS_D/obs" lasthi miss tmp
+_aos_obs_update() {  # <경로> <cursor> <줄 수> <inode> <reset 0|1>
+  local p=$1 c=$2 total=$3 ino=$4 rs=$5 F="$_AOS_D/obs" lasthi miss tmp
+  # reset 이면 그 경로의 행을 모두 버린 것으로 보고 다시 잰다
+  [ "$rs" = 1 ] && ino="reset:$ino"
   lasthi=$(P=$p awk -F'\t' -v ino="$ino" -v tot="$total" '$1 == ENVIRON["P"] && $4 == ino && $2 + 0 <= tot + 0 { h = $2 } END { print h + 0 }' "$F" 2>/dev/null) || lasthi=0
   [ "${lasthi:-0}" -lt "$c" ] && lasthi=$c
   miss=0
@@ -110,7 +125,7 @@ _aos_obs_update() {  # <경로> <cursor> <줄 수> <inode>
   fi
   tmp="$F.tmp.$$"
   if ! { if [ -f "$F" ]; then P=$p awk -F'\t' -v c="$c" -v ino="$ino" -v tot="$total" '!($1 == ENVIRON["P"] && ($2 + 0 <= c + 0 || $4 != ino || $2 + 0 > tot + 0))' "$F"; fi
-         if [ "$miss" = 1 ]; then printf '%s\t%s\t%s\t%s\n' "$p" "$total" "$_AOS_NOW" "$ino"; fi; } > "$tmp" 2>/dev/null \
+         if [ "$miss" = 1 ]; then printf '%s\t%s\t%s\t%s\n' "$p" "$total" "$_AOS_NOW" "${ino#reset:}"; fi; } > "$tmp" 2>/dev/null \
      || ! mv -f "$tmp" "$F" 2>/dev/null; then
     rm -f "$tmp" 2>/dev/null; ao_die 4 "상태 파일 기록 실패: $F"
   fi
@@ -119,16 +134,19 @@ _aos_bl() { printf '%s-%s\n' "$(printf '%s' "$1" | shasum | cut -c1-8)" "$2"; }
 
 # _aos_box <경로> — 한 받은편지함 점검
 _aos_box() {
-  local p=$1 c total m k arr exact ex age min cls open on obl oarr oex oino ats cage last lbl body ino rs ge=""
+  local p=$1 c total m k arr exact ex age min cls open on obl oarr oex oino ats cage last lbl body ino h1 rs=0 ge=""
   [ -f "$p" ] || return 0
-  _AOI_LOG=$p; _aoi_cursor; c=$_AOI_CUR; total=$(_aoi_count); ino=$(_aos_ino "$p")
+  _AOI_LOG=$p; _aoi_cursor; c=$_AOI_CUR; total=$(_aoi_count); ino=$(_aos_ino "$p"); h1=$(_aos_h1 "$p")
+  _aos_reset "$p" "$total" "$ino" "$h1" && rs=1
   # 1. 열린 backlog 가 끝났으면(cursor 가 그 줄을 넘음) 닫는다
   if [ "$_AOS_DRY" = 0 ]; then
     open=$(_aos_get "$_AOS_D/open" "$p")
     if [ -n "$open" ]; then
       IFS=$'\t' read -r obl on oarr oex oino <<< "$open"
-      # 파일이 잘리거나 교체됐으면(inode 다름·줄 수 < n) 옛 backlog 는 reset 으로 닫는다(ackts 판정 안 함)
-      rs=0; { [ "${oino:-}" != "$ino" ] || [ "$total" -lt "${on:-0}" ]; } && rs=1
+      # 잘림·교체(seen 판정)이거나 open 행의 inode 가 다르면 옛 backlog 는 reset 으로 닫는다(ackts 판정 안 함).
+      # inode 칸이 없는 옛 5칸 행은 inode 로 판정하지 않는다(크로스체크 S3 2회차 #2)
+      [ -n "${oino:-}" ] && [ "$oino" != "$ino" ] && rs=1
+      [ "$total" -lt "${on:-0}" ] && rs=1
       if [ "$rs" = 1 ] || [ "$c" -ge "${on:-0}" ]; then
         ats=""
         [ "$rs" = 0 ] && [ -f "$p.ackts" ] && ats=$(awk -F'\t' -v n="$on" '$1 + 0 <= n + 0 && n + 0 <= $2 + 0 { print $3; exit }' "$p.ackts" 2>/dev/null)
@@ -138,14 +156,15 @@ _aos_box() {
         _aos_set "$_AOS_D/open" "$p"; open=""
       fi
     fi
-    _aos_obs_update "$p" "$c" "$total" "$ino"
+    _aos_obs_update "$p" "$c" "$total" "$ino" "$rs"
+    _aos_set "$_AOS_D/seen" "$p" "$total	$ino	$h1"
   fi
   [ "$total" -gt "$c" ] || return 0
   # 2. 가장 오래된 미처리 줄의 도착 시각
   m=$((c + 1)); k=$((total - c))
   arr=$(awk -F'\t' -v m="$m" '$1 + 0 == m + 0 { print $2; exit }' "$p.times" 2>/dev/null)
   if [[ ${arr:-} =~ ^[0-9]+$ ]]; then exact=exact; ex=1
-  else exact=observed; ex=0; arr=$(_aos_obs_first "$p" "$m" "$ino" "$total"); [[ ${arr:-} =~ ^[0-9]+$ ]] || arr=$_AOS_NOW; ge="≥"; fi
+  else exact=observed; ex=0; arr=""; [ "$rs" = 1 ] || arr=$(_aos_obs_first "$p" "$m" "$ino" "$total"); [[ ${arr:-} =~ ^[0-9]+$ ]] || arr=$_AOS_NOW; ge="≥"; fi
   age=$((_AOS_NOW - arr)); [ "$age" -lt 0 ] && age=0; min=$((age / 60))
   lbl=$(_aos_bl "$p" "$m")
   last=$(_aos_get "$_AOS_D/alerts" "$p"); last=${last%%$'\t'*}
