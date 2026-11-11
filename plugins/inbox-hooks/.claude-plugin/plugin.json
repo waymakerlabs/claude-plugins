@@ -1,6 +1,6 @@
 {
   "name": "inbox-hooks",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "review-chain·auto-chain이 쓰는 받은편지함 훅(단독 사용 안 함). Inbox hooks used by review-chain and auto-chain (not for standalone use): asyncRewake waiters on Stop/StopFailure/UserPromptSubmit/SessionStart wake an idle Claude Code session when a line arrives in a subscribed agent-orchestrator inbox. No typing into the input box.",
   "author": {
     "name": "waymakerlabs",

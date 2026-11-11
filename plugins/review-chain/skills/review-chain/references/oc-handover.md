@@ -5,7 +5,7 @@ OC가 판단만 하고 진본이 파일에 있으므로, 교체 때 넘길 것�
 ## 1. OC 교체 (옛 OC가 시작)
 
 1. `merge.lock`이 없을 때 시작한다(병합 중이면 끝낸 뒤).
-2. **동결**: `state.md` frontmatter `oc-status: 교체중`으로 바꾼다. 이 순간부터 옛 OC는 새 결정·병합·worker 답을 하지 않는다. (0.2.0) 인계 순서: ① 처리 동결 ② 진행 중 처리를 끝내거나 되돌린다 ③ **실제로 처리한 마지막 번호까지만** `rc-watch.sh --ack $RC/inbox.log <n>`(받았지만 답하지 않은 줄·동결 뒤 들어온 줄은 ack하지 않는다) ④ `rc-watch.sh --unsubscribe $RC/inbox.log`(Monitor로 받고 있었으면 `TaskStop`도) ⑤ 인계 문서에 받은편지함 경로와 "받은편지함 동결 · 마지막 처리 번호 <n>"을 적는다 ⑥ 그 뒤 새 OC 기동. 동결 뒤 들어온 줄은 처리 위치 뒤에 그대로 남아 새 OC가 처리한다(표도 고치지 않는다). 옛 OC pane이 닫힐 때까지 이 상태를 유지한다.
+2. **동결**: `state.md` frontmatter `oc-status: 교체중`으로 바꾼다. 이 순간부터 옛 OC는 새 결정·병합·worker 답을 하지 않는다. (0.3.0, 4단계) 인계 순서: ① 진행 중 처리를 끝내거나 되돌리고 **실제로 처리한 마지막 번호까지만** `rc-watch.sh --ack $RC/inbox.log <n>`(답하지 않은 줄은 ack하지 않는다) ② `rc-watch.sh --unsubscribe $RC/inbox.log`(Monitor로 받고 있었으면 `TaskStop`도) ③ 인계 문서에 받은편지함 경로와 마지막 처리 번호 <n>을 적고 새 OC를 기동한다 ④ 새 OC는 `--subscribe` 뒤 `--pending`으로 n+1부터 처리한다. 동결 뒤 들어온 줄은 처리 위치 뒤에 그대로 남아 새 OC가 처리한다(표도 고치지 않는다). 옛 OC pane이 닫힐 때까지 이 상태를 유지한다.
 3. 동결 직전까지의 `state.md` worker 표 `마지막 보고`, `queue.md` 상태, "## 결정"이 최신인지 본다. 머릿속에만 있는 판단(사용자와 방금 합의한 순서 등)은 "## 결정"에 한 줄로 적는다. 동결 전에 받았지만 아직 답하지 않은 줄은 `--ack`하지 않은 채 둔다(새 OC가 `--pending`으로 본다). 이미 처리한 줄은 반드시 `--ack`해 둔다(새 OC가 중복 처리하지 않게).
 4. 짧은 인계 문서 `$RC/oc-handover-<n>.md`: 체인 폴더 절대경로, 리포, 옛 OC pane, 진행 중 사용자 대화 요지(OC 탭에서 하던 QC 흐름), 다음 첫 행동. 옛 인계 문서는 지우지 않는다.
 5. 새 OC 기동 — **이 경우에만** 전역 `session-handoff` 스킬(후속 세션 인계 프로토콜)의 새 탭 방식을 쓴다:
@@ -26,7 +26,7 @@ OC가 판단만 하고 진본이 파일에 있으므로, 교체 때 넘길 것�
 3. `"$AO" list --agents`로 worker 표의 이름이 살아 있는지 대조. 없는 이름은 상태 `막힘`(사유: 세션 없음) → §4로 교체 판단.
 4. `current-oc` 갱신(기록·호환용): `printf '%s\n' "$("$AO" whoami)" > "$RC/current-oc.tmp" && mv "$RC/current-oc.tmp" "$RC/current-oc"`, `current-oc.log`에 한 줄. 이 값은 메시지 경로에 쓰이지 않는다.
    그다음 **자기 구독**을 켠다(0.2.0): `<SKILL 폴더>/scripts/rc-watch.sh --subscribe $RC/inbox.log`. 옛 OC가 `--ack`한 위치 뒤의 줄부터 이어서 들어온다(훅이 없는 도구면 `messages.md` §1 "훅이 없는 도구" 문단).
-5. **재독**: `state.md`·`queue.md`를 다시 읽고 `rc-watch.sh --pending $RC/inbox.log`의 미처리 줄을 위에서부터 처리한다(처리할 때마다 `--ack <n>`). 깨움으로 같은 줄이 또 들어오면(`[재통지]` 포함) 이미 처리한 번호는 `--ack`만 한다. 인계 문서의 "마지막 처리 번호 <n>" 뒤(n+1)부터 처리한다.
+5. **재독**: `state.md`·`queue.md`를 다시 읽고 `rc-watch.sh --pending $RC/inbox.log`의 미처리 줄을 위에서부터 처리한다(처리할 때마다 `--ack <n>`). 깨움에 이미 처리한 `#n`이 다시 오면 `--ack`만 한다. 인계 문서의 "마지막 처리 번호 <n>" 뒤(n+1)부터 처리한다.
 6. 살아 있는 worker에 `[OC변경] <새 pane>`을 보내는 것은 **선택**(알림용)이다: `rc-send.sh --to <name> $RC OC변경 "<새 pane>"`. worker는 아무것도 다시 보낼 필요가 없다.
 7. 옛 OC pane 닫기: `"$AO" close <옛 OC pane>`(실패는 무시). 닫은 뒤 `--pending`을 한 번 더 보고(닫기 직전에 들어온 줄) 처리한다. 그다음 `oc-status: 활성`. 옛 OC 탭에 다른 pane(잡수정 worker)이 있으면 탭은 남는다 — 그 worker는 그대로 두고 표의 `탭` 칸은 바꾸지 않는다.
 8. 사용자에게 한 줄: `[OC] 교체 완료 — 새 OC <pane>, worker n개 연결, 대기열 m건.`
@@ -46,6 +46,6 @@ OC가 판단만 하고 진본이 파일에 있으므로, 교체 때 넘길 것�
 계기: worker 컨텍스트가 참(사용자가 말하거나 worker가 `[막힘] 컨텍스트`), 세션 소실, 반복 정지.
 
 1. 살아 있으면 옛 worker에 `rc-send.sh --to <옛 이름> $RC 답 'report.md "## 인계"를 쓰고 [완료] 대신 [막힘] 인계준비로 알려 줘'`. 소실이면 생략.
-2. 새 이름(`<name>2`)으로 같은 worktree·브랜치에 기동(SKILL §4, 배치는 옛 worker와 같은 종류). 지시서에 옛 `report.md` 경로와 "## 인계"부터 읽으라는 줄을 추가. 새 이름의 `workers/<name>2/inbox.log`와 구독 명령(`rc-watch.sh --subscribe …`, 0.2.0)을 지시서에 적는다(옛 worker 받은편지함은 이어받지 않는다).
+2. 새 이름(`<name>2`)으로 같은 worktree·브랜치에 기동(SKILL §4, 배치는 옛 worker와 같은 종류). 지시서에 옛 `report.md` 경로와 "## 인계"부터 읽으라는 줄을 추가. 새 이름의 `workers/<name>2/inbox.log`와 구독 명령(`rc-watch.sh --subscribe …`, 0.2.0)을 지시서에 적는다(옛 worker 받은편지함은 쓰지 않는다).
 3. 표: 옛 줄 `교체됨`, 새 줄은 범위·상태를 그대로 이어받는다. 선점은 이름 기준이므로 `rc-claim.sh --release $RC <옛 이름>` 뒤 새 worker가 같은 패턴을 `rc-claim.sh`로 다시 선점한다(옛 이름이 남아 있으면 새 worker가 자기 범위와 충돌한다). 옛 worker 선점은 옛 pane 닫기(4) 뒤에 해제해 편집 소유자가 둘인 시간이 없게 한다.
 4. 순서: 옛 worker의 1단계 보고 → 옛 pane 닫기 → 2단계 새 worker 기동. 같은 worktree에 편집 소유자가 둘인 시간을 두지 않는다. 새 worker 기동 증거(working|done)를 표에 적는다.

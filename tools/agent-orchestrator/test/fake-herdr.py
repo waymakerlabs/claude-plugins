@@ -89,12 +89,6 @@ if g == "status" and a == "server":
         print("status: running\nversion: 0.9.5")
     sys.exit(0)
 
-if g == "notification" and a == "show":
-    # 사람에게 보이는 알림(inbox-sweep). 호출은 calls.log 에 이미 남았다
-    if os.path.exists(os.path.join(D, "server-down")):
-        err("server_unavailable")
-    ok({"type": "notification_shown"})
-
 if g == "agent":
     if a == "list":
         ok({"agents": st["agents"], "type": "agent_list"})

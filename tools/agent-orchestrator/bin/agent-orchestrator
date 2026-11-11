@@ -2,8 +2,8 @@
 # agent-orchestrator — 오케스트레이션 툴(herdr 등) 추상화 진입점 (S1)
 #
 # 사용: agent-orchestrator <동작> [인자…]
-#   stdout = 필요한 값 한 줄(없으면 빈 출력, agent-read·list·inbox-watch·--pending·inbox-subscribe --list·inbox-sweep --dry-run만 여러 줄). 사유·경고는 stderr.
-#   JSON 출력 없음(예외: inbox-wait --session-start 의 훅 JSON 한 줄).
+#   stdout = 필요한 값 한 줄(없으면 빈 출력, agent-read·list·inbox-watch·--pending·inbox-subscribe --list만 여러 줄). 사유·경고는 stderr.
+#   JSON 출력 없음.
 #
 # 동작(계약 진본: docs/plans/2026-11-08-agent-orchestrator-plan.md §1):
 #   backend                                         백엔드 이름
@@ -37,17 +37,12 @@
 #   inbox-watch --pending <대상>                    미처리 줄(여러 줄)을 내고 종료
 #   inbox-watch --release <대상>                    이전 세션 보류 범위([이전 세션]·#0 안내) 해제
 #   inbox-watch --state <대상>                      감시 판정 한 줄 monitor|waiter|none(참고용)
-#   inbox-subscribe [--pane <pane>|--session <sid>] <대상>   구독 등록(키 pane-…|sid-…). --unsubscribe = 해제(장벽)
-#   inbox-subscribe --list [--pane|--session …]      줄마다 <경로>\t<sid>\t<active|dormant>(여러 줄)
-#   inbox-wait                                      훅 전용(stdin 훅 JSON). 0 / 2 깨움(stderr) / 4 잠금·기록·JSON·인자 오류
-#   inbox-wait --status|--drain|--undrain           "inbox-wait 2" / 철회 수 / 빈 출력
-#   inbox-wait --session-start                      동기 SessionStart 훅(stdin 훅 JSON). 빈 출력 또는 훅 JSON 한 줄(additionalContext), 항상 0
-#                                                   구현 lib/inbox-wait.sh(계획 2026-11-11 §2-3~§2-6)
-#   inbox-sweep [--dry-run] [--age-min 15] [--repeat-min 60]   launchd 전용 바깥 점검. 미처리가 오래된 받은편지함을
-#                                                   herdr notification 으로 사람에게만 알린다(입력 주입 없음). stdout 빈 출력
-#                                                   (--dry-run 은 줄마다 <경로>\t<k>\t<분>\t<exact|observed>\t<alert|quiet|skip>)
-#   inbox-sweep --register <대상>…                 상태 폴더 밖 받은편지함을 점검 대상(known.list)에 넣는다
-#                                                   구현 lib/inbox-sweep.sh(계획 2026-11-11 §2-8)
+#   inbox-subscribe [--pane <pane>|--session <sid>] <대상>   구독 등록(키 pane-…|sid-…). --unsubscribe = 해제(없어도 0)
+#   inbox-subscribe --list [--pane|--session …]      줄마다 구독 경로(여러 줄)
+#   inbox-wait                                      훅 전용(stdin 훅 JSON). 0 / 2 깨움(stderr) / 4 JSON·인자 오류
+#   inbox-wait --status|--drain|--undrain           "inbox-wait 2" / TERM 보낸 수 / 빈 출력
+#   inbox-wait --session-start                      옛 래퍼 호환용 무동작(stdin 버림, 빈 출력, 0)
+#                                                   구현 lib/inbox-wait.sh(계획 2026-11-11-inbox-simplify §2·§3·§10)
 #   받은편지함 종료 코드: 0 / 2 인자·대상 형식 / 4 기록·잠금·ack 실패
 #
 # 종료 코드: 0 성공 / 2 인자 오류 / 3 대상 없음·충돌 / 4 백엔드 실행 실패 / 5 에이전트 준비 안 됨
@@ -79,7 +74,7 @@ usage() { ao_die 2 "$*  (사용법: $AO_HOME/bin/agent-orchestrator 머리 주�
 
 # ── 0. 받은편지함 동작: 백엔드와 무관(herdr 밖·backend=none·백엔드 고장에서도 동작) → 여기서 처리하고 끝
 case "${1:-}" in
-  inbox-send|inbox-watch|inbox-subscribe|inbox-wait|inbox-sweep)
+  inbox-send|inbox-watch|inbox-subscribe|inbox-wait)
     [ -f "$AO_HOME/lib/inbox.sh" ] || ao_die 12 "lib/inbox.sh 없음: $AO_HOME/lib/inbox.sh"
     # shellcheck source=/dev/null
     . "$AO_HOME/lib/inbox.sh" || ao_die 12 "lib/inbox.sh 로딩 실패"
@@ -88,17 +83,11 @@ case "${1:-}" in
       # shellcheck source=/dev/null
       . "$AO_HOME/lib/inbox-wait.sh" || ao_die 12 "lib/inbox-wait.sh 로딩 실패"
     fi
-    if [ "$1" = inbox-sweep ]; then
-      [ -f "$AO_HOME/lib/inbox-sweep.sh" ] || ao_die 12 "lib/inbox-sweep.sh 없음"
-      # shellcheck source=/dev/null
-      . "$AO_HOME/lib/inbox-sweep.sh" || ao_die 12 "lib/inbox-sweep.sh 로딩 실패"
-    fi
     IOP=$1; shift
     case "$IOP" in
       inbox-send) ao_inbox_send "$@" ;;
       inbox-watch) ao_inbox_watch "$@" ;;
       inbox-subscribe) ao_inbox_subscribe "$@" ;;
-      inbox-sweep) ao_inbox_sweep "$@" ;;
       *) ao_inbox_wait "$@" ;;
     esac
     exit $? ;;

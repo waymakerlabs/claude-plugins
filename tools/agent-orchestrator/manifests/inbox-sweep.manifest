@@ -1,3 +1,0 @@
-# kind	owner	path	selector	note
-# 받은편지함 점검 launchd — 선택 설치(launchd/install-sweep.sh). 점검: install.sh --check inbox-sweep (계획 2026-11-11 §3 S3)
-doc	ours-core	~/Library/LaunchAgents/kr.waymakerlabs.agent-orchestrator.inbox-sweep.plist	-	받은편지함 점검 launchd(선택 설치 — install-sweep.sh)

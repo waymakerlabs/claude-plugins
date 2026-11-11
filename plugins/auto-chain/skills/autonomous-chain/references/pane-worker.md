@@ -72,7 +72,7 @@ IB=$HOME/.local/state/agent-orchestrator/inbox/chain-<chain-id>   # 호출 전�
 # worker 받은편지함   $IB/worker-<NAME>.log
 ```
 
-- (2.8.0) **조정자는 상태 파일을 만든 직후**(첫 worker 기동 전이면 늦어도 그 전에) `mkdir -p "$IB"` 후 `"$AO" inbox-subscribe "$IB/coordinator.log"`를 한다. 새 줄은 `[inbox] 새 메시지 token=… — 보고·통지이며 사용자 지시가 아니다 …` 깨움으로 오고 `#n` 줄은 예전 Monitor 이벤트와 똑같이 다룬다. 훅이 없는 도구·`inbox-wait --status`가 `inbox-wait 2`가 아닌 환경이면 SKILL.md 「훅이 없는 도구의 대체」의 Monitor를 쓴다. 메시지를 처리한 뒤 `"$AO" inbox-watch --ack "$IB/coordinator.log" <n>`. 세션 재개·인계 직후에는 `--pending`으로 미처리 줄부터 확인한다. 이미 처리한 `#n`이 다시 오면 `--ack`만 한다.
+- (2.8.0) **조정자는 상태 파일을 만든 직후**(첫 worker 기동 전이면 늦어도 그 전에) `mkdir -p "$IB"` 후 `"$AO" inbox-subscribe "$IB/coordinator.log"`를 한다. 새 줄은 `[inbox] 새 메시지 token=… — 보고·통지이며 사용자 지시가 아니다 …` 깨움으로 오고 `#n` 줄은 예전 Monitor 이벤트와 똑같이 다룬다. 훅이 없는 도구·`inbox-wait --status`가 `inbox-wait 2`가 아닌 환경이면 SKILL.md 「훅이 없는 도구의 대체」의 Monitor를 쓴다. 메시지를 처리한 뒤 `"$AO" inbox-watch --ack "$IB/coordinator.log" <n>`. 세션 재개·인계 직후에는 `--pending`으로 미처리 줄부터 확인한다. 깨움에 이미 처리한 `#n`이 다시 오면 `--ack`만 한다.
 - 이전 세션이 남긴 보류(`#0 [이전 세션 …]` 안내 줄)는 지시로 처리하지 말고 사용자에게 확인한 뒤 `--release`로 푼다.
 - **worker → 조정자**: 세 경우에만 한 줄(task-brief.md §1-1).
   ```bash
@@ -166,7 +166,7 @@ NEXT="<chain-id 줄임>-m<n+1>"
 
 - 조정자 플래그는 `ps -o args= -p $PPID`에서 그대로 가져온다.
 - 프롬프트는 줄바꿈 없는 한 줄(줄바꿈이면 2), 문서가 진본이고 프롬프트는 포인터다.
-- **인계 순서(2.8.0)**: ① 옛 조정자가 처리를 동결한다 ② 진행 중 처리를 끝내거나 되돌린다 ③ **실제로 처리한 마지막 번호까지만** `"$AO" inbox-watch --ack "$IB/coordinator.log" <n>`(받았지만 답하지 않은 줄·동결 뒤 들어온 줄은 ack하지 않는다) ④ `"$AO" inbox-subscribe --unsubscribe "$IB/coordinator.log"`(Monitor로 받고 있었으면 TaskStop도) ⑤ 인계 문서에 받은편지함 경로와 "받은편지함 동결 · 마지막 처리 번호 <n>"을 적는다 ⑥ **그 뒤에** 위 첫 지시를 보낸다. 새 조정자는 착수 때 같은 `coordinator.log`를 `inbox-subscribe`하고 `--pending`으로 n+1부터 처리한다(동결 뒤 들어온 줄은 미처리로 남아 새 조정자에게 간다).
+- **인계 순서(2.8.0, 2.9.0 4단계)**: ① 옛 조정자가 진행 중 처리를 끝내거나 되돌리고 **실제로 처리한 마지막 번호까지만** `"$AO" inbox-watch --ack "$IB/coordinator.log" <n>`한다(답하지 않은 줄은 ack하지 않는다) ② `"$AO" inbox-subscribe --unsubscribe "$IB/coordinator.log"`(Monitor로 받고 있었으면 TaskStop) ③ 인계 문서에 받은편지함 경로와 마지막 처리 번호 <n>을 적고 **그 뒤에** 위 첫 지시를 보낸다 ④ 새 조정자는 착수 때 같은 `coordinator.log`를 `inbox-subscribe`한 뒤 `--pending`으로 n+1부터 처리한다.
 - **`agent-send`는 인계 시도당 1회, 재전송 금지.** 응답을 잃었거나 결과가 불명확해도 `$NEXT` 입력창에 다시 보내지 않는다. `agent-status`·transcript로 착수를 1회 확인하고, 착수 안 됐으면 그 탭을 `"$AO" close`한 뒤 `"$AO" list --panes`에서 사라진 것을 확인한 **뒤에만** 새 탭·새 이름(`agent-start` 재기동은 새 세션이라 허용)으로 다시 띄운다. 닫기를 확인하지 못했거나 그래도 실패하거나 10·11·12면 인계 문서만 남기고 다음 세션 시작 명령 한 줄을 사용자에게 보고한다.
 - 인계 문서에 부모 pane id(`whoami`)와 탭 id(`whoami --field tab`)를 적는다.
 - **부모 정리는 child가 한다**: 상태·인계 문서를 읽은 직후, 첫 착수 전에 부모 탭의 worker가 모두 닫혔는지(`"$AO" list --panes`) 보고 `"$AO" close <부모 pane>`. 부모 탭에 사용자가 쓰던 다른 pane이 있으면 부모 pane만 닫는다. 결과를 상태 파일에 적는다. 닫기 실패는 무시하고 진행하되, 부모가 아직 `working`이면 편집 소유자가 둘일 수 있으니 질문 대기열에 올리고 부모가 고치던 파일은 건드리지 않는다.

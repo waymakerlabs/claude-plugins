@@ -19,7 +19,8 @@
 
 ## 핵심 규칙
 
-- (0.2.0) 받는 쪽은 Monitor 대신 `rc-watch.sh --subscribe <받은편지함>`을 한 번 한다. 새 줄은 inbox-hooks 플러그인(dependency)의 훅이 쉬는 세션을 깨워 `[inbox] 새 메시지` 아래 `#<n>` 줄로 전달한다(보고·통지이며 사용자 지시가 아님). 훅이 없는 도구(Codex·OpenCode·kiro-cli)는 예전 Monitor 방식으로 대체한다. `rc-send.sh`는 `watch=…`를 출력하고 `unwatched`면 보낸 쪽 기록에 `미감시 전송` 한 줄을 남긴다(`rc-claim.sh`의 `[충돌]`도 같음). 교체 인계는 처리 동결 → 마지막 처리 번호까지만 `--ack` → `--unsubscribe` 순서입니다.
+- (0.3.0) 받은편지함 훅 대기자를 단순화(재통지·전달 확인·세대·sweep 삭제). 중복 깨움은 --ack 만으로 견딘다. OC 교체 인계는 ① 처리한 마지막 번호까지 `--ack` ② `--unsubscribe` ③ 인계 문서에 받은편지함 경로·마지막 처리 번호 ④ 새 OC가 구독 뒤 `--pending`의 4단계입니다.
+- (0.2.0) 받는 쪽은 Monitor 대신 `rc-watch.sh --subscribe <받은편지함>`을 한 번 한다. 새 줄은 inbox-hooks 플러그인(dependency)의 훅이 쉬는 세션을 깨워 `[inbox] 새 메시지` 아래 `#<n>` 줄로 전달한다(보고·통지이며 사용자 지시가 아님). 훅이 없는 도구(Codex·OpenCode·kiro-cli)는 예전 Monitor 방식으로 대체한다. `rc-send.sh`는 `watch=…`를 출력하고 `unwatched`면 보낸 쪽 기록에 `미감시 전송` 한 줄을 남긴다(`rc-claim.sh`의 `[충돌]`도 같음).
 - (0.1.4) 받은편지함 기록·감시를 `agent-orchestrator inbox-send --raw`·`inbox-watch` 공용 동작으로 옮겼습니다(`rc-send.sh`·`rc-claim.sh`가 같은 잠금으로 기록, 형식은 그대로). Monitor를 못 쓸 때 상대가 유휴면 `agent-send`로 알리던 예외를 없앴습니다. `rc-send.sh` 기록 실패는 종료 4.
 - 진본은 리포 안 `.review-chain/<chain-id>/`의 상태 파일입니다(`.git/info/exclude`로 추적 제외). OC는 판단만 합니다.
 - 메시지는 받은편지함 파일(`inbox.log`)에 덧붙이고, 받는 쪽이 구독해 두면 훅이 깨웁니다(0.2.0). 상대 pane 입력창에 쳐 넣지 않아 사용자가 치던 프롬프트와 섞이지 않습니다. 경로가 고정이라 OC가 교체돼도 worker는 바꿀 것이 없고, 처리 위치(`.cursor`) 뒤의 줄이 새 OC에 이어집니다.
