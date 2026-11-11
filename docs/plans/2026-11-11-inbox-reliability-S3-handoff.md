@@ -9,7 +9,7 @@
   - `~/Dev/wml-plugins-inbox`는 쓰지 않는다(삭제도 하지 않는다).
 - branch `main`, HEAD는 이 문서를 담은 커밋. `origin/main`보다 앞섬, **push 안 함**(주인님 go 대기).
 - S2 커밋: `3e6793b`(플러그인·재통지 유예) → `59449dc`·`51797b3`·`f1dd046`(크로스체크 1~3회차 수정) → concurrent-3 수정 → 이 문서 커밋.
-- `git status --short`: 인계 커밋 뒤 확인값은 §8에 적는다.
+- `git status --short`(인계 시점, HEAD `2be4ecd` 기준): `?? .claude/` 한 줄뿐(서브에이전트 worktree — 커밋·삭제하지 않는다). `origin/main`보다 10 커밋 앞섬(S1 4 + S2 6).
 
 ## 2. 읽을 문서
 
