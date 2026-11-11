@@ -12,7 +12,7 @@
 #   AO_INBOX_TEST_PAUSE=<지점>:<초>[,<지점>:<초>…] — 지점마다 프로세스당 처음 한 번 멈춘다.
 #   AO_INBOX_TEST_PAUSE_MARK=<파일> — 멈출 때 "<지점> <pid>" 한 줄을 덧붙인다. <파일>.go 또는
 #   <파일>.go.<pid> 가 생기면 남은 시간 전에 재개한다.
-#   지점: pre-register registered poll notify-mid notify-locked sub-del-locked start-mid-out issue-wait
+#   지점: pre-register registered poll notify-mid notify-locked sub-del-locked start-mid-out issue-wait cleanup-locked
 # 스냅샷(_W_SNAP, 문자열): "off=<0|1>" / "pg=<pane-gen 내용>"(pane 있을 때) / "gen <키>=<n>"… / 대상 경로…
 # shellcheck shell=bash
 
@@ -52,8 +52,8 @@ _aoiw_genup() { _AOW_G=$(( $(_aoiw_gen "$1") + 1 )); _aoi_put "$_AOW_SUBS/$1.gen
 _aoiw_subs_del() {
   local f="$_AOW_SUBS/$1" rest
   grep -qF -- "$2"$'\t' "$f" 2>/dev/null || { _AOW_DEL=0; return 0; }
-  awk -F'\t' -v p="$2" '$1 == p' "$f" | grep -q . || { _AOW_DEL=0; return 0; }
-  rest=$(awk -F'\t' -v p="$2" '$1 != p' "$f")
+  _AOW_P="$2" awk -F'\t' 'BEGIN { p = ENVIRON["_AOW_P"] } $1 == p' "$f" | grep -q . || { _AOW_DEL=0; return 0; }
+  rest=$(_AOW_P="$2" awk -F'\t' 'BEGIN { p = ENVIRON["_AOW_P"] } $1 != p' "$f")
   if [ -n "$rest" ]; then _aoi_put "$f" "$rest"; else rm -f "$f" || ao_die 4 "구독 파일 삭제 실패: $f"; fi
   _aoiw_genup "$1"; _AOW_DEL=1
 }
@@ -86,9 +86,9 @@ _aoiw_sub_add() {
   local f="$_AOW_SUBS/$_S_KEY" cur old rest
   _aoi_recv_lock
   mkdir -p "$_AOW_SUBS" 2>/dev/null || ao_die 4 "구독 폴더 생성 실패: $_AOW_SUBS"
-  cur=$(awk -F'\t' -v p="$_AOI_LOG" '$1 == p { print $2; exit }' "$f" 2>/dev/null)
+  cur=$(_AOW_P="$_AOI_LOG" awk -F'\t' 'BEGIN { p = ENVIRON["_AOW_P"] } $1 == p { print $2; exit }' "$f" 2>/dev/null)
   if [ "$cur" != "$_S_SID" ]; then
-    rest=$(awk -F'\t' -v p="$_AOI_LOG" '$1 != p' "$f" 2>/dev/null)
+    rest=$(_AOW_P="$_AOI_LOG" awk -F'\t' 'BEGIN { p = ENVIRON["_AOW_P"] } $1 != p' "$f" 2>/dev/null)
     _aoi_put "$f" "${rest:+$rest$'\n'}$_AOI_LOG	$_S_SID"
     _aoiw_genup "$_S_KEY"
     _aoi_event sub "$_AOI_LOG" "sid=$_S_SID" op=add "gen=$_AOW_G" || true
@@ -233,8 +233,13 @@ _aoiw_cleanup() {
   local rc=$? t
   [ -n "$_W_BG" ] && kill "$_W_BG" 2>/dev/null
   if [ "$_W_REG" = 1 ]; then
-    while IFS= read -r t; do [ -n "$t" ] && _aoiw_unmark "$t"; done <<< "$_W_TGTS"
-    _aoiw_mine && rm -f "$_AOW_WAIT/$_W_SID.pid"
+    # 확인과 삭제 사이에 후임이 pid·표식을 바꾸지 못하게 fd 8 안에서 한다(이미 쥐었으면 그대로).
+    # 잠금을 못 잡으면 지우지 않는다 — 남은 pid·표식은 lstart 검사로 죽은 것으로 판정된다
+    if [ -n "${_AOI_LOCK8:-}" ] || AO_INBOX_LOCK_TRIES=40 _aoi_flock 8 "$AO_INBOX_DIR/recv.flock"; then
+      _aoiw_pause cleanup-locked
+      while IFS= read -r t; do [ -n "$t" ] && _aoiw_unmark "$t"; done <<< "$_W_TGTS"
+      _aoiw_mine && rm -f "$_AOW_WAIT/$_W_SID.pid"
+    fi
   fi
   [ -n "$_W_WHY" ] || _W_WHY="error:rc$rc"
   { [ -n "$_W_SID" ] || [ "${_W_WHY#error:}" != "$_W_WHY" ]; } && { _aoi_event wait-end - "sid=${_W_SID:--}" "tok=${_W_TOK:--}" "why=$_W_WHY" || true; }
@@ -274,7 +279,7 @@ _aoiw_deliv() {
 #   epoch 를 읽을 수 없는 token 은 유예 없음. 유예 뒤 통지 직전에 _aoiw_notify 가 전달 증거를 다시 본다.
 _aoiw_grace_over() {
   local tk e g=${AO_INBOX_RENOTIFY_GRACE:-15}
-  tk=$(awk -F'\t' -v p="$1" '$1 == p { print $4; exit }' "$_AOW_WAIT/$_W_SID.notified" 2>/dev/null)
+  tk=$(_AOW_P="$1" awk -F'\t' 'BEGIN { p = ENVIRON["_AOW_P"] } $1 == p { print $4; exit }' "$_AOW_WAIT/$_W_SID.notified" 2>/dev/null)
   e=${tk##*-}
   [[ $e =~ ^[0-9]{9,}$ ]] || return 0
   [ $(( $(date +%s) - e )) -ge "$g" ]
@@ -287,7 +292,7 @@ _aoiw_cands() {
     [ -n "$t" ] || continue
     _AOI_LOG=$t; tot=$(_aoi_count); cur=$(_aoiw_cur_of "$t")
     [ "$tot" -gt "$cur" ] || continue
-    row=$(awk -F'\t' -v p="$t" '$1 == p { print $2 "\t" $3 "\t" $5; exit }' "$_AOW_WAIT/$_W_SID.notified" 2>/dev/null)
+    row=$(_AOW_P="$t" awk -F'\t' 'BEGIN { p = ENVIRON["_AOW_P"] } $1 == p { print $2 "\t" $3 "\t" $5; exit }' "$_AOW_WAIT/$_W_SID.notified" 2>/dev/null)
     IFS=$'\t' read -r rn rst rc <<< "$row"
     [[ ${rn:-} =~ ^[0-9]+$ ]] || rn=0
     [[ ${rc:-} =~ ^[0-9]+$ ]] || rc=0
@@ -341,7 +346,7 @@ _aoiw_mark_notified() {
   local f="$_AOW_WAIT/$_W_SID.notified" t cur tot nc rn rest
   while IFS=$'\t' read -r t cur tot nc rn; do
     [ -n "$t" ] || continue
-    rest=$(awk -F'\t' -v p="$t" '$1 != p' "$f" 2>/dev/null)
+    rest=$(_AOW_P="$t" awk -F'\t' 'BEGIN { p = ENVIRON["_AOW_P"] } $1 != p' "$f" 2>/dev/null)
     _aoi_put "$f" "${rest:+$rest$'\n'}$t	$tot	pending	$_W_TOK	$nc"
   done <<< "$_W_C"
 }
@@ -412,9 +417,14 @@ _aoiw_ss_out() {
       print JSON::PP->new->utf8->canonical->encode({ hookSpecificOutput =>
         { hookEventName => "SessionStart", additionalContext => $t } })') || ao_die 4 "JSON 인코딩 실패"
     [ "$(printf '%s\n' "$_W_JS" | LC_ALL=C wc -c | tr -d ' ')" -le 8192 ] && return 0
-    [ "$cap" -gt 0 ] || return 0
+    [ "$cap" -gt 0 ] || break
     cap=$((cap - 1))
   done
+  # 대상 머리만으로도 8KB를 넘는다: token 머리 + 대상 수 + --pending 안내만(크기 고정)
+  txt="$(printf '%s\n' "$_W_OUT" | head -1)"$'\n'"[inbox] 미처리 줄이 있는 대상 $(printf '%s\n' "$_W_C" | grep -c .)개 — 목록이 길어 줄였다. \"$ao\" inbox-subscribe --list 로 대상을 보고 \"$ao\" inbox-watch --pending <대상> 으로 읽어라"
+  _W_JS=$(printf '%s' "$txt" | "$AO_PERL" -MJSON::PP -e 'local $/; my $t = <STDIN>; utf8::decode($t);
+    print JSON::PP->new->utf8->canonical->encode({ hookSpecificOutput =>
+      { hookEventName => "SessionStart", additionalContext => $t } })') || ao_die 4 "JSON 인코딩 실패"
 }
 # 잠금 안 재확인: 끄기 표식·발급·스냅샷이 그대로인가(0)
 _aoiw_ss_recheck() {
@@ -522,9 +532,9 @@ _aoiw_notify() {
     trap _aoiw_on_term TERM; return 0
   fi
   _aoiw_body
-  printf "%s\n" "$_W_OUT" >&5
+  _aoiw_mark_notified   # 먼저 기록: 실패하면 ao_die 4 로 끝나고 stderr(fd 5)는 비어 있다(훅 규약)
   _aoiw_pause notify-mid
-  _aoiw_mark_notified
+  printf "%s\n" "$_W_OUT" >&5
   _aoi_event wait-notify - "sid=$_W_SID" "tok=$_W_TOK" "n=$_W_NLO-$_W_NHI" "arr=${_W_ARR:--}" "re=$_W_RE" || true
   _W_WHY=notify
   _aoiw_pause notify-locked
