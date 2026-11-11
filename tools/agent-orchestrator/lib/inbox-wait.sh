@@ -232,6 +232,10 @@ _aoiw_unmark() {
 # 종료 정리(EXIT trap): 자식 perl 종료, 내 표식·pid 파일 정리, wait-end 사건, 잠금 해제
 _aoiw_cleanup() {
   local rc=$? t
+  # 정리 중 신호는 무시한다: 후임의 _aoiw_reap TERM 이 여기 도착하면 _aoiw_on_term 의 exit 가 EXIT trap 을
+  # 중간에 끊어 표식·pid 정리와 wait-end 사건이 빠졌다(inbox-wait-concurrent-3 간헐 실패). 정리는 유한하고
+  # (fd 8 최대 2초) 후임은 2초 뒤 KILL 하므로 막히지 않는다
+  trap ':' TERM HUP INT
   [ -n "$_W_BG" ] && kill "$_W_BG" 2>/dev/null
   if [ "$_W_REG" = 1 ]; then
     # 확인과 삭제 사이에 후임이 pid·표식을 바꾸지 못하게 fd 8 안에서 한다. 이미 쥐었으면(_W_L8=1 이고
