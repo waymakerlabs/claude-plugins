@@ -2,7 +2,8 @@
 # agent-orchestrator — 오케스트레이션 툴(herdr 등) 추상화 진입점 (S1)
 #
 # 사용: agent-orchestrator <동작> [인자…]
-#   stdout = 필요한 값 한 줄(없으면 빈 출력, agent-read·list·inbox-watch·--pending만 여러 줄). 사유·경고는 stderr. JSON 출력 없음.
+#   stdout = 필요한 값 한 줄(없으면 빈 출력, agent-read·list·inbox-watch·--pending·inbox-subscribe --list만 여러 줄). 사유·경고는 stderr.
+#   JSON 출력 없음(예외: inbox-wait --session-start 의 훅 JSON 한 줄).
 #
 # 동작(계약 진본: docs/plans/2026-11-08-agent-orchestrator-plan.md §1):
 #   backend                                         백엔드 이름
@@ -39,8 +40,9 @@
 #   inbox-subscribe [--pane <pane>|--session <sid>] <대상>   구독 등록(키 pane-…|sid-…). --unsubscribe = 해제(장벽)
 #   inbox-subscribe --list [--pane|--session …]      줄마다 <경로>\t<sid>\t<active|dormant>(여러 줄)
 #   inbox-wait                                      훅 전용(stdin 훅 JSON). 0 / 2 깨움(stderr) / 4 잠금·기록·JSON·인자 오류
-#   inbox-wait --status|--drain|--undrain|--session-start   "inbox-wait 2" / 철회 수 / 빈 출력 / (B2 자리)
-#                                                   구현 lib/inbox-wait.sh(계획 2026-11-11 §2-4·§2-5)
+#   inbox-wait --status|--drain|--undrain           "inbox-wait 2" / 철회 수 / 빈 출력
+#   inbox-wait --session-start                      동기 SessionStart 훅(stdin 훅 JSON). 빈 출력 또는 훅 JSON 한 줄(additionalContext), 항상 0
+#                                                   구현 lib/inbox-wait.sh(계획 2026-11-11 §2-3~§2-6)
 #   받은편지함 종료 코드: 0 / 2 인자·대상 형식 / 4 기록·잠금·ack 실패
 #
 # 종료 코드: 0 성공 / 2 인자 오류 / 3 대상 없음·충돌 / 4 백엔드 실행 실패 / 5 에이전트 준비 안 됨

@@ -17,12 +17,14 @@ T=$(cd "$T" && pwd -P)
 trap 'rm -rf "$T"' EXIT
 FAKE="$T/bin"; NOHERDR="$T/bin-noherdr"; FD="$T/fake"
 mkdir -p "$FAKE" "$NOHERDR" "$FD" "$T/home"
+# 실제 상태 폴더 변경 검사(inbox-real-state-untouched)용: env -i 전에 진짜 HOME을 저장하고 기준 시각을 남긴다
+REAL_HOME=$HOME; touch "$T/stamp"
 cp "$HERE/fake-herdr.py" "$FAKE/herdr"; chmod +x "$FAKE/herdr"
-EXPECT=253
+EXPECT=265
 
 PASS=0; FAIL=0
 # 여러 줄 값은 ⏎로 이어 한 줄 한 케이스를 지킨다
-ok()  { PASS=$((PASS + 1)); echo "PASS $1 — $(printf '%s' "$2" | tr '\n' '⏎')"; }
+ok()  { PASS=$((PASS + 1)); echo "$1" >> "$T/pass.names"; echo "PASS $1 — $(printf '%s' "$2" | tr '\n' '⏎')"; }
 bad() { FAIL=$((FAIL + 1)); echo "FAIL $1 — 기대 $(printf '%s' "$2" | tr '\n' '⏎') / 실제 $(printf '%s' "$3" | tr '\n' '⏎')"; }
 
 reset_state() {
@@ -617,6 +619,8 @@ wgo() { : > "$W/$1.mk.go"; }
 sub() { local s=$1; shift; run2 CLAUDE_CODE_SESSION_ID="$s" -- bash "$BIN" inbox-subscribe "$@"; }
 snd() { aoi2 inbox-send --raw "$1" "$2" > /dev/null 2>&1; }
 evw() { grep -F $'\tev=wait-end\t' "$SI/events.log" | grep -F "tok=$(wtok "$1")" | sed 's/.*why=//' | tail -1; }
+# evp <이름> → 그 pid 토큰(w<pid>-)의 마지막 wait-end why. wait-start 전에 끝난 대기자용
+evp() { local p; eval "p=\${WP_$1:-}"; grep -F $'\tev=wait-end\t' "$SI/events.log" | grep -F "tok=w$p-" | sed 's/.*why=//' | tail -1; }
 # 대기자 토큰: wait-start 사건에서 그 pid의 토큰
 wtok() { local p; eval "p=\${WP_$1:-}"; grep -F $'\tev=wait-start\t' "$SI/events.log" | grep -oE "tok=w$p-[^	]+" | tail -1 | cut -c5-; }
 alive() { kill -0 "$1" 2>/dev/null; }
@@ -825,9 +829,120 @@ wgo dn; wrc dn; c1=$WRC; wait "$DP"; snd "$LDN" "drain 뒤 줄"; wl dn2 "$NS" St
 [ "$early/$c1/$(cat "$W/dn.d")/$c2" = 0/2/0/0/0 ] && [ "$(evw dn2)" = off ] && ok inbox-drain-notify-race "notify-locked 중 drain 은 대기·통지 끝난 뒤 진행·이후 새 줄 통지 0" || bad inbox-drain-notify-race "0/2/0/0/0" "$early/$c1/$(cat "$W/dn.d")/$c2"
 ao2 inbox-wait --undrain; u=$RC; ns; LUD="$SB/ud.log"; sub "$NS" "$LUD"; wl ud "$NS" Stop; wfor "$W/ud.mk" registered; snd "$LUD" "다시 켬"; wrc ud
 [ "$u/$WRC" = 0/2 ] && [ ! -e "$SI/hooks.off" ] && ok inbox-undrain "--undrain 뒤 새 대기자 정상 등록·깨움" || bad inbox-undrain "0/2" "$u/$WRC"
+echo "== 받은편지함: SessionStart·세대(계획 2026-11-11 S1 B2)"
+# 동기 훅: ss <이름> <sid> <source> [VAR=값 …] → $W/<이름>.out(stdout)·SRC(rc). ssbg 는 백그라운드(SP_<이름>)
+ssj() { printf '{"session_id":"%s","source":"%s","hook_event_name":"SessionStart","transcript_path":"%s"}' "$2" "$3" "$W/$1.tr" > "$W/$1.sj"; rm -f "$W/$1.mk" "$W/$1.mk.go"; }
+ss() { local n=$1; ssj "$@"; shift 3
+  (cd "$T" && exec env -i "${BASE2[@]}" AO_INBOX_TEST_PAUSE_MARK="$W/$n.mk" ${1+"$@"} bash "$BIN" inbox-wait --session-start < "$W/$n.sj" > "$W/$n.out" 2> "$W/$n.serr"); SRC=$?; }
+ssbg() { local n=$1; ssj "$@"; shift 3
+  (cd "$T" && exec env -i "${BASE2[@]}" AO_INBOX_TEST_PAUSE_MARK="$W/$n.mk" ${1+"$@"} bash "$BIN" inbox-wait --session-start < "$W/$n.sj" > "$W/$n.out" 2> "$W/$n.serr") &
+  eval "SP_$n=\$!"; }
+# jctx <이름> → additionalContext(빈 출력이면 빈 값, JSON 해석 실패 rc 9)
+jctx() { /usr/bin/perl -MJSON::PP -e 'local $/; my $r = <STDIN>; exit 0 unless length $r; binmode STDOUT, ":utf8";
+  my $d = eval { JSON::PP->new->utf8->decode($r) } or exit 9; my $h = $d->{hookSpecificOutput};
+  exit 8 unless ($h->{hookEventName} // "") eq "SessionStart"; print $h->{additionalContext}' < "$W/$1.out"; }
+ns; LSS="$SB/ss.log"; sub "$NS" "$LSS"; snd "$LSS" "시작 줄"; ss s1 "$NS" resume; c1=$SRC; x1=$(jctx s1); j1=$?
+ns; sub "$NS" "$SB/ss0.log"; ss s0 "$NS" resume; c0=$SRC
+[ "$c1/$j1/$c0" = 0/0/0 ] && printf '%s' "$x1" | grep -qF '#1 시작 줄' && [ ! -s "$W/s0.out" ] && [ ! -s "$W/s1.serr" ] \
+  && ok inbox-wait-session-start "resume → stdout JSON 해석 가능·additionalContext 에 #1·미처리 0이면 빈 출력" || bad inbox-wait-session-start "0/0/0 #1" "$c1/$j1/$c0 $(cat "$W/s1.out")"
+ns; PA=$NS; ns; PB=$NS; ns; PC=$NS; PK=pane-w7_p1; LRS="$SB/rs.log"
+sub "$PA" "$LRS" --pane w7:p1; g0=$(cat "$SI/subs/$PK.gen")
+ss r1 "$PB" resume HERDR_PANE_ID=w7:p1; l1=$(cat "$SI/subs/$PK"); g1=$(cat "$SI/subs/$PK.gen")
+ss r2 "$PC" clear HERDR_PANE_ID=w7:p1; l2=$(cat "$SI/subs/$PK"); x2=$(jctx r2)
+run2 CLAUDE_CODE_SESSION_ID="$PC" -- bash "$BIN" inbox-subscribe --list --pane w7:p1
+[ "$l1" = "$LRS	$PB" ] && [ "$g1" = $((g0 + 1)) ] && [ "$l2" = "$l1" ] && printf '%s' "$x2" | grep -qF '이전 세션 구독 1개' \
+  && [ "$OUT" = "$LRS	$PB	dormant" ] && grep -F 'op=move' "$SI/events.log" | grep -qF "sid=$PB" && grep -F 'op=dormant' "$SI/events.log" | grep -qF "sid=$PB" \
+  && ok inbox-wait-start-resume-sub "resume → pane 키 구독 sid A→B·gen+1·move / clear → 휴면·안내 줄·dormant" || bad inbox-wait-start-resume-sub "B·gen+1·dormant" "$l1 g$g0→$g1 / $l2 / $OUT / $x2"
+ns; LUB="$SB/ub.log"; sub "$NS" "$LUB"; snd "$LUB" "장벽"; ssbg ub "$NS" resume AO_INBOX_TEST_PAUSE=start-mid-out:4; wfor "$W/ub.mk" start-mid-out
+(run2 CLAUDE_CODE_SESSION_ID="$NS" -- bash "$BIN" inbox-subscribe --unsubscribe "$LUB"; echo "$RC" > "$W/ub.un") & UP=$!
+(run2 -- bash "$BIN" inbox-wait --drain; echo "$RC/$OUT" > "$W/ub.d") & DP=$!
+sleep 0.6; early=0; { [ -s "$W/ub.un" ] || [ -s "$W/ub.d" ]; } && early=1; jctx ub > /dev/null 2>&1; pj=$?
+wgo ub; wait "$SP_ub"; cu=$?; wait "$UP" "$DP"; xu=$(jctx ub); ju=$?; ao2 inbox-wait --undrain
+snd "$LUB" "해제 뒤"; ss ub2 "$NS" resume
+[ "$early/$pj/$cu/$ju/$(cat "$W/ub.un")/$(cat "$W/ub.d")" = "0/9/0/0/0/0/0" ] && printf '%s' "$xu" | grep -qF '#1 장벽' && [ ! -s "$W/ub2.out" ] \
+  && ok inbox-start-unsub-barrier "start-mid-out 중 해제·drain 은 출력 완료까지 대기·JSON 완전·그 뒤 0·해제 뒤 시작 출력 0" || bad inbox-start-unsub-barrier "0/9/0/0/0/0/0" "$early/$pj/$cu/$ju/$(cat "$W/ub.un")/$(cat "$W/ub.d") $(cat "$W/ub2.out")"
+ns; LB1="$SB/bf1.log"; LB2="$SB/bf2.log"; sub "$NS" "$LB1"; sub "$NS" "$LB2"; snd "$LB1" "해제될 줄"; snd "$LB2" "남는 줄"
+sub "$NS" "$LB1" --unsubscribe; ub=$RC; ss bf "$NS" resume; xb=$(jctx bf)
+[ "$ub" = 0 ] && ! printf '%s' "$xb" | grep -qF "$LB1" && printf '%s' "$xb" | grep -qF "== $LB2" \
+  && ok inbox-start-unsub-before "해제 0 뒤 --session-start → 해제한 대상 없음(남은 대상만)" || bad inbox-start-unsub-before "LB2만" "$ub $xb"
+# 통지 합계: 동기 출력(비어 있지 않음) + async 대기자 exit 2. 행 token 이 알린 쪽 token 과 같은지(덮어쓰기 0)
+ntok() { local tk; tk=$(cut -f4 "$SI/wait/$1.notified" 2>/dev/null)
+  if grep -qF "token=$tk " "$W/$2.err" 2>/dev/null || jctx "$3" 2>/dev/null | grep -qF "token=$tk "; then echo ok; else echo bad; fi; }
+rr=""; for k in 1 2 3 4 5 6 7 8 9 10; do
+  ns; LAR="$SB/ar$k.log"; sub "$NS" "$LAR"; snd "$LAR" "경쟁 $k"
+  wl ar "$NS" SessionStart AO_INBOX_WAIT_MAX=1; ssbg as "$NS" startup; wait "$SP_as"; wrc ar
+  tot=$(( $([ "$WRC" = 2 ] && echo 1 || echo 0) + $([ -s "$W/as.out" ] && echo 1 || echo 0) ))
+  rr="$rr $tot/$(grep -c . "$SI/wait/$NS.notified" 2>/dev/null)/$(ntok "$NS" ar as)"
+done
+[ "$(printf '%s\n' $rr | sort -u | tr '\n' ' ')" = "1/1/ok " ] && ok inbox-start-async-race "동기·async 동시 10회 → 회마다 통지 1·notified 행 1·token 일치" || bad inbox-start-async-race "1/1/ok ×10" "$rr"
+ns; LO1="$SB/o1.log"; sub "$NS" "$LO1"; snd "$LO1" "동기 먼저"; ss of1 "$NS" startup
+wl oa1 "$NS" SessionStart AO_INBOX_WAIT_MAX=1; wrc oa1; c1=$WRC; s1=$(cut -f3 "$SI/wait/$NS.notified")
+ns; LO2="$SB/o2.log"; sub "$NS" "$LO2"; snd "$LO2" "async 먼저"; wl oa2 "$NS" SessionStart; wrc oa2; c2=$WRC
+ss of2 "$NS" startup; s2=$(cut -f3 "$SI/wait/$NS.notified")
+[ "$c1/$s1/$c2/$s2" = 0/ctx/2/pending ] && jctx of1 | grep -qF '#1 동기 먼저' && [ ! -s "$W/oa1.err" ] && [ ! -s "$W/of2.out" ] && grep -qF '#1 async 먼저' "$W/oa2.err" \
+  && ok inbox-start-async-order "동기 먼저 → ctx·async 통지 0 / async 먼저 → pending·동기 출력 0" || bad inbox-start-async-order "0/ctx/2/pending" "$c1/$s1/$c2/$s2"
+ns; PA=$NS; ns; PB=$NS; PK=pane-w6_p1; PLG="$SI/$PK.log"; ss la "$PA" startup HERDR_PANE_ID=w6:p1
+wl lo "$PA" Stop HERDR_PANE_ID=w6:p1 AO_INBOX_TEST_PAUSE=pre-register:4; wfor "$W/lo.mk" pre-register
+ss lb "$PB" clear HERDR_PANE_ID=w6:p1; wl lb "$PB" Stop HERDR_PANE_ID=w6:p1; wfor "$W/lb.mk" registered
+pg0=$(cat "$SI/pane-gen/$PK"); ow0=$(cat "$PLG.owner"); wgo lo; wrc lo; ca=$WRC
+pg1=$(cat "$SI/pane-gen/$PK"); ow1=$(cat "$PLG.owner"); snd "$PLG" "늦은 옛 훅 뒤"; wrc lb; cb=$WRC
+[ "$ca/$cb" = 0/2 ] && [ "$(evp lo)" = pane-superseded ] && [ "$pg1" = "2	$PB" ] && [ "$pg0" = "$pg1" ] && [ "$ow0/$ow1" = "$PB/$PB" ] && [ ! -s "$W/lo.err" ] && grep -qF '#1 늦은 옛 훅 뒤' "$W/lb.err" \
+  && ok inbox-pane-gen-late-old "A Stop pre-register 지연 → B clear 발급·등록 → A pane-superseded 0·pane-gen·owner 는 B·새 줄은 B만" || bad inbox-pane-gen-late-old "0/2 pane-superseded 2⇥B" "$ca/$cb $(evp lo) $pg1 $ow1"
+ns; PA=$NS; ns; PB=$NS; PK=pane-w6_p2; PLG="$SI/$PK.log"; ss ba "$PA" startup HERDR_PANE_ID=w6:p2
+ss bb "$PB" clear HERDR_PANE_ID=w6:p2; wl rb "$PB" Stop HERDR_PANE_ID=w6:p2; wfor "$W/rb.mk" registered
+ss bc "$PA" resume HERDR_PANE_ID=w6:p2; snd "$PLG" "A 복귀 뒤"; wrc rb; cb=$WRC
+[ "$cb" = 0 ] && [ "$(evp rb)" = pane-superseded ] && [ "$(cat "$SI/pane-gen/$PK")" = "3	$PA" ] && [ "$(cat "$SI/wait/$PA.issued")" = "$PK	3" ] && [ ! -s "$W/rb.err" ] \
+  && ok inbox-pane-gen-resume-back "B 수신 중 A resume → gen 3·A 발급·B pane-superseded" || bad inbox-pane-gen-resume-back "0 pane-superseded 3⇥A" "$cb $(evp rb) $(cat "$SI/pane-gen/$PK")"
+ns; PK=pane-w6_p3; PLG="$SI/$PK.log"
+wl iw "$NS" SessionStart HERDR_PANE_ID=w6:p3 AO_INBOX_TEST_PAUSE=issue-wait:4; wfor "$W/iw.mk" issue-wait; e1=0; grep -qF registered "$W/iw.mk" && e1=1
+ss iws "$NS" startup HERDR_PANE_ID=w6:p3; wgo iw; wfor "$W/iw.mk" registered; e2=$?; snd "$PLG" "발급 뒤"; wrc iw; c1=$WRC
+ns; wl in "$NS" SessionStart HERDR_PANE_ID=w6:p4 AO_INBOX_ISSUE_WAIT=0.6; wrc in; c2=$WRC
+[ "$e1/$e2/$c1/$c2" = 0/0/2/0 ] && [ "$(evp in)" = no-issue ] && [ ! -s "$W/in.err" ] && [ ! -e "$SI/pane-gen/pane-w6_p4" ] \
+  && ok inbox-async-start-issue-wait "async 대기자 issue-wait 중 동기 늦게 → 발급 뒤 등록·깨움 / 동기 없음 → 시간 초과 no-issue" || bad inbox-async-start-issue-wait "0/0/2/0 no-issue" "$e1/$e2/$c1/$c2 $(evp in)"
+ns; PA=$NS; ns; PB=$NS; PK=pane-w6_p5; PLG="$SI/$PK.log"; ss fa "$PA" startup HERDR_PANE_ID=w6:p5; i0=$(cat "$SI/wait/$PA.issued")
+ss fb "$PB" clear HERDR_PANE_ID=w6:p5; wl fb "$PB" Stop HERDR_PANE_ID=w6:p5; wfor "$W/fb.mk" registered
+wl fa "$PA" SessionStart HERDR_PANE_ID=w6:p5 AO_INBOX_TEST_PAUSE=issue-wait:4; wfor "$W/fa.mk" issue-wait; sleep 0.3; e1=0; alive "$WP_fa" || e1=1
+ss fc "$PA" resume HERDR_PANE_ID=w6:p5; wgo fa; wfor "$W/fa.mk" registered; e2=$?; sleep 0.3; snd "$PLG" "F1 새 줄"; wrc fa; ca=$WRC; wrc fb; cb=$WRC
+[ "$i0/$e1/$e2/$ca/$cb" = "$PK	1/0/0/2/0" ] && grep -qF '#1 F1 새 줄' "$W/fa.err" && [ ! -s "$W/fb.err" ] && [ "$(evp fb)" = pane-superseded ] \
+  && ok inbox-async-start-resume-stale-issue "옛 issued(gen 1) 남은 A resume: async 먼저 issue-wait → 동기 gen 3 발급 → 등록·A 깨움·B 통지 0 (delta F1)" || bad inbox-async-start-resume-stale-issue "1/0/0/2/0" "$i0/$e1/$e2/$ca/$cb $(evp fb)"
+# 기존 받은편지함 케이스(B1까지 116개) 이름 — 하나라도 PASS로 실행되지 않으면 FAIL
+INBOX_OLD="
+  inbox-send inbox-format inbox-raw inbox-raw-notime inbox-4000-ok inbox-no-truncate inbox-4000-multibyte
+  inbox-raw-over4000 inbox-over4000-with-time inbox-over-nowrite inbox-arg-relative inbox-arg-not-log
+  inbox-arg-dotdot inbox-arg-bad-pane inbox-arg-no-line inbox-arg-empty-line inbox-watch-no-target
+  inbox-ack-bad-n inbox-watch-bad-opt inbox-backend-none inbox-no-herdr inbox-pane-target inbox-pane-path
+  inbox-pending-pane inbox-parallel-20 inbox-create-race inbox-ack-race inbox-ack-no-tmp inbox-ack-lower-keep
+  inbox-ack-max inbox-ack-beyond inbox-ack-readonly inbox-watched inbox-watch-from-cursor
+  inbox-watch-mark-cleaned inbox-unwatched-after inbox-watch-redeliver inbox-watch-acked-hidden
+  inbox-watch-foreign-pid inbox-watch-mark-token inbox-owner-held inbox-owner-held-persist inbox-owner-third
+  inbox-owner-pending inbox-release inbox-release-normal inbox-owner-no-sid inbox-lock-live-pid
+  inbox-lock-dead-pid inbox-lock-recovered inbox-lock-two-recoverers inbox-send-times inbox-send-waiter-watched
+  inbox-send-superseded-unwatched inbox-watch-state-waiter inbox-watch-state-monitor inbox-watch-format-kept
+  inbox-watch-state-none inbox-send-meta-fail-times inbox-send-meta-fail-events inbox-send-append-fail
+  inbox-ack-ts inbox-ev-no-body inbox-ev-schema inbox-state-root inbox-sub-add inbox-sub-dup inbox-sub-pane-key
+  inbox-sub-no-key inbox-sub-bad-target inbox-sub-list inbox-sub-known inbox-sub-gen inbox-sub-claim
+  inbox-sub-move inbox-wait-no-target inbox-wait-no-sid inbox-wait-bad-json inbox-wait-status inbox-wait-wake
+  inbox-wait-cursor-untouched inbox-wait-wake-two inbox-wait-pending-now inbox-wait-cap-20 inbox-wait-line-500
+  inbox-wait-claim-first inbox-wait-clear-pane inbox-wait-term-in-notify inbox-wait-term-before-notify
+  inbox-wait-undelivered-renotify inbox-wait-delivered-quiet inbox-wait-held-no-loop inbox-wait-concurrent-3
+  inbox-wait-pid-reuse inbox-wait-other-sid inbox-wait-timeout inbox-wait-term-mark inbox-wait-fd9-free
+  inbox-ev-lag-arrival inbox-sub-del-barrier inbox-sub-del-running inbox-sub-handover inbox-snapshot-atomic
+  inbox-ctx-demote inbox-pane-gen-supersede inbox-pane-gen-notify-check inbox-pane-gen-only-sessionstart
+  inbox-pane-gen-no-issue inbox-wait-term-direct inbox-wait-term-lockwait inbox-delivered-no-event
+  inbox-delivered-ack inbox-off-before-register inbox-drain-after-register inbox-drain-notify-race inbox-undrain
+"
+miss=""; for nm in $INBOX_OLD; do grep -qxF "$nm" "$T/pass.names" || miss="$miss $nm"; done; nold=$(printf '%s\n' $INBOX_OLD | grep -c .)
+[ -z "$miss" ] && [ "$nold" = 116 ] && ok inbox-regress-all "기존 받은편지함 케이스 ${nold}개 모두 PASS 로 실행됨" || bad inbox-regress-all "116개 전부" "${nold}개, 누락:$miss"
 left=0; for f in "$SI"/wait/*.pid; do [ -f "$f" ] && _p=$(awk '{print $1}' "$f") && kill -0 "$_p" 2>/dev/null && left=$((left + 1)); done
 lw=$(ps -axo command | grep -F "$T" | grep -cF 'inbox-wait' )
 [ "$left/$lw" = 0/0 ] || echo "WARN 남은 대기자 pid $left·프로세스 $lw"
+# 맨 끝: 실제 상태 폴더에 시험이 만들 수 있는 이름이 기준 시각 뒤에 바뀌지 않았는가.
+#   다른 세션이 실제로 쓰는 받은편지함(*.log·.cursor·.owner·.flock 등)은 시험과 무관하게 바뀌므로 세지 않는다
+RS="$REAL_HOME/.local/state/agent-orchestrator"; touched=""
+if [ -d "$RS" ]; then
+  touched=$(find "$RS" -newer "$T/stamp" 2>/dev/null | grep -E '/(events\.log|known\.list|recv\.flock|hooks\.off)$|/(subs|wait|pane-gen)(/|$)|\.(times|ackts)$|\.waiters(/|$)')
+fi
+[ -z "$touched" ] && ok inbox-real-state-untouched "실제 $RS 에 시험 상태 이름 변경 0" || bad inbox-real-state-untouched "0" "$touched"
 TOTAL=$((PASS + FAIL))
 echo "== 집계: PASS $PASS / FAIL $FAIL / 총 $TOTAL (기대 $EXPECT)"
 [ "$TOTAL" = "$EXPECT" ] || { echo "FAIL 케이스 총계 불일치: $TOTAL ≠ $EXPECT"; exit 1; }

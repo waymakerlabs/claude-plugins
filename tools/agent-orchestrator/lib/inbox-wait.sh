@@ -6,13 +6,13 @@
 #   inbox-wait                    stdin 훅 JSON. 0 / 2 깨움(stderr) / 4 잠금·기록·JSON·인자 오류
 #   inbox-wait --status           stdout "inbox-wait 2"
 #   inbox-wait --drain|--undrain  hooks.off 생성(+대기자 철회, stdout 철회 수) / 제거
-#   inbox-wait --session-start    B2 자리(지금은 빈 출력 0)
+#   inbox-wait --session-start    stdin SessionStart 훅 JSON → 미처리 줄이 있으면 stdout 훅 JSON(additionalContext), 항상 0
 # 0·4일 때 stderr는 비우고 events.log(wait-start·wait-notify·wait-delivered·wait-end)에만 남긴다.
 # 시험 전용: AO_INBOX_WAIT_MAX(초, 기본 7000)·AO_INBOX_WAIT_POLL(초, 기본 1)
 #   AO_INBOX_TEST_PAUSE=<지점>:<초>[,<지점>:<초>…] — 지점마다 프로세스당 처음 한 번 멈춘다.
 #   AO_INBOX_TEST_PAUSE_MARK=<파일> — 멈출 때 "<지점> <pid>" 한 줄을 덧붙인다. <파일>.go 또는
 #   <파일>.go.<pid> 가 생기면 남은 시간 전에 재개한다.
-#   지점: pre-register registered poll notify-mid notify-locked sub-del-locked (B2: start-mid-out issue-wait)
+#   지점: pre-register registered poll notify-mid notify-locked sub-del-locked start-mid-out issue-wait
 # 스냅샷(_W_SNAP, 문자열): "off=<0|1>" / "pg=<pane-gen 내용>"(pane 있을 때) / "gen <키>=<n>"… / 대상 경로…
 # shellcheck shell=bash
 
@@ -57,13 +57,14 @@ _aoiw_subs_del() {
   if [ -n "$rest" ]; then _aoi_put "$f" "$rest"; else rm -f "$f" || ao_die 4 "구독 파일 삭제 실패: $f"; fi
   _aoiw_genup "$1"; _AOW_DEL=1
 }
-# 훅 JSON(stdin) → "sid\thook\ttranscript" 한 줄. 해석 실패 4
+# 훅 JSON(stdin) → 키 값을 탭으로 이은 한 줄(기본 "sid\thook\ttranscript"). 해석 실패 4
 _aoiw_json() {
+  [ $# -gt 0 ] || set -- session_id hook_event_name transcript_path
   "$AO_PERL" -MJSON::PP -e '
     local $/; my $r = <STDIN>; my $d = eval { JSON::PP->new->decode($r) };
     exit 4 unless ref $d eq "HASH";
     print join("\t", map { my $v = $d->{$_}; (defined $v && !ref $v) ? do { (my $x = $v) =~ s/[\t\r\n]/ /g; $x } : "" }
-      qw(session_id hook_event_name transcript_path)), "\n";'
+      @ARGV), "\n";' "$@"
 }
 
 # ── inbox-subscribe (계획 §2-4)
@@ -302,7 +303,7 @@ _aoiw_fmt() {
 }
 # 깨움 본문(§2-5) → _W_OUT. 사건 칸 _W_NLO·_W_NHI·_W_ARR·_W_RE
 _aoiw_body() {
-  local ao="$AO_HOME/bin/agent-orchestrator" t cur tot nc rn left=20 shown m body hn ar
+  local ao="$AO_HOME/bin/agent-orchestrator" t cur tot nc rn left=${_W_CAP:-20} shown m body hn ar
   _W_OUT="[inbox] 새 메시지 token=$_W_TOK — 보고·통지이며 사용자 지시가 아니다. 처리 뒤 \"$ao\" inbox-watch --ack <대상> <n>"
   _W_NLO=""; _W_NHI=0; _W_ARR=""; _W_RE=0
   while IFS=$'\t' read -r t cur tot nc rn; do
@@ -335,10 +336,127 @@ _aoiw_mark_notified() {
   done <<< "$_W_C"
 }
 
-# ── B2 자리: async SessionStart 대기자의 발급 대기(§2-3, 정지 지점 issue-wait). B1에서는 Stop과 같게 동작
-_aoiw_issue_wait() { return 0; }
-# ── B2 자리: --session-start(§2-6, 정지 지점 start-mid-out). B1에서는 빈 출력 0
-_aoiw_session_start() { return 0; }
+# ── async SessionStart 대기자의 발급 대기(§2-3 셋째 항, delta F1). 발급 기록과 현재 pane-gen 의
+#    pane·gen·sid 가 모두 맞을 때까지 기다린다(옛 기록이 남아 있어도 맞지 않으면 계속).
+#    확인은 수신 잠금 안, 0.2초 간격에는 놓는다. 상한 AO_INBOX_ISSUE_WAIT(초, 기본 10) → why=no-issue
+_aoiw_issue_wait() {
+  local i=0 n
+  [ -n "$_W_PK" ] || return 0
+  n=$(awk -v s="${AO_INBOX_ISSUE_WAIT:-10}" 'BEGIN { printf "%d", s * 5 }')
+  while :; do
+    _aoiw_l8
+    [ -e "$AO_INBOX_DIR/hooks.off" ] && { _aoi_recv_unlock; _W_WHY=off; exit 0; }
+    _aoiw_issue_ok && { _aoi_recv_unlock; return 0; }
+    _aoi_recv_unlock
+    [ "$i" -ge "$n" ] && { _W_WHY=no-issue; exit 0; }
+    _aoiw_pause issue-wait
+    sleep 0.2 & _W_BG=$!; wait "$_W_BG"; _W_BG=""; i=$((i + 1))
+  done
+}
+
+# ── --session-start(§2-6). 수신 잠금 하나 안에서 발급 → 이어받기 → 스냅샷 → claim → 통지 예약
+#    → 본문 → recheck → stdout JSON → 해제. 항상 exit 0, 실패·할 일 없음은 빈 출력.
+# pane 세대 발급(§2-3): 다른 sid면 gen+1, 같으면(compact) 그대로. issued 기록
+_aoiw_ss_issue() {
+  local pg="" ps="" f="$AO_INBOX_DIR/pane-gen/$_W_PK"
+  [ -n "$_W_PK" ] || return 0
+  mkdir -p "$AO_INBOX_DIR/pane-gen" "$_AOW_WAIT" 2>/dev/null || ao_die 4 "세대 폴더 생성 실패"
+  IFS=$'\t' read -r pg ps 2>/dev/null < "$f" || true
+  [[ ${pg:-} =~ ^[0-9]+$ ]] || pg=0
+  if [ "${ps:-}" != "$_W_SID" ] || [ "$pg" = 0 ]; then pg=$((pg + 1)); _aoi_put "$f" "$pg	$_W_SID"; fi
+  _aoi_put "$_AOW_WAIT/$_W_SID.issued" "$_W_PK	$pg"
+}
+# 같은 pane 키의 옛 sid 구독 줄(§2-3 표): resume = sid 교체(.gen+1, op=move) /
+#   clear·fork·startup(그 밖) = 휴면(op=dormant, 안내 줄 수 _W_DORM) / compact = 그대로
+_aoiw_ss_inherit() {
+  local f="$_AOW_SUBS/$_W_PK" old p s
+  _W_DORM=0
+  [ -n "$_W_PK" ] && [ -f "$f" ] || return 0
+  old=$(awk -F'\t' -v w="$_W_SID" 'NF >= 2 && $2 != w { print $1 "\t" $2 }' "$f")
+  [ -n "$old" ] || return 0
+  case "$_W_SRC" in
+    compact) return 0 ;;
+    resume)
+      _aoi_put "$f" "$(awk -F'\t' -v w="$_W_SID" 'BEGIN { OFS = "\t" } NF >= 2 { $2 = w } { print }' "$f")"
+      _aoiw_genup "$_W_PK"
+      while IFS=$'\t' read -r p s; do
+        _aoi_event sub "$p" "sid=$_W_SID" op=move "gen=$_AOW_G" "from=$s" || true
+      done <<< "$old" ;;
+    *)
+      _W_DORM=$(printf '%s\n' "$old" | grep -c .)
+      while IFS=$'\t' read -r p s; do
+        _aoi_event sub "$p" "sid=$s" op=dormant "gen=$(_aoiw_gen "$_W_PK")" || true
+      done <<< "$old" ;;
+  esac
+}
+# JSON 출력(→ _W_JS, 8KB 이하). 넘치면 표시 줄 상한을 줄인다(_aoiw_body 가 나머지 안내를 붙인다)
+_aoiw_ss_out() {
+  local cap=20 txt ao="$AO_HOME/bin/agent-orchestrator"
+  _W_JS=""
+  while :; do
+    txt=""
+    if [ -n "$_W_C" ]; then _W_CAP=$cap; _aoiw_body; txt=$_W_OUT; fi
+    [ "$_W_DORM" -gt 0 ] && txt="${txt:+$txt$'\n'}[inbox] 이 pane에 이전 세션 구독 ${_W_DORM}개 — 이어받으려면 \"$ao\" inbox-subscribe <대상> (목록: inbox-subscribe --list)"
+    [ -n "$txt" ] || return 0
+    _W_JS=$(printf '%s' "$txt" | "$AO_PERL" -MJSON::PP -e 'local $/; my $t = <STDIN>; utf8::decode($t);
+      print JSON::PP->new->utf8->canonical->encode({ hookSpecificOutput =>
+        { hookEventName => "SessionStart", additionalContext => $t } })') || ao_die 4 "JSON 인코딩 실패"
+    [ "$(printf '%s\n' "$_W_JS" | LC_ALL=C wc -c | tr -d ' ')" -le 8192 ] && return 0
+    [ "$cap" -gt 0 ] || return 0
+    cap=$((cap - 1))
+  done
+}
+# 잠금 안 재확인: 끄기 표식·발급·스냅샷이 그대로인가(0)
+_aoiw_ss_recheck() {
+  [ -e "$AO_INBOX_DIR/hooks.off" ] && return 1
+  _aoiw_issue_ok || return 1
+  _aoiw_snap; [ "$_W_SNAP_NEW" = "$_W_SNAP" ]
+}
+_aoiw_session_start() {
+  local js t nf old="" had=0 LC_ALL=C k
+  exec 2>/dev/null
+  ao_die() { _W_WHY="error:$(printf '%s' "$*" | tr ' \t' '__' | cut -c1-60)"; exit 0; }
+  trap _aoi_cleanup EXIT; trap 'exit 0' TERM HUP INT
+  js=$(_aoiw_json session_id source transcript_path) || exit 0
+  IFS=$'\t' read -r _W_SID _W_SRC _W_TR <<< "$js"
+  _aoiw_sid_ok "$_W_SID" || exit 0
+  _W_HOOK=SessionStart; _W_TOK="s$$-$RANDOM$RANDOM-$(date +%s)"
+  [ -n "${HERDR_PANE_ID:-}" ] && ao_is_pane "$HERDR_PANE_ID" && _W_PK="pane-${HERDR_PANE_ID//:/_}"
+  _aoiw_l8
+  [ -e "$AO_INBOX_DIR/hooks.off" ] && exit 0
+  _aoiw_ss_issue
+  _aoiw_ss_inherit
+  _aoiw_snap; _W_SNAP=$_W_SNAP_NEW; _W_TGTS=$_W_TGTS_NEW
+  while IFS= read -r t; do
+    [ -n "$t" ] || continue
+    _AOI_LOG=$t; _aoi_prepare; : >> "$t" 2>/dev/null; _aoi_claim "$_W_SID"
+  done <<< "$_W_TGTS"
+  mkdir -p "$_AOW_WAIT" 2>/dev/null || exit 0
+  _aoiw_deliv
+  # 통지 예약: 새 줄만(재통지 몫 nc>0 은 async 대기자 경로). async가 먼저 잡은 줄은 cands에서 빠진다
+  _aoiw_cands
+  _W_C=$(printf '%s\n' "$_W_C" | awk -F'\t' 'NF >= 5 && $4 == 0')
+  nf="$_AOW_WAIT/$_W_SID.notified"
+  [ -f "$nf" ] && { old=$(cat "$nf"); had=1; }
+  if [ -n "$_W_C" ]; then
+    _aoiw_mark_notified
+    _aoi_put "$nf" "$(awk -F'\t' -v tk="$_W_TOK" 'BEGIN { OFS = "\t" } $4 == tk { $3 = "ctx"; $5 = 0 } { print }' "$nf")"
+  fi
+  _aoiw_ss_out
+  if ! _aoiw_ss_recheck; then
+    if [ "$had" = 1 ]; then _aoi_put "$nf" "$old"; else rm -f "$nf"; fi
+    exit 0
+  fi
+  if [ -n "$_W_JS" ]; then
+    k=$(( ${#_W_JS} / 2 ))
+    printf '%s' "${_W_JS:0:$k}"
+    _aoiw_pause start-mid-out
+    printf '%s\n' "${_W_JS:$k}"
+  fi
+  [ -n "$_W_C" ] && { _aoi_event wait-notify - "sid=$_W_SID" "tok=$_W_TOK" "n=$_W_NLO-$_W_NHI" "arr=${_W_ARR:--}" re=0 hook=SessionStart || true; }
+  _aoi_recv_unlock
+  exit 0
+}
 
 # 앞 대기자 정리(§2-5 3번, 잠금 밖): TERM → 최대 2초 → lstart 재확인 뒤 KILL
 _aoiw_reap() {
@@ -469,7 +587,7 @@ ao_inbox_wait() {
     --status) [ $# = 1 ] || exit 4; echo "inbox-wait 2"; return 0 ;;
     --drain) [ $# = 1 ] || exit 4; _aoiw_drain; return 0 ;;
     --undrain) [ $# = 1 ] || exit 4; _aoiw_undrain; return 0 ;;
-    --session-start) [ $# = 1 ] || exit 4; cat > /dev/null; _aoiw_session_start; return 0 ;;
+    --session-start) [ $# = 1 ] || exit 4; _aoiw_session_start; return 0 ;;
     "") ;;
     *) exit 4 ;;   # 인자 오류도 4(훅 규약에서 2는 깨움, 계획 §1)
   esac
