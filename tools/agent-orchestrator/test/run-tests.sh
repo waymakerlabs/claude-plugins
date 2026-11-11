@@ -20,7 +20,7 @@ mkdir -p "$FAKE" "$NOHERDR" "$FD" "$T/home"
 # 실제 상태 폴더 변경 검사(inbox-real-state-untouched)용: env -i 전에 진짜 HOME을 저장하고 기준 시각을 남긴다
 REAL_HOME=$HOME; touch "$T/stamp"
 cp "$HERE/fake-herdr.py" "$FAKE/herdr"; chmod +x "$FAKE/herdr"
-EXPECT=300
+EXPECT=304
 
 PASS=0; FAIL=0
 # 여러 줄 값은 ⏎로 이어 한 줄 한 케이스를 지킨다
@@ -1063,6 +1063,23 @@ mkdir -p "$H5/Library/LaunchAgents"; : > "$H5/Library/LaunchAgents/kr.waymakerla
 run HOME="$H5" -- bash "$R/tools/agent-orchestrator/install.sh" --check inbox-sweep; m2=$RC; o2=$OUT
 [ "$m1/$m2" = 1/0 ] && printf '%s' "$o1" | grep -q '^없음	doc	ours-core	~/Library/LaunchAgents/' && printf '%s' "$o2" | grep -q '^있음	doc	ours-core	~/Library/LaunchAgents/' \
   && printf '%s' "$o2" | grep -q '^== inbox-sweep: 필수 1/1 있음' && ok inbox-check-sweep-doc "plist 없음 → 없음·1 / 있음 → 있음·0 (kind doc)" || bad inbox-check-sweep-doc "1/0" "$m1/$m2 $(grep inbox-sweep <<< "$o1")"
+# 크로스체크 S3 1회차 회귀 시험
+swn hang; swsend "$T0" w1:p1 "줄"; HB="$T/bin-hang"; mkdir -p "$HB"
+printf '#!/bin/sh\necho "herdr $*" >> "%s/hang.calls"\n(sleep 6; echo late) &\necho "status: running"\n' "$T" > "$HB/herdr"; chmod +x "$HB/herdr"
+s0=$(date +%s); run2 AO_STATE_ROOT="$SWR" AO_INBOX_NOW=$((T0 + 960)) AO_SWEEP_HERDR_TIMEOUT=1 PATH="$HB:/usr/bin:/bin" -- bash "$BIN" inbox-sweep; el=$(( $(date +%s) - s0 ))
+[ "$RC" = 0 ] && [ "$el" -le 4 ] && lockfree6() { /usr/bin/perl -MFcntl=:flock -e 'open(F, ">>", $ARGV[0]) or exit 4; exit(flock(F, LOCK_EX | LOCK_NB) ? 0 : 1)' "$SWI/sweep/state.flock"; } && lockfree6 \
+  && ok inbox-sweep-herdr-child-hang "출력 fd 를 문 손자 herdr(6초) + 상한 1초 → sweep ${el}초에 0·잠금 풀림" || bad inbox-sweep-herdr-child-hang "≤4초·잠금 풀림" "rc=$RC ${el}초"
+pkill -f "$T/bin-hang" 2>/dev/null; true
+swn trunc; B="$SWI/pane-w2_p9.log"; for i in 1 2 3 4 5 6 7 8 9 10; do echo "옛$i" >> "$B"; done
+sw "$T0"; rm -f "$B"; echo "새 줄" > "$B"; sw $((T0 + 1200)) --dry-run; d=$(dcls "$B"); sw $((T0 + 1200)); cl=$(sev backlog-close)
+[ "$d" = 1/0/observed/quiet ] && printf '%s' "$cl" | grep -qF 'reset=1' && [ "$(sev backlog-open | wc -l | tr -d ' ')" = 2 ] \
+  && ok inbox-sweep-truncated-obs "10줄 관측 뒤 파일 교체(새 1줄) → 옛 obs 안 씀(0분 quiet)·옛 backlog reset=1 로 닫고 새로 엶" || bad inbox-sweep-truncated-obs "1/0/observed/quiet reset" "$d | $cl"
+swn dreg; sw "$T0" --dry-run --register "$T/rc-ext/z.log"; r1=$RC
+[ "$r1" = 2 ] && [ ! -e "$SWI/known.list" ] && ok inbox-sweep-dry-register "--dry-run --register → 2·known.list 쓰기 0" || bad inbox-sweep-dry-register "2·없음" "rc=$r1 $(cat "$SWI/known.list" 2>&1)"
+isw --apply; echo 'v1' > "$T/v1.mark"; cp "$PL" "$T/pl.v1"; isw --uninstall; isw --apply; isw --uninstall; r5=$RC
+AD="$HS/.claude/archive/agent-orchestrator"; na=$(find "$AD" -name '*.plist' | wc -l | tr -d ' ')
+[ "$r5" = 0 ] && [ "$na" = 3 ] && [ -d "$AD/inbox-sweep-20261111-000000.1" ] && [ -d "$AD/inbox-sweep-20261111-000000.2" ] \
+  && ok inbox-sweep-uninstall-no-clobber "같은 AO_TS 로 보관 세 번 → 보관본 3개(.1·.2 접미), 덮어쓰기 0" || bad inbox-sweep-uninstall-no-clobber "3개" "rc=$r5 $na $(ls "$AD")"
 # 기존 받은편지함 케이스(B1까지 116개) 이름 — 하나라도 PASS로 실행되지 않으면 FAIL
 INBOX_OLD="
   inbox-send inbox-format inbox-raw inbox-raw-notime inbox-4000-ok inbox-no-truncate inbox-4000-multibyte

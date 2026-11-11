@@ -46,7 +46,10 @@ if [ "$mode" = uninstall ]; then
   fi
   if loaded; then "$LC" bootout "$DOM/$LABEL" 2>/dev/null || die 4 "launchctl bootout 실패"; echo "해제	$DOM/$LABEL"; fi
   if [ -e "$DST" ]; then
-    mkdir -p "$ARC" && mv "$DST" "$ARC/" || die 4 "보관 실패: $DST → $ARC"
+    # 같은 초에 두 번 보관해도 앞 보관본을 덮어쓰지 않는다(크로스체크 S3 1회차 #4): 빈 자리를 찾고 mv -n
+    base=$ARC; i=1
+    while [ -e "$ARC/${DST##*/}" ]; do ARC="$base.$i"; i=$((i + 1)); done
+    mkdir -p "$ARC" && mv -n "$DST" "$ARC/" && [ ! -e "$DST" ] || die 4 "보관 실패: $DST → $ARC"
     echo "보관	$DST → $ARC/"
   else
     echo "없음	$DST"

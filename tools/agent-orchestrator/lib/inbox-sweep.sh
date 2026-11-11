@@ -13,7 +13,7 @@
 # --dry-run: 알림·상태 기록·events 없이 stdout "<경로>\t<k>\t<분>\t<exact|observed>\t<alert|quiet|skip>"
 #   (미처리 줄이 있는 받은편지함만). 잠금도 잡지 않는다(읽기 전용).
 # 종료 0 / 2 인자 / 4 상태 파일 기록 실패. 겹친 실행(fd 6 sweep/state.flock 을 곧바로 못 잡음)은 0.
-# 상태(sweep/): obs "<경로>\t<n>\t<첫 관측>" · alerts "<경로>\t<epoch>\t<bl>" · open "<경로>\t<bl>\t<n>\t<arr>\t<exact>"
+# 상태(sweep/): obs "<경로>\t<hi>\t<관측>\t<inode>" · alerts "<경로>\t<epoch>\t<bl>" · open "<경로>\t<bl>\t<n>\t<arr>\t<exact>\t<inode>"
 # events: backlog-open·backlog-close·sweep-alert(계획 §2-9). events.log 가 AO_INBOX_EV_MAX(바이트, 기본 10MB)를
 #   넘으면 events.log.<epoch> 로 옮기고 새 파일을 연다(삭제 없음).
 # 시험 전용: AO_INBOX_NOW(epoch 고정), AO_SWEEP_HERDR_TIMEOUT(초, 기본 10 — herdr 호출 상한),
@@ -50,18 +50,26 @@ _aos_name() {
   printf '%s\n' "${p%.log}"
 }
 
-# herdr 호출: 시간 상한(perl alarm), stdin 막음, fd 6(sweep 잠금) 닫음 — 서버 자동 기동 등으로 남는 자식이
-#   잠금을 물려받으면 다음 sweep 이 모두 "겹친 실행"으로 끝나기 때문이다
+# herdr 호출: 새 프로세스 그룹에서 실행하고 시간 상한(AO_SWEEP_HERDR_TIMEOUT초, 기본 10)이 지나면 그룹 전체를
+#   KILL 한다. stdout 은 파이프가 아니라 임시 파일로 받는다 — 손자 프로세스가 출력 fd 를 물고 남아도 sweep 이
+#   기다리지 않게(크로스체크 S3 1회차 #1). stdin 막음, fd 6(sweep 잠금) 닫음 — 남는 자식이 잠금을 물려받으면
+#   다음 sweep 이 모두 "겹친 실행"으로 끝나기 때문이다. 출력은 _AOS_HOUT(파일 경로)
+_AOS_HOUT=""
 _aos_herdr() {
   command -v herdr >/dev/null 2>&1 || return 127
-  "$AO_PERL" -e 'alarm shift; exec @ARGV or exit 127' "${AO_SWEEP_HERDR_TIMEOUT:-10}" herdr "$@" 6>&- </dev/null
+  [ -n "$_AOS_HOUT" ] || _AOS_HOUT=$(mktemp "${TMPDIR:-/tmp}/ao-sweep-h.XXXXXX") || return 1
+  "$AO_PERL" -e '
+    my $t = shift; my $pid = fork; defined $pid or exit 1;
+    if (!$pid) { setpgrp(0, 0); exec @ARGV; exit 127 }
+    $SIG{ALRM} = sub { kill "KILL", -$pid; kill "KILL", $pid; exit 142 };
+    alarm $t; waitpid($pid, 0); exit($? & 127 ? 1 : $? >> 8)' \
+    "${AO_SWEEP_HERDR_TIMEOUT:-10}" herdr "$@" > "$_AOS_HOUT" 2>/dev/null 6>&- </dev/null
 }
-# _aos_notify <본문> → 0 보냄 / 1 못 보냄(herdr 없음·서버 꺼짐·실패)
+# _aos_notify <본문> → 0 보냄 / 1 못 보냄(herdr 없음·서버 꺼짐·실패·시간 초과)
 _aos_notify() {
-  local st
-  st=$(_aos_herdr status server 2>/dev/null) || return 1
-  printf '%s\n' "$st" | grep -q '^status: running' || return 1
-  _aos_herdr notification show "받은편지함 미처리" --body "$1" --sound request >/dev/null 2>&1
+  _aos_herdr status server || return 1
+  grep -q '^status: running' "$_AOS_HOUT" 2>/dev/null || return 1
+  _aos_herdr notification show "받은편지함 미처리" --body "$1" --sound request
 }
 
 # 대상 목록(정렬·중복 제거)
@@ -84,13 +92,16 @@ _aos_rotate() {
 
 # ── sweep/obs: 받은편지함마다 "<경로>\t<그때 줄 수 hi>\t<관측 epoch>" 행을 줄 수가 늘 때 덧붙인다(times 에
 #    행이 빠진 줄이 새로 생겼을 때만). 줄 m 의 첫 관측 = hi ≥ m 인 첫 행의 epoch. cursor ≥ hi 인 행은 지운다.
-_aos_obs_first() {   # <경로> <m> → epoch 또는 빈 출력
+#    행 끝 칸은 받은편지함 파일의 inode 다. inode 가 다르거나 hi > 지금 줄 수(파일이 잘림·교체)인 행은 옛 파일의
+#    관측이라 쓰지 않고 지운다(크로스체크 S3 1회차 #2 — 잘린 뒤 새 줄에 옛 관측 시각을 쓰면 하한이 깨진다).
+_aos_ino() { stat -f %i "$1" 2>/dev/null || echo 0; }
+_aos_obs_first() {   # <경로> <m> <inode> <줄 수> → epoch 또는 빈 출력
   [ -f "$_AOS_D/obs" ] || return 0
-  P=$1 awk -F'\t' -v m="$2" '$1 == ENVIRON["P"] && $2 + 0 >= m + 0 { print $3; exit }' "$_AOS_D/obs" 2>/dev/null
+  P=$1 awk -F'\t' -v m="$2" -v ino="$3" -v tot="$4" '$1 == ENVIRON["P"] && $4 == ino && $2 + 0 <= tot + 0 && $2 + 0 >= m + 0 { print $3; exit }' "$_AOS_D/obs" 2>/dev/null
 }
-_aos_obs_update() {  # <경로> <cursor> <줄 수>
-  local p=$1 c=$2 total=$3 F="$_AOS_D/obs" lasthi miss tmp
-  lasthi=$(P=$p awk -F'\t' '$1 == ENVIRON["P"] { h = $2 } END { print h + 0 }' "$F" 2>/dev/null) || lasthi=0
+_aos_obs_update() {  # <경로> <cursor> <줄 수> <inode>
+  local p=$1 c=$2 total=$3 ino=$4 F="$_AOS_D/obs" lasthi miss tmp
+  lasthi=$(P=$p awk -F'\t' -v ino="$ino" -v tot="$total" '$1 == ENVIRON["P"] && $4 == ino && $2 + 0 <= tot + 0 { h = $2 } END { print h + 0 }' "$F" 2>/dev/null) || lasthi=0
   [ "${lasthi:-0}" -lt "$c" ] && lasthi=$c
   miss=0
   if [ "$total" -gt "$lasthi" ]; then
@@ -98,8 +109,8 @@ _aos_obs_update() {  # <경로> <cursor> <줄 수>
     [ -f "$p.times" ] || miss=1
   fi
   tmp="$F.tmp.$$"
-  if ! { if [ -f "$F" ]; then P=$p awk -F'\t' -v c="$c" '!($1 == ENVIRON["P"] && $2 + 0 <= c + 0)' "$F"; fi
-         if [ "$miss" = 1 ]; then printf '%s\t%s\t%s\n' "$p" "$total" "$_AOS_NOW"; fi; } > "$tmp" 2>/dev/null \
+  if ! { if [ -f "$F" ]; then P=$p awk -F'\t' -v c="$c" -v ino="$ino" -v tot="$total" '!($1 == ENVIRON["P"] && ($2 + 0 <= c + 0 || $4 != ino || $2 + 0 > tot + 0))' "$F"; fi
+         if [ "$miss" = 1 ]; then printf '%s\t%s\t%s\t%s\n' "$p" "$total" "$_AOS_NOW" "$ino"; fi; } > "$tmp" 2>/dev/null \
      || ! mv -f "$tmp" "$F" 2>/dev/null; then
     rm -f "$tmp" 2>/dev/null; ao_die 4 "상태 파일 기록 실패: $F"
   fi
@@ -108,30 +119,33 @@ _aos_bl() { printf '%s-%s\n' "$(printf '%s' "$1" | shasum | cut -c1-8)" "$2"; }
 
 # _aos_box <경로> — 한 받은편지함 점검
 _aos_box() {
-  local p=$1 c total m k arr exact ex age min cls open on obl oarr oex ats cage last lbl body ge=""
+  local p=$1 c total m k arr exact ex age min cls open on obl oarr oex oino ats cage last lbl body ino rs ge=""
   [ -f "$p" ] || return 0
-  _AOI_LOG=$p; _aoi_cursor; c=$_AOI_CUR; total=$(_aoi_count)
+  _AOI_LOG=$p; _aoi_cursor; c=$_AOI_CUR; total=$(_aoi_count); ino=$(_aos_ino "$p")
   # 1. 열린 backlog 가 끝났으면(cursor 가 그 줄을 넘음) 닫는다
   if [ "$_AOS_DRY" = 0 ]; then
     open=$(_aos_get "$_AOS_D/open" "$p")
     if [ -n "$open" ]; then
-      IFS=$'\t' read -r obl on oarr oex <<< "$open"
-      if [ "$c" -ge "${on:-0}" ] || [ "$total" -lt "${on:-0}" ]; then
+      IFS=$'\t' read -r obl on oarr oex oino <<< "$open"
+      # 파일이 잘리거나 교체됐으면(inode 다름·줄 수 < n) 옛 backlog 는 reset 으로 닫는다(ackts 판정 안 함)
+      rs=0; { [ "${oino:-}" != "$ino" ] || [ "$total" -lt "${on:-0}" ]; } && rs=1
+      if [ "$rs" = 1 ] || [ "$c" -ge "${on:-0}" ]; then
         ats=""
-        [ -f "$p.ackts" ] && ats=$(awk -F'\t' -v n="$on" '$1 + 0 <= n + 0 && n + 0 <= $2 + 0 { print $3; exit }' "$p.ackts" 2>/dev/null)
+        [ "$rs" = 0 ] && [ -f "$p.ackts" ] && ats=$(awk -F'\t' -v n="$on" '$1 + 0 <= n + 0 && n + 0 <= $2 + 0 { print $3; exit }' "$p.ackts" 2>/dev/null)
         if [[ ${ats:-} =~ ^[0-9]+$ ]]; then cage=$((ats - oarr)); else cage=$((_AOS_NOW - oarr)); ats=-; fi
-        _aoi_event backlog-close "$p" "bl=$obl" "age=$cage" "exact=$oex" "ackts=$ats" || true
+        if [ "$rs" = 1 ]; then _aoi_event backlog-close "$p" "bl=$obl" "age=$cage" "exact=$oex" "ackts=$ats" reset=1 || true
+        else _aoi_event backlog-close "$p" "bl=$obl" "age=$cage" "exact=$oex" "ackts=$ats" || true; fi
         _aos_set "$_AOS_D/open" "$p"; open=""
       fi
     fi
-    _aos_obs_update "$p" "$c" "$total"
+    _aos_obs_update "$p" "$c" "$total" "$ino"
   fi
   [ "$total" -gt "$c" ] || return 0
   # 2. 가장 오래된 미처리 줄의 도착 시각
   m=$((c + 1)); k=$((total - c))
   arr=$(awk -F'\t' -v m="$m" '$1 + 0 == m + 0 { print $2; exit }' "$p.times" 2>/dev/null)
   if [[ ${arr:-} =~ ^[0-9]+$ ]]; then exact=exact; ex=1
-  else exact=observed; ex=0; arr=$(_aos_obs_first "$p" "$m"); [[ ${arr:-} =~ ^[0-9]+$ ]] || arr=$_AOS_NOW; ge="≥"; fi
+  else exact=observed; ex=0; arr=$(_aos_obs_first "$p" "$m" "$ino" "$total"); [[ ${arr:-} =~ ^[0-9]+$ ]] || arr=$_AOS_NOW; ge="≥"; fi
   age=$((_AOS_NOW - arr)); [ "$age" -lt 0 ] && age=0; min=$((age / 60))
   lbl=$(_aos_bl "$p" "$m")
   last=$(_aos_get "$_AOS_D/alerts" "$p"); last=${last%%$'\t'*}
@@ -141,7 +155,7 @@ _aos_box() {
   if [ "$_AOS_DRY" = 1 ]; then printf '%s\t%s\t%s\t%s\t%s\n' "$p" "$k" "$min" "$exact" "$cls"; return 0; fi
   # 3. 새 backlog 열기
   if [ -z "$open" ]; then
-    _aos_set "$_AOS_D/open" "$p" "$lbl	$m	$arr	$ex"
+    _aos_set "$_AOS_D/open" "$p" "$lbl	$m	$arr	$ex	$ino"
     _aoi_event backlog-open "$p" "bl=$lbl" "arr=$arr" "exact=$ex" || true
   fi
   [ "$cls" = alert ] || return 0
@@ -174,6 +188,8 @@ ao_inbox_sweep() {
     esac
   done
   if [ "$reg" = 1 ]; then
+    # --register 는 쓰기 동작이라 --dry-run·--age-min 등과 함께 받지 않는다(크로스체크 S3 1회차 #3)
+    [ "$_AOS_DRY" = 0 ] || _aos_usage "--register 는 --dry-run 과 함께 쓸 수 없음"
     [ $# -ge 1 ] || _aos_usage "--register 뒤에 대상이 없음"
     for p in "$@"; do _aoi_resolve "$p"; done   # 형식 검사를 먼저(하나라도 틀리면 아무것도 넣지 않음)
     for p in "$@"; do _aoi_resolve "$p"; _aoi_known_add || ao_die 4 "known.list 기록 실패: $_AOI_LOG"; done
@@ -189,6 +205,7 @@ ao_inbox_sweep() {
     _aos_rotate
   fi
   [ -d "$AO_INBOX_DIR" ] || return 0
+  trap '[ -n "$_AOS_HOUT" ] && rm -f "$_AOS_HOUT"' EXIT
   while IFS= read -r p; do
     case "$p" in /*.log) _aos_box "$p" ;; esac
   done <<< "$(_aos_targets)"
