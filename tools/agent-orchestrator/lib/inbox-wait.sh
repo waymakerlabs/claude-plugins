@@ -269,6 +269,16 @@ _aoiw_deliv() {
   [ "$ch" = 1 ] || return 0
   if [ -n "$new" ]; then _aoi_put "$f" "$new"; else rm -f "$f"; fi
 }
+# 재통지 유예(S2 실측 ①): 깨운 턴의 UserPromptSubmit 대기자가 transcript 기록보다 먼저 시작해 같은 줄을
+#   곧바로 재통지했다. 그 행 token 끝의 epoch 로부터 AO_INBOX_RENOTIFY_GRACE(초, 기본 15)가 지나야 재통지한다.
+#   epoch 를 읽을 수 없는 token 은 유예 없음. 유예 뒤 통지 직전에 _aoiw_notify 가 전달 증거를 다시 본다.
+_aoiw_grace_over() {
+  local tk e g=${AO_INBOX_RENOTIFY_GRACE:-15}
+  tk=$(awk -F'\t' -v p="$1" '$1 == p { print $4; exit }' "$_AOW_WAIT/$_W_SID.notified" 2>/dev/null)
+  e=${tk##*-}
+  [[ $e =~ ^[0-9]{9,}$ ]] || return 0
+  [ $(( $(date +%s) - e )) -ge "$g" ]
+}
 # 통지 후보(잠금 없이 읽어도 된다) → _W_C 줄마다 "<경로>\t<cursor>\t<마지막 줄>\t<재통지 횟수(새 줄 0)>\t<재통지 표시 상한 n>"
 _aoiw_cands() {
   local t cur tot rn rst rc row
@@ -284,7 +294,7 @@ _aoiw_cands() {
     if [ -z "$row" ] || [ "$tot" -gt "$rn" ]; then
       [ "$rst" = pending ] || rn=0
       _W_C="${_W_C:+$_W_C$'\n'}$t	$cur	$tot	0	$rn"
-    elif [ "$rst" = pending ] && [ "$rc" -lt 3 ]; then
+    elif [ "$rst" = pending ] && [ "$rc" -lt 3 ] && _aoiw_grace_over "$t"; then
       _W_C="${_W_C:+$_W_C$'\n'}$t	$cur	$tot	$((rc + 1))	$rn"
     fi
   done <<< "$_W_TGTS"
@@ -499,6 +509,7 @@ _aoiw_notify() {
   trap '_AOI_TERM=1' TERM
   _aoiw_recheck; r=$?
   if [ "$r" = 3 ]; then _aoiw_adopt; r=0; _aoiw_cands; [ -n "$_W_C" ] || r=9; fi
+  [ "$r" = 0 ] && _aoiw_deliv   # 유예 동안 들어온 전달 증거(transcript token)를 잠금 안에서 반영
   if [ "$r" != 0 ]; then
     _aoi_recv_unlock
     [ "$r" = 1 ] && exit 0

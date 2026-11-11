@@ -1,0 +1,35 @@
+{
+  "description": "review-chain·auto-chain이 쓰는 받은편지함 훅(단독 사용 안 함) — agent-orchestrator inbox-wait 대기자",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/inbox-hook.sh wait", "asyncRewake": true, "timeout": 7200 }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/inbox-hook.sh wait", "asyncRewake": true, "timeout": 7200 }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/inbox-hook.sh wait", "asyncRewake": true, "timeout": 7200 }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/inbox-hook.sh session-start", "timeout": 10 },
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/inbox-hook.sh wait", "asyncRewake": true, "timeout": 7200 }
+        ]
+      }
+    ]
+  }
+}

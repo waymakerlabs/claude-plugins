@@ -188,6 +188,19 @@
       "category": "workflow",
       "keywords": ["qc", "review", "chain", "worker", "worktree", "merge", "agent-orchestrator", "claude-code"],
       "homepage": "https://github.com/waymakerlabs/claude-plugins"
+    },
+    {
+      "name": "inbox-hooks",
+      "version": "0.1.0",
+      "description": "review-chain·auto-chain이 쓰는 받은편지함 훅(단독 사용 안 함). Inbox hooks used by review-chain and auto-chain (not for standalone use): asyncRewake waiters wake an idle session when a subscribed agent-orchestrator inbox gets a line. Disabled by default; enabled only as a dependency.",
+      "author": {
+        "name": "waymakerlabs",
+        "email": "peter@waymakerlabs.com"
+      },
+      "source": "./plugins/inbox-hooks",
+      "category": "workflow",
+      "keywords": ["inbox", "hooks", "review-chain", "auto-chain", "agent-orchestrator", "dependency-only"],
+      "homepage": "https://github.com/waymakerlabs/claude-plugins"
     }
   ]
 }

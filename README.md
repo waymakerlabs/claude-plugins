@@ -531,6 +531,8 @@ Run it from the project folder you want to set up:
 
 Requires `tools/agent-orchestrator` with a supported backend (e.g. herdr).
 
+> **inbox-hooks** — review-chain·auto-chain이 쓰는 받은편지함 훅(단독 사용 안 함). Disabled by default, enabled only as a dependency of review-chain/auto-chain. See [plugins/inbox-hooks](plugins/inbox-hooks/README.md).
+
 #### Install
 
 ```bash

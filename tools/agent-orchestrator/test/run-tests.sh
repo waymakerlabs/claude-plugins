@@ -20,7 +20,7 @@ mkdir -p "$FAKE" "$NOHERDR" "$FD" "$T/home"
 # 실제 상태 폴더 변경 검사(inbox-real-state-untouched)용: env -i 전에 진짜 HOME을 저장하고 기준 시각을 남긴다
 REAL_HOME=$HOME; touch "$T/stamp"
 cp "$HERE/fake-herdr.py" "$FAKE/herdr"; chmod +x "$FAKE/herdr"
-EXPECT=265
+EXPECT=266
 
 PASS=0; FAIL=0
 # 여러 줄 값은 ⏎로 이어 한 줄 한 케이스를 지킨다
@@ -530,7 +530,7 @@ echo "== 받은편지함: 송신 기록·감시 판정(계획 2026-11-11 S1)"
 # 새 호출은 상태 루트를 임시 폴더로, HERDR_PANE_ID는 비운다(계획 §1 시험 격리 조건)
 SR="$T/state"; SI="$SR/inbox"; S1="$T/s1"; mkdir -p "$S1"
 BASE2=(PATH="$FAKE:/usr/bin:/bin" HOME="$T/home" FAKE_DIR="$FD" HERDR_ENV=1
-       HERDR_TAB_ID=w1:t1 HERDR_WORKSPACE_ID=w1 AO_STATE_ROOT="$SR")
+       HERDR_TAB_ID=w1:t1 HERDR_WORKSPACE_ID=w1 AO_STATE_ROOT="$SR" AO_INBOX_RENOTIFY_GRACE=0)
 run2() { local e=(); while [ "$1" != -- ]; do e+=("$1"); shift; done; shift
   OUT=$(cd "$T" && env -i "${BASE2[@]}" ${e[@]+"${e[@]}"} "$@" 2>"$T/err"); RC=$?; ERR=$(cat "$T/err"); }
 ao2() { run2 -- bash "$BIN" "$@"; }
@@ -811,6 +811,12 @@ ns; LNE="$SB/ne.log"; sub "$NS" "$LNE"; snd "$LNE" "증거 없음"; wl ne1 "$NS"
 wl ne2 "$NS" UserPromptSubmit; wrc ne2; c=$WRC
 [ "$c" = 2 ] && grep -qF '[재통지]' "$W/ne2.err" && ! grep -F $'\tev=wait-delivered\t' "$SI/events.log" | grep -qF "sid=$NS" \
   && ok inbox-delivered-no-event "UserPromptSubmit 만으로 delivered 아님·재통지 대상 유지" || bad inbox-delivered-no-event "2 [재통지]" "rc=$c"
+ns; LGR="$SB/gr.log"; sub "$NS" "$LGR"; snd "$LGR" "유예 줄"; wl g1 "$NS" Stop; wrc g1
+wl g2 "$NS" UserPromptSubmit AO_INBOX_RENOTIFY_GRACE=2 AO_INBOX_WAIT_MAX=1; wrc g2; c2=$WRC
+tk=$(cut -f4 "$SI/wait/$NS.notified"); echo "Stop hook feedback: token=$tk" > "$W/g3.tr"
+wl g3 "$NS" Stop AO_INBOX_RENOTIFY_GRACE=1; wrc g3; c3=$WRC
+[ "$c2/$c3" = 0/0 ] && [ ! -s "$W/g2.err" ] && [ ! -s "$W/g3.err" ] && grep -F $'\tev=wait-delivered\t' "$SI/events.log" | grep -qF "tok=$tk" \
+  && ok inbox-renotify-grace "깨움 직후 대기자는 유예 동안 재통지 0·유예 뒤 transcript token 이 보이면 delivered·통지 0" || bad inbox-renotify-grace "0/0 delivered" "$c2/$c3 $(cat "$SI/wait/$NS.notified")"
 ns; LDA="$SB/da.log"; sub "$NS" "$LDA"; snd "$LDA" "ack 될 줄"; wl da1 "$NS" Stop; wrc da1
 ao2 inbox-watch --ack "$LDA" 1; wl da2 "$NS" Stop AO_INBOX_WAIT_MAX=1; wrc da2; c=$WRC
 [ "$c" = 0 ] && [ ! -e "$SI/wait/$NS.notified" ] && ok inbox-delivered-ack "transcript 없음 + ack → 행 삭제·깨움 0" || bad inbox-delivered-ack "0·행 없음" "rc=$c $(cat "$SI/wait/$NS.notified" 2>&1)"
@@ -928,11 +934,11 @@ INBOX_OLD="
   inbox-wait-pid-reuse inbox-wait-other-sid inbox-wait-timeout inbox-wait-term-mark inbox-wait-fd9-free
   inbox-ev-lag-arrival inbox-sub-del-barrier inbox-sub-del-running inbox-sub-handover inbox-snapshot-atomic
   inbox-ctx-demote inbox-pane-gen-supersede inbox-pane-gen-notify-check inbox-pane-gen-only-sessionstart
-  inbox-pane-gen-no-issue inbox-wait-term-direct inbox-wait-term-lockwait inbox-delivered-no-event
+  inbox-pane-gen-no-issue inbox-wait-term-direct inbox-wait-term-lockwait inbox-delivered-no-event inbox-renotify-grace
   inbox-delivered-ack inbox-off-before-register inbox-drain-after-register inbox-drain-notify-race inbox-undrain
 "
 miss=""; for nm in $INBOX_OLD; do grep -qxF "$nm" "$T/pass.names" || miss="$miss $nm"; done; nold=$(printf '%s\n' $INBOX_OLD | grep -c .)
-[ -z "$miss" ] && [ "$nold" = 116 ] && ok inbox-regress-all "기존 받은편지함 케이스 ${nold}개 모두 PASS 로 실행됨" || bad inbox-regress-all "116개 전부" "${nold}개, 누락:$miss"
+[ -z "$miss" ] && [ "$nold" = 117 ] && ok inbox-regress-all "기존 받은편지함 케이스 ${nold}개 모두 PASS 로 실행됨" || bad inbox-regress-all "117개 전부" "${nold}개, 누락:$miss"
 left=0; for f in "$SI"/wait/*.pid; do [ -f "$f" ] && _p=$(awk '{print $1}' "$f") && kill -0 "$_p" 2>/dev/null && left=$((left + 1)); done
 lw=$(ps -axo command | grep -F "$T" | grep -cF 'inbox-wait' )
 [ "$left/$lw" = 0/0 ] || echo "WARN 남은 대기자 pid $left·프로세스 $lw"
