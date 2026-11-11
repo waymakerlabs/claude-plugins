@@ -107,16 +107,8 @@ if [ -n "$HITS" ]; then
       # 미감시 전송 기록(0.2.0): 보고서 `- 진행:` 줄 아래(없으면 끝). 실패해도 경고만
       F="$RC/workers/$NAME/report.md"
       if [ -f "$F" ]; then
-        RC_REC="- 미감시 전송 $RC/inbox.log $(date +%H:%M)" awk 'BEGIN { rec = ENVIRON["RC_REC"] }
-          { L[NR] = $0 }
-          END {
-            at = 0
-            for (i = 1; i <= NR; i++) if (L[i] ~ /^- 진행:/) { at = i; break }
-            if (at) while (at < NR && L[at + 1] ~ /^- 미감시 전송 /) at++
-            for (i = 1; i <= NR; i++) { print L[i]; if (at && i == at) print rec }
-            if (!at) print rec
-          }' "$F" > "$F.tmp.$$" && mv "$F.tmp.$$" "$F" \
-          || { rm -f "$F.tmp.$$"; echo "rc-claim: 경고: 미감시 전송 기록 실패 ($F)" >&2; }
+        "$(cd "$(dirname "$0")" && pwd)/rc-note-unwatched.sh" report "$F" "- 미감시 전송 $RC/inbox.log $(date +%H:%M)" 2>/dev/null \
+          || echo "rc-claim: 경고: 미감시 전송 기록 실패 ($F)" >&2
       fi   # report.md 없으면 조용히 생략(stderr 를 이전과 똑같이 유지)
     fi
   else

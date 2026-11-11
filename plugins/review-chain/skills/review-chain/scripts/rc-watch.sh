@@ -16,8 +16,9 @@
 #   이 스크립트는 인자만 검사하고 exec 한다. 환경: AGENT_ORCHESTRATOR=<실행 파일>
 #   (기본 ~/.local/bin/agent-orchestrator).
 #
-# 구독(--subscribe)은 `agent-orchestrator inbox-subscribe`를 그대로 부른다. 세션 id 는 환경
-#   CLAUDE_CODE_SESSION_ID(또는 herdr pane 안이면 HERDR_PANE_ID)에서 읽는다.
+# 구독(--subscribe)은 `agent-orchestrator inbox-subscribe`를 그대로 부른다. 구독 키는 herdr pane 안이면
+#   HERDR_PANE_ID(pane 키), 아니면 CLAUDE_CODE_SESSION_ID(세션 키)다. 등록 세션 id 는 어느 경우든
+#   CLAUDE_CODE_SESSION_ID 에서 읽으므로 이 값이 없으면 inbox-subscribe 가 2(구독 키 없음)로 끝난다.
 # 대체(훅이 없는 도구) Monitor 예: command "<SKILL>/scripts/rc-watch.sh <$RC>/inbox.log", timeout_ms 1800000,
 #   description "review-chain 받은편지함". 30분이면 끝나므로 만료 알림을 받으면 같은 명령으로 다시 켠다.
 #   cursor 부터 다시 읽으므로 만료~재기동 사이에 들어온 줄도 빠지지 않는다.

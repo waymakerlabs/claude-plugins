@@ -262,6 +262,23 @@ rm -f "$KC/workers/bob/report.md"
 "$S/rc-claim.sh" "$KC" bob src/c.txt >/dev/null 2>"$TMP/se"; rc=$?
 [ "$rc" = 4 ] && [ "$(cat "$TMP/se")" = "CONFLICT src/c.txt↔alice:src/" ] && ok "rc-claim-unwatched-record report.md 없으면 조용히 생략(stderr 이전과 동일)" || bad "rc-claim report 없음" "rc=$rc $(cat "$TMP/se")"
 
+# rc-note-concurrent (S4 크로스체크 1회차 #1): 동시 unwatched 송신 기록이 서로 지우지 않는다
+CC=$(mkchain "$TMP" rc-20260101-cc); mkreport "$CC" alice; printf '# state\n## 미감시 전송\n\n## 뒤 절\n- z\n' > "$CC/state.md"
+"$S/rc-claim.sh" "$CC" bob src/ >/dev/null 2>&1
+i=0
+while [ $i -lt 15 ]; do
+  AGENT_ORCHESTRATOR=$FAKE2 FAKE_W=unwatched "$S/rc-send.sh" --to alice "$CC" 답 "o$i" >/dev/null 2>&1 &
+  AGENT_ORCHESTRATOR=$FAKE2 FAKE_W=unwatched "$S/rc-send.sh" "$CC" alice 질문 "w$i" >/dev/null 2>&1 &
+  AGENT_ORCHESTRATOR=$FAKE2 FAKE_W=unwatched "$S/rc-claim.sh" "$CC" alice src/x$i >/dev/null 2>&1 &
+  i=$((i + 1))
+done
+wait
+NS=$(grep -c '^- 미감시 전송 ' "$CC/state.md"); NR=$(grep -c '^- 미감시 전송 ' "$CC/workers/alice/report.md")
+if [ "$NS" = 15 ] && [ "$NR" = 30 ] && [ "$(tail -n 1 "$CC/state.md")" = "- z" ] && grep -qx -- "- 진행: 2/5" "$CC/workers/alice/report.md"; then
+  ok "rc-note-concurrent 동시 rc-send 15+15·rc-claim 충돌 15 기록 보존(state.md 15, report.md 30)"
+else bad "rc-note-concurrent" "state=$NS report=$NR (기대 15/30)"; fi
+ls "$CC"/*.tmp.* "$CC"/workers/alice/*.tmp.* >/dev/null 2>&1 && bad "rc-note-concurrent 임시 파일 잔존" || ok "rc-note-concurrent 임시 파일 잔존 없음"
+
 # rc-watch-subscribe: --subscribe 뒤 --list 에 경로, --unsubscribe 뒤 사라짐 (AO_STATE_ROOT 임시 폴더, pane 없음)
 SC=$(mkchain "$TMP" rc-20260101-sub); SB="$SC/inbox.log"; SID=0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d
 env -u HERDR_PANE_ID CLAUDE_CODE_SESSION_ID=$SID "$W" --subscribe "$SB" >/dev/null 2>"$TMP/se"; rc=$?

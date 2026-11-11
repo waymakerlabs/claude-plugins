@@ -70,6 +70,7 @@ if [ "${RC_DRY_RUN:-0}" = 1 ]; then
   exit 0
 fi
 
+HERE=$(cd "$(dirname "$0")" && pwd)
 AO=${AGENT_ORCHESTRATOR:-$HOME/.local/bin/agent-orchestrator}
 W=$("$AO" inbox-send --raw "$BOX" "$LINE") || die 4 "기록 실패: $BOX"
 W=$(printf '%s' "$W" | tr -d '[:space:]')
@@ -84,33 +85,14 @@ if [ "$W" = unwatched ]; then
     if [ ! -f "$F" ]; then
       echo "rc-send: 경고: state.md 없음 — 미감시 전송 기록 생략 ($F)" >&2
     else
-      RC_REC=$REC awk 'BEGIN { rec = ENVIRON["RC_REC"] }
-        { L[NR] = $0 }
-        END {
-          s = 0; e = NR
-          for (i = 1; i <= NR; i++) if (L[i] == "## 미감시 전송") { s = i; break }
-          if (s) { for (i = s + 1; i <= NR; i++) if (L[i] ~ /^## /) { e = i - 1; break }
-                   at = s; for (i = s + 1; i <= e; i++) if (L[i] !~ /^[ \t]*$/) at = i }
-          for (i = 1; i <= NR; i++) { print L[i]; if (s && i == at) print rec }
-          if (!s) { if (NR > 0) print ""; print "## 미감시 전송"; print rec }
-        }' "$F" > "$F.tmp.$$" && mv "$F.tmp.$$" "$F" \
-        || { rm -f "$F.tmp.$$"; echo "rc-send: 경고: 미감시 전송 기록 실패 ($F)" >&2; }
+      "$HERE/rc-note-unwatched.sh" state "$F" "$REC" || echo "rc-send: 경고: 미감시 전송 기록 실패 ($F)" >&2
     fi
   else
     F="$RC/workers/$NAME/report.md"   # worker→OC: report.md 의 `- 진행:` 줄 아래(없으면 파일 끝)
     if [ ! -f "$F" ]; then
       echo "rc-send: 경고: report.md 없음 — 미감시 전송 기록 생략 ($F)" >&2
     else
-      RC_REC=$REC awk 'BEGIN { rec = ENVIRON["RC_REC"] }
-        { L[NR] = $0 }
-        END {
-          at = 0
-          for (i = 1; i <= NR; i++) if (L[i] ~ /^- 진행:/) { at = i; break }
-          if (at) while (at < NR && L[at + 1] ~ /^- 미감시 전송 /) at++
-          for (i = 1; i <= NR; i++) { print L[i]; if (at && i == at) print rec }
-          if (!at) print rec
-        }' "$F" > "$F.tmp.$$" && mv "$F.tmp.$$" "$F" \
-        || { rm -f "$F.tmp.$$"; echo "rc-send: 경고: 미감시 전송 기록 실패 ($F)" >&2; }
+      "$HERE/rc-note-unwatched.sh" report "$F" "$REC" || echo "rc-send: 경고: 미감시 전송 기록 실패 ($F)" >&2
     fi
   fi
 fi

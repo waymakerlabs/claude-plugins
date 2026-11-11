@@ -130,7 +130,7 @@ IB=$HOME/.local/state/agent-orchestrator/inbox/chain-<chain-id>   # 호출 전�
   | `<task> 감시 불가 · agent-orchestrator rc=<코드> (UNVERIFIED)` | 11·12면 §0(12는 사용자 알림). 4면 다음 회차를 본다 |
 - 판정 단계:
   1. 감시 줄은 **후보**다. 한 줄 보고(`[<chain-id> M/W] T04 정지 후보 · 마지막 진척 12분 전 · working (실측)`).
-  2. 후보면 `"$AO" agent-read <NAME> --lines 30` 1회. **진짜 정지**(응답 없이 멈춘 요청·재시도 루프)일 때만 `"$AO" agent-keys <NAME> Escape`(입력창에는 아무것도 치지 않는다) 뒤 worker 받은편지함에 `"$AO" inbox-send "$IB/worker-<NAME>.log" "보고서 <경로>와 지금까지 조사를 이어서 진행해"`. worker가 유휴가 되면 Monitor 알림으로 깨어나 읽는다. 화면이 일하는 중이면 아무것도 하지 않는다.
+  2. 후보면 `"$AO" agent-read <NAME> --lines 30` 1회. **진짜 정지**(응답 없이 멈춘 요청·재시도 루프)일 때만 `"$AO" agent-keys <NAME> Escape`(입력창에는 아무것도 치지 않는다) 뒤 worker 받은편지함에 `"$AO" inbox-send "$IB/worker-<NAME>.log" "보고서 <경로>와 지금까지 조사를 이어서 진행해"`. worker가 유휴가 되면 받은편지함 구독의 훅 깨움으로(훅이 없는 도구면 Monitor 알림으로) 깨어나 읽는다(2.8.0). 화면이 일하는 중이면 아무것도 하지 않는다.
   3. close·재기동은 마지막 진척 **20분 이상이 2회**(재지시 뒤에도 다시 20분)일 때만. 새 이름·새 pane, 재기동 지시서에 **이전 보고서·이전 transcript 경로**를 넣는다.
 - 진단 보고에는 근거 종류를 붙인다: `실측`(transcript·`agent-status`) 또는 `화면 추정`(`agent-read`, 그것만이면 `UNVERIFIED`).
 - 정지와 API 재시도 반복은 구현 실패 횟수(SKILL.md §7)에 넣지 않는다.
