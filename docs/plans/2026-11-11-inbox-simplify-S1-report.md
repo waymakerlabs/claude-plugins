@@ -64,3 +64,5 @@
 - gsr-macbook: Tailscale offline(23:30, 잠자기 추정). 깨어나면 자동 갱신·스모크하는 백그라운드 스크립트 `/tmp/s5-c2/macbook-deploy.sh`(최대 12시간, 결과 `/tmp/s5-c2/macbook-deploy.result`). 마켓 자동 갱신(autoUpdate true)으로도 들어온다.
 - 스모크 스크립트의 확인 사건을 `wait-notify` → `wake`로 바꿨다(새 events.log 계약).
 - 실제 Claude 세션의 asyncRewake 깨움은 새 세션이 열려 대기자가 뜬 뒤 events.log `wake`로 확인한다(아직 미확인).
+- gsr-macbook(2026-11-12 03:49, 재시도 219회 뒤 접속): 마켓 HEAD `a8f5353`, auto-chain 2.9.0·review-chain 0.3.0·inbox-hooks 0.2.0(마켓 자동 갱신으로 이미 들어와 있었다). 스모크 대기자 exit 2·`#1 probe`·`wake` 1·실제 상태 변경 0·sweep LaunchAgent 0. **세 머신 배포 완료.**
+- 실제 세션 깨움(office): 실제 events.log에 `ev=wake` 6건(23:43~00:41, `chain-grit-portal/coordinator` n=15~17 포함). 새 core의 훅 대기자가 실제 Claude 세션에서 깨운 기록이다.
