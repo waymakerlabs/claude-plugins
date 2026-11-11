@@ -69,4 +69,32 @@ ev=wait-notify  sid=cccccccc-…-000000000003  n=1-1  arr=1794384887  re=0
 1. 되돌림 D 단계 안내문에 `[이전 세션]` 보류 줄 처리 안내가 없다. 실제 되돌림 때 안내 한 줄에 "#0/`[이전 세션]` 줄은 사용자 확인 뒤 `--ack`/`--release`"를 덧붙인다.
 2. C1·office·home C2는 push 뒤에만 확인할 수 있다.
 
-다음(주인님 go 필요): ① `feat/inbox-hooks`·main push ② main 병합(fast-forward) → 계획 S5 "병합 뒤 순서" → 세 머신 C1·C2 → 1주 관찰.
+## 7. 병합·push (주인님 go, 2026-11-11 17:21)
+
+- `git push -u origin feat/inbox-hooks`(새 브랜치) → `main`에 `--ff-only` 병합 → `git push origin main`: `d681522..2662c2c`. 병합 커밋 없음.
+- 이 맥 자동 갱신(17:22 확인): 마켓 사본 HEAD `2662c2c`. `installed_plugins.json` auto-chain 2.8.0·review-chain 0.2.0·inbox-hooks 0.1.0(`lastUpdated` 08:21:58Z).
+- **C1 이 맥 충족**: `~/.local/bin/agent-orchestrator inbox-wait --status` → `inbox-wait 2`, rc 0.
+- **C2 이 맥 설치 판 통과**: 같은 스모크를 `AO=~/.local/bin/agent-orchestrator`로 다시 실행(`/tmp/s5-c2/result-installed.txt`). 대기자 exit 2, `#1 probe`, `wait-notify` 1, 실제 상태 폴더 `find -newer` 0.
+- office·home C1·C2: 미실행(다른 머신 실행은 go 대상).
+- 진행 중 체인(gira-defect-night·grit-portal)은 바꾸지 않았다. 다음 인계 때 새 조정자가 새 스킬로 전환한다(계획 S5 병합 뒤 순서 2).
+
+## 8. 참고 사례 — 다른 체인의 회수 지연 2건 (받은편지함 경로 아님)
+
+주인님 전달(2026-11-11). 상태 파일·보고서 mtime·실제 받은편지함·`events.log`를 읽기만 해서 확인했다.
+
+| 체인 | 지연 | worker 방식 | 조정자 기록 |
+|---|---|---|---|
+| gira-backlog-night | M1-W3-T06(보고서 13:07:20)·M2-W1-T01(13:06:34) → 17:11 회수, **약 4시간** | ① `Agent`(상태 파일 39·40행) | "완료 알림이 이 세션에 오지 않았다, 원인 미확정"(state.md 62행) |
+| grit-portal | M4-W4-T07(보고서 15:43:27) → 17:0x, **약 1시간 20분** | ① `Agent` bg(state.md 79행) | "T07·T01c 합친 진행 감시가 이벤트 없이 만료, 16:01 감시 시작 뒤 줄 변화 없음" |
+
+**이번 변경(S1~S4)이 이 두 건을 막는가: 아니다.**
+
+- 이번 변경이 덮는 것은 `inbox-send`로 받은편지함에 쓴 줄을 쉬는 세션에 알리는 경로다. 두 건 모두 ① `Agent` worker인데, ① worker는 메시지를 보내지 않고 반환 한 줄로 끝난다(task-brief.md 13행 "완료 알림이 조정자에게 간다"). 두 체인 `coordinator.log`에도 해당 시각 worker 줄이 없다(gbn 1줄, 12:08. grit 5줄, 마지막 14:37).
+- 실제 `events.log`는 `send` 153·`ack` 3뿐이고 `wait-*`가 0이다. 두 조정자는 2.8.0 이전 세션이라 대기자가 없다(계획대로 다음 인계부터 전환).
+- 원인 ① gbn: Claude Code의 백그라운드 `Agent` 완료 알림이 조정자 세션에 닿지 않은 것으로 보인다. 런타임 쪽이라 우리 리포에서 고칠 수 없고, 원인은 확인하지 못했다(UNVERIFIED).
+- 원인 ② grit: 스킬의 표준 진행 감시 스크립트(SKILL.md 482~496행)는 기동마다 새 `mktemp` 캐시를 쓰므로 첫 루프에서 `- 진행: 완료`를 출력해야 한다. "변화 없어 알림 없음"이 났다면 그 세션이 스크립트를 고쳐 썼을 가능성이 높다(UNVERIFIED, 그 세션의 Monitor 명령은 못 봤다). 진행 감시는 웨이브마다 띄우게 돼 있지만(SKILL.md 482행) 완료 판정은 worker 반환으로만 한다고 적혀 있고(500행), 진행 감시가 30분마다 만료되면 다시 띄워야 한다. 그래서 완료 알림이 빠지면 받쳐 주는 것은 이 감시 하나뿐이다.
+
+**막으려면(제안, 미반영)**:
+1. ① `Agent` worker도 끝낼 때 조정자 받은편지함에 `inbox-send … done <보고서>` 한 줄을 보낸다. 2.8.0 조정자는 `coordinator.log`를 구독하므로 완료 알림이 빠져도 훅 대기자가 깨운다. task-brief.md §7·SKILL.md 「세션 간 메시지」 문구 변경이며 합의 결정 §3과 충돌하지 않는다. 남는 구멍: 조정자가 쉬지 않고 다른 일을 하는 중이면 깨움은 턴이 끝날 때 온다(지연은 턴 길이).
+2. 진행 감시 절에 "재기동 직후 각 보고서 `- 진행:` 줄을 직접 읽어 확인하고, 표준 스크립트를 고쳐 쓰지 않는다"를 추가한다.
+3. 진행 감시가 `- 진행: 완료`를 알렸는데 worker 반환이 없으면, 반환을 기다리지 말고 보고서로 회수한다(500행 "완료 판정은 반환"의 예외로 명시).
