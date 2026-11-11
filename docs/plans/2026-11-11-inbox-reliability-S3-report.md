@@ -66,4 +66,4 @@
 ## 6. 미결·다음 할 일
 
 - **주인님 go 대기**: (a) `install-sweep.sh --apply`, (b) S1~S3 push(마켓 사본 갱신 → 링크가 새 판), (c) `~/.local/bin` 교체. go 뒤 계획 S3 종료 조건의 launchd 경유 실제 알림 확인(`/tmp/ao-sweep-probe/x.log` 등록 → 다음 주기 `sweep-alert sent=1`·화면 알림 → ack·등록 해제)과 외부 받은편지함 전환 절차(`find ~/Dev -maxdepth 6 -path '*/.review-chain/*/inbox.log'` → `--register`).
-- **⑨ G5**: 결과는 S2 보고서 §4 ⑨ 줄에 옮긴다(이 세션 또는 S4).
+- **⑨ G5 통과**(15:58 확인): `why=timeout`이 시작 뒤 7001초(7000±5 안). S2 보고서 §4 ⑨ 줄에 옮겼다. S5 병합 조건 C3 충족. 시험 pane `w3:p64`는 이 세션 지시(닫지 말 것)에 따라 열어 둔다.

@@ -61,7 +61,7 @@ inbox-hooks 시험 케이스: `hook-ao-missing`·`hook-ao-old`·`hook-off-marker
 | ⑥ | 사람 입력 중 깨움 | 통과 | 입력창에 `사람이입력중인문장`이 남은 상태에서 #5 깨움·처리, 입력창 내용 그대로·주입 0 |
 | ⑦ | SessionStart additionalContext (G3) | 통과 | resume 때 `hook_additional_context`로 #7 전달(transcript), `wait-notify … hook=SessionStart` |
 | ⑧ | 구독 0인 세션 | 통과 | 13:44 첫 세션·14:00 새 세션 모두 `why=no-target`, 대기자 프로세스 0 |
-| ⑨ | 7000초 자체 종료 (G5) | 관측 중 | StopFailure 대기자 `w73717`(시작 1794373297)를 `g5-watch.sh`가 감시, 결과 `/tmp/inbox-hooks-test/g5.result` |
+| ⑨ | 7000초 자체 종료 (G5) | **통과**(S3 세션에서 확인) | StopFailure 대기자 `w73717` 시작 1794373297 → `wait-end why=timeout` ts=1794380298, **7001초**(기준 7000±5). 런타임이 먼저 죽이지 않음. 감시 스크립트 기록 elapsed=7006은 5초 폴링 지연 포함. G5 대응(기본값 낮추기) 불필요 |
 | ⑩ | 같은 가짜 pane에서 A → `/clear` B → 1줄 (G7) | 통과 | 14:00 clear 순간 A의 Stop 대기자 `w69092` `why=pane-superseded`. 런타임 자동 취소 아님(core가 세대 검증으로 끝냄). 새 줄은 B만 깨움 |
 
 G4(깨움 stderr가 transcript에 남는가, 플러그인 경로): 통과 — 모든 깨움에서 `token=` 이 jsonl에 기록되고 `wait-delivered`가 났다.
@@ -108,7 +108,7 @@ G8(같은 이벤트의 동기·async 병렬): resume·clear에서 동기 `s…`�
 
 ## 7. 남은 위험
 
-- ⑨ G5 결과 미확정 — S5 병합 조건.
+- ⑨ G5: 통과(7001초, §4) — S5 병합 조건 C3 충족.
 - 재통지 유예 15초: transcript 기록이 15초보다 늦으면 한 번 중복 재통지가 남는다(상한 3회는 그대로). 실측 기록 지연은 1초 안팎이었다.
 - 동시 부하 때 core 시험 FAIL 2(이름 미기록) — §2-2.
 - ~/.local/bin 판은 아직 옛 판이라 실제 세션에서 플러그인을 켜도 래퍼가 조용히 아무것도 하지 않는다(의도된 안전판). 교체는 주인님 go.
