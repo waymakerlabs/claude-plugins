@@ -21,7 +21,7 @@ mkdir -p "$FAKE" "$NOHERDR" "$FD" "$T/home"
 REAL_HOME=$HOME; touch "$T/stamp"
 REAL_EV="$REAL_HOME/.local/state/agent-orchestrator/inbox/events.log"; REAL_EV_SZ=$(wc -c < "$REAL_EV" 2>/dev/null | tr -d ' '); REAL_EV_SZ=${REAL_EV_SZ:-0}
 cp "$HERE/fake-herdr.py" "$FAKE/herdr"; chmod +x "$FAKE/herdr"
-EXPECT=234
+EXPECT=239
 
 PASS=0; FAIL=0
 # 여러 줄 값은 ⏎로 이어 한 줄 한 케이스를 지킨다
@@ -588,7 +588,7 @@ wfor() { local i=0 n=$(( ${3:-5} * 20 )); while [ $i -lt $n ]; do grep -qF -- "$
 #   기본 POLL 0.2·MAX 5, registered:0 으로 등록 완료를 표식 파일에 남긴다(PAUSE를 주면 덧붙음)
 wl() { local n=$1 s=$2 h=$3 pz="registered:0"; shift 3
   local e=(); for a in "$@"; do case "$a" in AO_INBOX_TEST_PAUSE=*) pz="$pz,${a#*=}" ;; *) e+=("$a") ;; esac; done
-  printf '{"session_id":"%s","hook_event_name":"%s"}' "$s" "$h" > "$W/$n.json"
+  printf '{"session_id":"%s","hook_event_name":"%s","transcript_path":"%s"}' "$s" "$h" "${WL_TP:-}" > "$W/$n.json"
   rm -f "$W/$n.mk" "$W/$n.mk.go"
   (cd "$T" && exec env -i "${BASE2[@]}" AO_INBOX_WAIT_POLL=0.2 AO_INBOX_WAIT_MAX=5 AO_INBOX_TEST_PAUSE="$pz" \
      AO_INBOX_TEST_PAUSE_MARK="$W/$n.mk" ${e[@]+"${e[@]}"} bash "$BIN" inbox-wait < "$W/$n.json" 2> "$W/$n.err") &
@@ -720,6 +720,32 @@ wl dc "$D1" Stop; wrc dc; c3=$WRC; ao2 inbox-wait --undrain; u=$RC
 wl dd "$D1" Stop; wrc dd; c4=$WRC
 [ "$d/$c1$c2$c3/$u/$c4" = 0/2/000/0/2 ] && [ ! -s "$W/da.err" ] && [ ! -e "$SI/hooks.off" ] && grep -qF '#1 끈 뒤' "$W/dd.err" \
   && ok inbox-drain "대기자 2개 → --drain stdout 2·둘 다 0·끈 동안 새 대기자 0·--undrain 뒤 다시 깨움" || bad inbox-drain "0/2/000/0/2" "$d/$c1$c2$c3/$u/$c4"
+# bg(daemon) 세션은 물려받은 HERDR_PANE_ID 를 쓰지 않는다(2026-11-12 p6K)
+ns; LBG="$SB/bg.log"; sub "$NS" "$LBG"; : > "$SI/wait/pane-w9_p2.pid"
+wl bg "$NS" Stop HERDR_PANE_ID=w9:p2 CLAUDE_CODE_SESSION_KIND=bg; wfor "$W/bg.mk" registered; snd "$LBG" "bg 새 줄"; wrc bg; c=$WRC
+[ "$c" = 2 ] && [ -f "$SI/wait/sid-$NS.pid" ] && [ ! -s "$SI/wait/pane-w9_p2.pid" ] && grep -qF '#1 bg 새 줄' "$W/bg.err" \
+  && ok inbox-wait-bg-key "SESSION_KIND=bg → pane 키 대신 sid 키·pane 표식 안 건드림" || bad inbox-wait-bg-key "2·sid 키" "rc=$c $(ls "$SI/wait" | tr '\n' ' ')"
+# 멈춤 점검: transcript 픽스처(마지막 assistant 글)
+mktp() { printf '{"type":"assistant","isSidechain":false,"message":{"content":[{"type":"text","text":"%s"}]}}\n' "$2" > "$W/$1.jsonl"; }
+EXM='[inbox] 대기 만료(재등록)'
+ns; LST="$SB/st.log"; sub "$NS" "$LST"; snd "$LST" "완료 보고"; echo 1 > "$LST.notified"; mktp st1 "보고 드렸습니다."
+WL_TP="$W/st1.jsonl" wl s1 "$NS" Stop AO_INBOX_STALL=1; wrc s1; c1=$WRC
+WL_TP="$W/st1.jsonl" wl s2 "$NS" Stop AO_INBOX_STALL=1 AO_INBOX_WAIT_MAX=2; wrc s2; c2=$WRC
+[ "$c1/$c2" = 2/2 ] && grep -qF '멈춤 점검 — 안 읽은' "$W/s1.err" && grep -qF '#1~#1' "$W/s1.err" && grep -qF "$EXM" "$W/s2.err" \
+  && ok inbox-wait-stall-unacked "알렸지만 ack 없는 줄 → 1초 뒤 멈춤 깨움·같은 n 은 다시 안 깨움" || bad inbox-wait-stall-unacked "2/2" "$c1/$c2 $(cat "$W/s1.err" "$W/s2.err")"
+ns; LSPR="$SB/spr.log"; sub "$NS" "$LSPR"; mktp sp1 "검수 끝. 이어서 3단계를 진행하겠습니다."
+WL_TP="$W/sp1.jsonl" wl p1 "$NS" Stop AO_INBOX_STALL=1; wrc p1; c1=$WRC
+WL_TP="$W/sp1.jsonl" wl p2 "$NS" Stop AO_INBOX_STALL=1 AO_INBOX_WAIT_MAX=2; wrc p2; c2=$WRC
+WL_TP="$W/sp1.jsonl" wl p3 "$NS" UserPromptSubmit AO_INBOX_STALL=1 AO_INBOX_WAIT_MAX=2; wrc p3; c3=$WRC
+WL_TP="$W/sp1.jsonl" wl p4 "$NS" Stop AO_INBOX_STALL=1; wrc p4; c4=$WRC
+[ "$c1/$c2/$c3/$c4" = 2/2/2/2 ] && grep -qF '이어서 하겠다' "$W/p1.err" && grep -qF "$EXM" "$W/p2.err" && grep -qF "$EXM" "$W/p3.err" && grep -qF '이어서 하겠다' "$W/p4.err" \
+  && ok inbox-wait-stall-promise "약속으로 끝난 턴 → 멈춤 깨움 1회·연속 안 깨움·사람 입력 뒤 다시 1회" || bad inbox-wait-stall-promise "2/2/2/2" "$c1/$c2/$c3/$c4"
+ns; LSQ="$SB/sq.log"; sub "$NS" "$LSQ"; mktp sq1 "기다리는 동안 어느 쪽으로 진행할까요?"
+WL_TP="$W/sq1.jsonl" wl q1 "$NS" Stop AO_INBOX_STALL=1 AO_INBOX_WAIT_MAX=2; wrc q1; c=$WRC
+[ "$c" = 2 ] && grep -qF "$EXM" "$W/q1.err" && ok inbox-wait-stall-question "질문으로 끝난 턴 → 멈춤 깨움 없음" || bad inbox-wait-stall-question "만료만" "rc=$c $(cat "$W/q1.err")"
+ns; LSD="$SB/sd.log"; sub "$NS" "$LSD"; mktp sd1 "M2를 마감했습니다. 다음 작업은 내일 합니다."
+WL_TP="$W/sd1.jsonl" wl d1 "$NS" Stop AO_INBOX_STALL=1 AO_INBOX_WAIT_MAX=2; wrc d1; c=$WRC
+[ "$c" = 2 ] && grep -qF "$EXM" "$W/d1.err" && ok inbox-wait-stall-done "약속 없이 끝난 턴 → 멈춤 깨움 없음" || bad inbox-wait-stall-done "만료만" "rc=$c $(cat "$W/d1.err")"
 # 받은편지함 케이스 이름 — 하나라도 PASS로 실행되지 않으면 FAIL(하니스 전제: 지운 시험이 조용히 빠지지 않게)
 INBOX_OLD="
   inbox-send inbox-format inbox-raw inbox-raw-notime inbox-4000-ok inbox-no-truncate inbox-4000-multibyte

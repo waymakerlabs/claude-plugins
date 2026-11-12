@@ -21,8 +21,11 @@ _aoiw_json() {
     local $/; my $r = <STDIN>; my $d = eval { JSON::PP->new->decode($r) };
     exit 4 unless ref $d eq "HASH";
     print join("\t", map { my $v = $d->{$_}; (defined $v && !ref $v) ? do { (my $x = $v) =~ s/[\t\r\n]/ /g; $x } : "" }
-      qw(session_id hook_event_name)), "\n";'
+      qw(session_id hook_event_name transcript_path)), "\n";'
 }
+# 백그라운드(daemon) 세션은 화면 pane 의 HERDR_PANE_ID 를 물려받는다. 그 값을 쓰면 화면 세션의 대기자를
+#   밀어내고 깨움을 가로챈다(2026-11-12 p6K #23 유실). bg 세션은 pane 키를 쓰지 않는다
+_aoiw_env_pane() { [ "${CLAUDE_CODE_SESSION_KIND:-}" = bg ] || printf '%s' "${HERDR_PANE_ID:-}"; }
 _aoiw_sid_ok() { [[ ${1:-} =~ ^[0-9a-fA-F-]{8,64}$ ]]; }
 
 # ── inbox-subscribe
@@ -31,7 +34,7 @@ _aoiw_sub_usage() { ao_die 2 "$*  (사용: inbox-subscribe [--unsubscribe|--list
 _aoiw_sub_key() {
   local pane=$1 ses=$2
   _S_SID=${ses:-${CLAUDE_CODE_SESSION_ID:-}}
-  [ -z "$pane" ] && [ -z "$ses" ] && pane=${HERDR_PANE_ID:-}
+  [ -z "$pane" ] && [ -z "$ses" ] && pane=$(_aoiw_env_pane)
   if [ -n "$pane" ]; then
     ao_is_pane "$pane" || _aoiw_sub_usage "pane id 형식 오류: $pane"
     _S_KEY="pane-${pane//:/_}"
@@ -135,16 +138,64 @@ _aoiw_wake() {
     [ "$(_aoi_num "$t.notified")" -lt "$n" ] && { printf '%s\n' "$n" > "$t.notified.tmp.$$" && mv -f "$t.notified.tmp.$$" "$t.notified"; } 2>/dev/null
     _aoi_event wake "$t" "n=$n"
   done <<< "$_W_DUE"
+  rm -f "$_AOW_WAIT/$_W_KEY.stall" 2>/dev/null
   _aoiw_pause notify-mid; printf '%s\n' "$out" >&5; exit 2
 }
+# ── 멈춤 점검(2026-11-12): Stop 뒤 AO_INBOX_STALL(기본 600)초 동안 새 줄이 없을 때 한 번 본다.
+#   ① 알렸지만 --ack 안 된 줄(n > cursor)이 남음 → 깨움(같은 n 으로는 한 번만, <log>.stalled)
+#   ② 마지막 답이 "이어서 하겠다·기다린다"로 끝남(질문으로 끝나면 제외) → 깨움(연속 1회, wait/<키>.stall)
+# 결과 _W_STALL(깨움 본문). 없으면 1
+_aoiw_last_text() {
+  tail -c 3000000 "$_W_TP" 2>/dev/null | "$AO_PERL" -MJSON::PP -e '
+    my $last = "";
+    while (my $l = <STDIN>) { my $d = eval { decode_json($l) } or next;
+      next unless ($d->{type} // "") eq "assistant" && !$d->{isSidechain};
+      my $c = $d->{message}{content}; next unless ref $c eq "ARRAY";
+      my $t = join "", map { ($_->{type} // "") eq "text" ? $_->{text} : "" } @$c;
+      $last = $t if $t =~ /\S/ }
+    print $last;'
+}
+_aoiw_stall_due() {
+  local t c n s txt k="$_AOW_WAIT/$_W_KEY.stall" rx
+  _W_STALL=""
+  while IFS=$'\t' read -r t _; do
+    [ -n "$t" ] || continue
+    c=$(_aoi_num "$t.cursor"); _AOI_LOG=$t; n=$(_aoi_count); s=$(_aoi_num "$t.stalled")
+    if [ "$n" -gt "$c" ] && [ "$s" != "$n" ]; then
+      _W_STALL="${_W_STALL:+$_W_STALL$'\n'}== $t — #$((c + 1))~#$n 알림은 나갔지만 처리(--ack) 기록이 없다"
+      { printf '%s\n' "$n" > "$t.stalled.tmp.$$" && mv -f "$t.stalled.tmp.$$" "$t.stalled"; } 2>/dev/null
+    fi
+  done <<< "$_W_BASE"
+  if [ -n "$_W_STALL" ]; then
+    _W_STALL="[inbox] 멈춤 점검 — 안 읽은 받은편지함 줄이 남아 있다. \"$AO_HOME/bin/agent-orchestrator\" inbox-watch --pending <대상> 으로 읽고 처리한 뒤 --ack 하라. 처리했으면 --ack 만, 사람 결정이 필요하면 사용자에게 바로 알려라"$'\n'"$_W_STALL"
+    return 0
+  fi
+  [ "$(_aoi_num "$k")" -ge 1 ] && return 1
+  txt=$(_aoiw_last_text | tail -c 6000)
+  [ -n "$txt" ] || return 1
+  printf '%s' "$txt" | tail -c 80 | grep -qE '(\?|까요|할지|주세요|주십시오)[[:space:]*)]*$' && return 1
+  rx='이어서|이어 가|이어가|진행하겠|진행 ?중|착수하겠|들어가겠|들어갑니다|띄우겠|기다리|기다립|대기 중|대기하|회수 대기|(오면|끝나면|되면|마치면|돌아오면) [^.]{0,60}(하겠|합니다|갑니다|확인|병합)|[Ww]aiting|[Rr]esuming|[Ww]ill (continue|resume)'
+  printf '%s' "$txt" | grep -qE "$rx" || return 1
+  { echo 1 > "$k"; } 2>/dev/null
+  _W_STALL="[inbox] 멈춤 점검 — 마지막 답에서 이어서 하겠다(또는 기다린다)고 했는데 진행이 없다. 기다리던 결과(task-notification·보고 파일·받은편지함)가 이미 왔는지 확인하고, 왔으면 이어 가라. 정말 기다리는 중이면 무엇을 기다리는지 한 줄로 사용자에게 알리고 쉬어라"
+}
+_aoiw_stall_wake() {
+  trap '' TERM
+  _aoi_event stall - "key=$_W_KEY"
+  printf '%s\n' "$_W_STALL" >&5; exit 2
+}
 _aoiw_main() {
-  local js pf ls prev="" start max=${AO_INBOX_WAIT_MAX:-7000} poll=${AO_INBOX_WAIT_POLL:-1} t b n
+  local js pf ls prev="" start max=${AO_INBOX_WAIT_MAX:-7000} poll=${AO_INBOX_WAIT_POLL:-1} t b n ep
+  local stall=${AO_INBOX_STALL:-600} stall_at=""
   [ -e "$AO_INBOX_DIR/hooks.off" ] && exit 0
   js=$(_aoiw_json) || exit 4
-  IFS=$'\t' read -r _W_SID _W_HOOK <<< "$js"
+  IFS=$'\t' read -r _W_SID _W_HOOK _W_TP <<< "$js"
   _aoiw_sid_ok "$_W_SID" || exit 0
-  if [ -n "${HERDR_PANE_ID:-}" ] && ao_is_pane "$HERDR_PANE_ID"; then _W_KEY="pane-${HERDR_PANE_ID//:/_}"; else _W_KEY="sid-$_W_SID"; fi
+  ep=$(_aoiw_env_pane)
+  if [ -n "$ep" ] && ao_is_pane "$ep"; then _W_KEY="pane-${ep//:/_}"; else _W_KEY="sid-$_W_SID"; fi
   _aoiw_sync; [ -n "$_W_TGTS" ] || exit 0
+  # 사람이 입력했으면 "연속 1회" 멈춤 점검 표식을 푼다
+  [ "$_W_HOOK" = UserPromptSubmit ] && rm -f "$_AOW_WAIT/$_W_KEY.stall" 2>/dev/null
   # 등록(§3 5번): 앞 대기자를 읽어 두고 내 표식을 쓴 뒤, 살아 있고 lstart 가 맞으면 TERM(기다리지 않음)
   mkdir -p "$_AOW_WAIT" 2>/dev/null || exit 4
   pf="$_AOW_WAIT/$_W_KEY.pid"; ls=$(_aoi_lstart $$); _W_TOK="w$$-$RANDOM$RANDOM-$(date +%s)"
@@ -153,6 +204,8 @@ _aoiw_main() {
   [ -n "$prev" ] && [ "$prev" != $$ ] && kill -TERM "$prev" 2>/dev/null
   _aoiw_pause registered
   start=$(date +%s)
+  # 멈춤 점검은 Stop 대기자만(턴 도중인 UserPromptSubmit 대기자는 아님). 0 이면 끔
+  if [ "$_W_HOOK" = Stop ] && [ "$stall" -gt 0 ] 2>/dev/null && [ -f "$_W_TP" ]; then stall_at=$((start + stall)); fi
   while :; do
     [ -e "$AO_INBOX_DIR/hooks.off" ] && exit 0
     [ "$(awk '{print $NF; exit}' "$pf" 2>/dev/null)" = "$_W_TOK" ] || exit 0
@@ -163,6 +216,9 @@ _aoiw_main() {
       [ "$n" -gt "$b" ] && _W_DUE="${_W_DUE:+$_W_DUE$'\n'}$t	$n"
     done <<< "$_W_BASE"
     [ -n "$_W_DUE" ] && _aoiw_wake
+    if [ -n "$stall_at" ] && [ "$(date +%s)" -ge "$stall_at" ]; then
+      stall_at=""; _aoiw_stall_due && _aoiw_stall_wake "$stall"
+    fi
     # 만료(§10-3): 대상이 있으므로 exit 2 로 깨워 다음 Stop 에서 대기자가 다시 뜨게 한다
     if [ $(( $(date +%s) - start )) -ge "$max" ]; then
       trap '' TERM; echo "[inbox] 대기 만료(재등록) — 새 메시지 없음. 할 일 없으면 아무 말 없이 쉬어라" >&5; exit 2
