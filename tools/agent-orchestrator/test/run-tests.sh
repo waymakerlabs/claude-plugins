@@ -21,7 +21,7 @@ mkdir -p "$FAKE" "$NOHERDR" "$FD" "$T/home"
 REAL_HOME=$HOME; touch "$T/stamp"
 REAL_EV="$REAL_HOME/.local/state/agent-orchestrator/inbox/events.log"; REAL_EV_SZ=$(wc -c < "$REAL_EV" 2>/dev/null | tr -d ' '); REAL_EV_SZ=${REAL_EV_SZ:-0}
 cp "$HERE/fake-herdr.py" "$FAKE/herdr"; chmod +x "$FAKE/herdr"
-EXPECT=239
+EXPECT=241
 
 PASS=0; FAIL=0
 # 여러 줄 값은 ⏎로 이어 한 줄 한 케이스를 지킨다
@@ -588,7 +588,7 @@ wfor() { local i=0 n=$(( ${3:-5} * 20 )); while [ $i -lt $n ]; do grep -qF -- "$
 #   기본 POLL 0.2·MAX 5, registered:0 으로 등록 완료를 표식 파일에 남긴다(PAUSE를 주면 덧붙음)
 wl() { local n=$1 s=$2 h=$3 pz="registered:0"; shift 3
   local e=(); for a in "$@"; do case "$a" in AO_INBOX_TEST_PAUSE=*) pz="$pz,${a#*=}" ;; *) e+=("$a") ;; esac; done
-  printf '{"session_id":"%s","hook_event_name":"%s","transcript_path":"%s"}' "$s" "$h" "${WL_TP:-}" > "$W/$n.json"
+  printf '{"session_id":"%s","hook_event_name":"%s","transcript_path":"%s","prompt":"%s"}' "$s" "$h" "${WL_TP:-}" "${WL_PROMPT:-}" > "$W/$n.json"
   rm -f "$W/$n.mk" "$W/$n.mk.go"
   (cd "$T" && exec env -i "${BASE2[@]}" AO_INBOX_WAIT_POLL=0.2 AO_INBOX_WAIT_MAX=5 AO_INBOX_TEST_PAUSE="$pz" \
      AO_INBOX_TEST_PAUSE_MARK="$W/$n.mk" ${e[@]+"${e[@]}"} bash "$BIN" inbox-wait < "$W/$n.json" 2> "$W/$n.err") &
@@ -736,7 +736,7 @@ WL_TP="$W/st1.jsonl" wl s2 "$NS" Stop AO_INBOX_STALL=1 AO_INBOX_WAIT_MAX=2; wrc 
 ns; LSPR="$SB/spr.log"; sub "$NS" "$LSPR"; mktp sp1 "검수 끝. 이어서 3단계를 진행하겠습니다."
 WL_TP="$W/sp1.jsonl" wl p1 "$NS" Stop AO_INBOX_STALL=1; wrc p1; c1=$WRC
 WL_TP="$W/sp1.jsonl" wl p2 "$NS" Stop AO_INBOX_STALL=1 AO_INBOX_WAIT_MAX=2; wrc p2; c2=$WRC
-WL_TP="$W/sp1.jsonl" wl p3 "$NS" UserPromptSubmit AO_INBOX_STALL=1 AO_INBOX_WAIT_MAX=2; wrc p3; c3=$WRC
+WL_TP="$W/sp1.jsonl" WL_PROMPT="계속해" wl p3 "$NS" UserPromptSubmit AO_INBOX_STALL=1 AO_INBOX_WAIT_MAX=2; wrc p3; c3=$WRC
 WL_TP="$W/sp1.jsonl" wl p4 "$NS" Stop AO_INBOX_STALL=1; wrc p4; c4=$WRC
 [ "$c1/$c2/$c3/$c4" = 2/2/2/2 ] && grep -qF '이어서 하겠다' "$W/p1.err" && grep -qF "$EXM" "$W/p2.err" && grep -qF "$EXM" "$W/p3.err" && grep -qF '이어서 하겠다' "$W/p4.err" \
   && ok inbox-wait-stall-promise "약속으로 끝난 턴 → 멈춤 깨움 1회·연속 안 깨움·사람 입력 뒤 다시 1회" || bad inbox-wait-stall-promise "2/2/2/2" "$c1/$c2/$c3/$c4"
@@ -746,6 +746,15 @@ WL_TP="$W/sq1.jsonl" wl q1 "$NS" Stop AO_INBOX_STALL=1 AO_INBOX_WAIT_MAX=2; wrc 
 ns; LSD="$SB/sd.log"; sub "$NS" "$LSD"; mktp sd1 "M2를 마감했습니다. 다음 작업은 내일 합니다."
 WL_TP="$W/sd1.jsonl" wl d1 "$NS" Stop AO_INBOX_STALL=1 AO_INBOX_WAIT_MAX=2; wrc d1; c=$WRC
 [ "$c" = 2 ] && grep -qF "$EXM" "$W/d1.err" && ok inbox-wait-stall-done "약속 없이 끝난 턴 → 멈춤 깨움 없음" || bad inbox-wait-stall-done "만료만" "rc=$c $(cat "$W/d1.err")"
+ns; LSN="$SB/sn.log"; sub "$NS" "$LSN"; mktp sn1 "끝나면 이어서 진행하겠습니다."
+WL_TP="$W/sn1.jsonl" wl n1 "$NS" Stop AO_INBOX_STALL=1; wrc n1; c1=$WRC
+WL_TP="$W/sn1.jsonl" WL_PROMPT="<task-notification> Stop hook feedback [inbox] 멈춤 점검" wl n2 "$NS" UserPromptSubmit AO_INBOX_STALL=1 AO_INBOX_WAIT_MAX=2; wrc n2
+WL_TP="$W/sn1.jsonl" wl n3 "$NS" Stop AO_INBOX_STALL=1 AO_INBOX_WAIT_MAX=2; wrc n3; c3=$WRC
+[ "$c1/$c3" = 2/2 ] && grep -qF '이어서 하겠다' "$W/n1.err" && grep -qF "$EXM" "$W/n3.err" \
+  && ok inbox-wait-stall-notify-no-reset "깨움 통지로 들어온 UserPromptSubmit 은 1회 표식을 풀지 않음(되풀이 없음)" || bad inbox-wait-stall-notify-no-reset "2/2·만료만" "$c1/$c3 $(cat "$W/n3.err")"
+ns; LSO="$SB/so.log"; sub "$NS" "$LSO"; mktp so1 "기다린다로 끝나면 깨웁니다. 원하시면 추가하겠습니다."
+WL_TP="$W/so1.jsonl" wl o1 "$NS" Stop AO_INBOX_STALL=1 AO_INBOX_WAIT_MAX=2; wrc o1; c=$WRC
+[ "$c" = 2 ] && grep -qF "$EXM" "$W/o1.err" && ok inbox-wait-stall-offer "\"원하시면 ~\" 제안으로 끝난 턴 → 멈춤 깨움 없음" || bad inbox-wait-stall-offer "만료만" "rc=$c $(cat "$W/o1.err")"
 # 받은편지함 케이스 이름 — 하나라도 PASS로 실행되지 않으면 FAIL(하니스 전제: 지운 시험이 조용히 빠지지 않게)
 INBOX_OLD="
   inbox-send inbox-format inbox-raw inbox-raw-notime inbox-4000-ok inbox-no-truncate inbox-4000-multibyte

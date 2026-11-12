@@ -20,8 +20,11 @@ _aoiw_json() {
   "$AO_PERL" -MJSON::PP -e '
     local $/; my $r = <STDIN>; my $d = eval { JSON::PP->new->decode($r) };
     exit 4 unless ref $d eq "HASH";
-    print join("\t", map { my $v = $d->{$_}; (defined $v && !ref $v) ? do { (my $x = $v) =~ s/[\t\r\n]/ /g; $x } : "" }
-      qw(session_id hook_event_name transcript_path)), "\n";'
+    my $p = $d->{prompt}; $p = "" unless defined $p && !ref $p;
+    # 사람 입력 여부: 깨움 통지(task-notification·[inbox])도 UserPromptSubmit 으로 들어온다
+    my $human = ($p =~ /\S/ && $p !~ /\[inbox\]|<task-notification>|Stop hook (feedback|blocking)/) ? 1 : 0;
+    print join("\t", (map { my $v = $d->{$_}; (defined $v && !ref $v) ? do { (my $x = $v) =~ s/[\t\r\n]/ /g; $x } : "" }
+      qw(session_id hook_event_name transcript_path)), $human), "\n";'
 }
 # 백그라운드(daemon) 세션은 화면 pane 의 HERDR_PANE_ID 를 물려받는다. 그 값을 쓰면 화면 세션의 대기자를
 #   밀어내고 깨움을 가로챈다(2026-11-12 p6K #23 유실). bg 세션은 pane 키를 쓰지 않는다
@@ -174,6 +177,7 @@ _aoiw_stall_due() {
   txt=$(_aoiw_last_text | tail -c 6000)
   [ -n "$txt" ] || return 1
   printf '%s' "$txt" | tail -c 80 | grep -qE '(\?|까요|할지|주세요|주십시오)[[:space:]*)]*$' && return 1
+  printf '%s' "$txt" | tail -c 300 | grep -qE '원하시면|말씀해 주시면|정해 주시면|정해 주십시오|결정하실' && return 1
   rx='이어서|이어 가|이어가|진행하겠|진행 ?중|착수하겠|들어가겠|들어갑니다|띄우겠|기다리|기다립|대기 중|대기하|회수 대기|(오면|끝나면|되면|마치면|돌아오면) [^.]{0,60}(하겠|합니다|갑니다|확인|병합)|[Ww]aiting|[Rr]esuming|[Ww]ill (continue|resume)'
   printf '%s' "$txt" | grep -qE "$rx" || return 1
   { echo 1 > "$k"; } 2>/dev/null
@@ -189,13 +193,13 @@ _aoiw_main() {
   local stall=${AO_INBOX_STALL:-600} stall_at=""
   [ -e "$AO_INBOX_DIR/hooks.off" ] && exit 0
   js=$(_aoiw_json) || exit 4
-  IFS=$'\t' read -r _W_SID _W_HOOK _W_TP <<< "$js"
+  IFS=$'\t' read -r _W_SID _W_HOOK _W_TP _W_HUMAN <<< "$js"
   _aoiw_sid_ok "$_W_SID" || exit 0
   ep=$(_aoiw_env_pane)
   if [ -n "$ep" ] && ao_is_pane "$ep"; then _W_KEY="pane-${ep//:/_}"; else _W_KEY="sid-$_W_SID"; fi
   _aoiw_sync; [ -n "$_W_TGTS" ] || exit 0
-  # 사람이 입력했으면 "연속 1회" 멈춤 점검 표식을 푼다
-  [ "$_W_HOOK" = UserPromptSubmit ] && rm -f "$_AOW_WAIT/$_W_KEY.stall" 2>/dev/null
+  # 사람이 입력했으면 "연속 1회" 멈춤 점검 표식을 푼다(깨움 통지로 들어온 UserPromptSubmit 은 아님 — 10분마다 되풀이 방지)
+  [ "$_W_HOOK" = UserPromptSubmit ] && [ "$_W_HUMAN" = 1 ] && rm -f "$_AOW_WAIT/$_W_KEY.stall" 2>/dev/null
   # 등록(§3 5번): 앞 대기자를 읽어 두고 내 표식을 쓴 뒤, 살아 있고 lstart 가 맞으면 TERM(기다리지 않음)
   mkdir -p "$_AOW_WAIT" 2>/dev/null || exit 4
   pf="$_AOW_WAIT/$_W_KEY.pid"; ls=$(_aoi_lstart $$); _W_TOK="w$$-$RANDOM$RANDOM-$(date +%s)"
