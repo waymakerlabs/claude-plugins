@@ -21,7 +21,7 @@ mkdir -p "$FAKE" "$NOHERDR" "$FD" "$T/home"
 REAL_HOME=$HOME; touch "$T/stamp"
 REAL_EV="$REAL_HOME/.local/state/agent-orchestrator/inbox/events.log"; REAL_EV_SZ=$(wc -c < "$REAL_EV" 2>/dev/null | tr -d ' '); REAL_EV_SZ=${REAL_EV_SZ:-0}
 cp "$HERE/fake-herdr.py" "$FAKE/herdr"; chmod +x "$FAKE/herdr"
-EXPECT=259
+EXPECT=261
 
 PASS=0; FAIL=0
 # 여러 줄 값은 ⏎로 이어 한 줄 한 케이스를 지킨다
@@ -431,8 +431,17 @@ ao notify "제목 하나" "본문 하나"; [ "$RC" = 0 ] && called "notification
   && ok notify-herdr "herdr 안 → herdr notification show" || bad notify-herdr "rc=0·호출" "rc=$RC $(tail -1 "$FD/calls.log")"
 printf '#!/bin/sh\nprintf "%%s|" "$@" > "%s/osa.log"\n' "$T" > "$T/osa"; chmod +x "$T/osa"
 run HERDR_ENV= AO_OSASCRIPT="$T/osa" -- bash "$BIN" notify "밖 제목" "밖 본문"
-[ "$RC" = 0 ] && grep -qF '|밖 제목|밖 본문|' "$T/osa.log" 2>/dev/null && ok notify-osascript "herdr 밖 → osascript 인자 그대로" || bad notify-osascript "rc=0·인자" "rc=$RC $(cat "$T/osa.log" 2>&1)"
+[ "$RC" = 0 ] && grep -qF -- '|--|밖 제목|밖 본문|' "$T/osa.log" 2>/dev/null && ok notify-osascript "herdr 밖 → osascript 인자 그대로" || bad notify-osascript "rc=0·인자" "rc=$RC $(cat "$T/osa.log" 2>&1)"
 ao notify "제목만"; chk notify-bad-args 2
+run HERDR_ENV= AO_OSASCRIPT="$T/osa" -- bash "$BIN" notify "-s" "o"
+[ "$RC" = 0 ] && grep -qF -- '|--|-s|o|' "$T/osa.log" 2>/dev/null && ok notify-dash-args "'-'로 시작하는 제목·본문 앞에 -- (옵션 해석 방지)" || bad notify-dash-args "|--|-s|o|" "$(cat "$T/osa.log" 2>&1)"
+FD="$FD" /usr/bin/python3 - <<'PY2'
+import json, os
+p = os.path.join(os.environ["FD"], "state.json"); s = json.load(open(p))
+s["panes"].append({"pane_id": "w1:p6", "tab_id": "w1:t1", "rect": {"x": 0, "y": 0, "height": 50}, "cwd": "/tmp/x", "label": "pane_not_found"})
+json.dump(s, open(p, "w"))
+PY2
+ao inbox-send w1:p6 "라벨에 같은 글자"; chk inbox-send-pane-label-literal 0 unwatched
 
 echo "== 받은편지함: 병렬 기록·생성 경쟁·ack 경쟁(§4-2·3·4)"
 L2="$IB/par.log"

@@ -178,8 +178,8 @@ _aoi_pane_gone() {
   [ "${HERDR_ENV:-}" = 1 ] || return 1
   command -v herdr >/dev/null 2>&1 || return 1
   out=$(herdr pane get "$1" 2>&1)
-  case "$out" in *'"pane_not_found"'*) return 0 ;; esac
-  return 1
+  # 해석한 error.code 가 정확히 pane_not_found 일 때만(본문·라벨에 같은 글자가 있어도 오판하지 않음)
+  [ "$(printf '%s' "$out" | ao_json "(d.get('error') or {}).get('code')" 2>/dev/null)" = pane_not_found ]
 }
 
 # _aoi_mark_ok <표식 파일> → 세 칸 "<pid> <lstart> <token>"의 pid가 살아 있고 lstart가 같으면 0.

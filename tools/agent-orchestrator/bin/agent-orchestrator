@@ -89,7 +89,7 @@ if [ "${1:-}" = notify ]; then
   OSA=${AO_OSASCRIPT:-/usr/bin/osascript}   # 시험이 덮어쓴다
   if [ -x "$OSA" ]; then
     # 값은 argv로 넘긴다(AppleScript 문자열에 끼우지 않음 — 따옴표 주입 방지)
-    "$OSA" -e 'on run a' -e 'display notification (item 2 of a) with title (item 1 of a)' -e 'end run' "$2" "$3" >/dev/null 2>&1 \
+    "$OSA" -e 'on run a' -e 'display notification (item 2 of a) with title (item 1 of a)' -e 'end run' -- "$2" "$3" >/dev/null 2>&1 \
       || ao_warn "notify: 알림 표시 실패(무시)"
   else
     ao_warn "notify: 알림 수단 없음(무시)"
