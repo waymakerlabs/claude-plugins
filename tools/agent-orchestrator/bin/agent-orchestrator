@@ -15,6 +15,16 @@
 #                                                   빈 값·숫자만 → 인자 그대로 / 이미 "[XX] " 접두어 → 유지(경고)
 #                                                   그 밖(사용자 이름) → 본문 두고 인자 접두어만 앞에(인자에 접두어 없으면 유지)
 #                                                   --force = 판정 없이 바꿈(이 세션이 붙인 이름일 때만)
+#                                                   탭 가드: 탭이 "-"이고 pane 인자가 "[OC] "로 시작하면 탭을 한 번 확인 —
+#                                                   [XX] 있으면 그대로 / 사용자 이름 → "[OC] <이름>" / 빈 값·숫자 → "[OC] <pane 본문 첫 ' · ' 앞>"
+#                                                   (바꾸면 stderr "탭 접두어 보정: 옛 → 새", 실패는 경고만. [WO]/[RV]는 탭 안 건드림)
+#   session-init <OC|WO|RV> <한글 이름> [--tab <탭 한글>] [--inbox <경로|pane>]...
+#                                                   시작 단계 한 번에(백엔드 결정 전에 처리, 단계마다 이 진입점을 하위 프로세스로 부른다):
+#                                                   ① self-name(force 0) — OC = 탭 "[OC] <--tab|이름>" + pane "[OC] <이름>", WO/RV = pane만
+#                                                      (백엔드 없음 11·미지원 10이면 이름은 건너뛰고 stderr 안내 한 줄, 오류 아님)
+#                                                   ② --inbox 마다 폴더 mkdir -p 뒤 inbox-subscribe <대상>(같은 키 결정)
+#                                                   ③ stdout 한 줄 "session-init role=R tab=<탭|-> pane=<pane|-> subs=<이 세션 구독 수>"
+#                                                   인자·대상·구독 키 오류 = 2(부작용 전). 그 밖엔 모든 단계를 돌고, 실패가 있으면 첫 실패 코드
 #   agent-start <이름> <pane> --kind claude|codex -- <CLI 인자…>
 #   agent-send <이름|pane> <한 줄> [--confirm]      상태(working|done|idle)
 #   agent-wait <이름|pane> [--timeout 초]           최종 상태(done|idle). timeout 7
@@ -95,6 +105,55 @@ if [ "${1:-}" = notify ]; then
     ao_warn "notify: 알림 수단 없음(무시)"
   fi
   exit 0
+fi
+
+# ── 0-2. session-init: 시작 단계 묶음(이름 붙이기 + 받은편지함 구독). 단계마다 이 진입점을 하위 프로세스로 불러
+#   기존 동작(self-name 판정·inbox-subscribe 키 결정·whoami)을 그대로 재사용한다. 인자 검사(2)는 부작용 전에 끝낸다
+if [ "${1:-}" = session-init ]; then
+  shift
+  SI_ROLE=${1:-}; SI_NAME=${2:-}; SI_TAB=""; SI_INB=()
+  [ $# -ge 2 ] || usage "session-init <OC|WO|RV> <한글 이름> [--tab <탭 한글>] [--inbox <경로|pane>]..."
+  shift 2
+  case "$SI_ROLE" in OC|WO|RV) ;; *) usage "session-init 역할은 OC|WO|RV: $SI_ROLE" ;; esac
+  ao_one_line "$SI_NAME" || usage "session-init 이름은 비어 있지 않은 한 줄"
+  case "$SI_NAME" in -*) usage "session-init 이름이 옵션처럼 보임: $SI_NAME" ;; esac
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --tab)
+        [ $# -ge 2 ] || usage "--tab 값 없음"
+        [ "$SI_ROLE" = OC ] || usage "--tab 은 OC 만(작업자 pane은 조정자 탭을 함께 쓴다)"
+        ao_one_line "$2" || usage "--tab 값은 비어 있지 않은 한 줄"; SI_TAB=$2; shift 2 ;;
+      --inbox) [ $# -ge 2 ] || usage "--inbox 값 없음"; SI_INB+=("$2"); shift 2 ;;
+      *) usage "session-init 알 수 없는 인자: $1" ;;
+    esac
+  done
+  if [ "${#SI_INB[@]}" -gt 0 ]; then
+    # shellcheck source=/dev/null
+    . "$AO_HOME/lib/inbox.sh" && . "$AO_HOME/lib/inbox-wait.sh" || ao_die 12 "lib/inbox*.sh 로딩 실패"
+    for t in "${SI_INB[@]}"; do ( _aoi_resolve "$t" ) || exit 2; done
+    ( _aoiw_sub_key "" "" ) || exit 2   # 구독 키(HERDR_PANE_ID·CLAUDE_CODE_SESSION_ID)가 없으면 부작용 전에 2
+  fi
+  SI_AO=("$BASH" "$AO_HOME/bin/agent-orchestrator"); SI_RC=0
+  si_fail() { [ "$SI_RC" = 0 ] && SI_RC=$1; }
+  # 1) 이름: OC = 탭 + pane, WO/RV = pane만(탭은 건드리지 않는다)
+  if [ "$SI_ROLE" = OC ]; then SI_T="[OC] ${SI_TAB:-$SI_NAME}"; else SI_T=-; fi
+  SI_ERR=$("${SI_AO[@]}" self-name "$SI_T" "[$SI_ROLE] $SI_NAME" 2>&1 >/dev/null); c=$?
+  case "$c" in
+    0) [ -z "$SI_ERR" ] || printf '%s\n' "$SI_ERR" >&2 ;;
+    10|11) ao_warn "session-init: 이름 붙이기 건너뜀(백엔드 없음·미지원 rc=$c) — 구독은 계속" ;;
+    *) [ -z "$SI_ERR" ] || printf '%s\n' "$SI_ERR" >&2; si_fail "$c" ;;
+  esac
+  # 2) 구독: inbox-subscribe <대상> 과 같다(폴더는 미리 만든다)
+  for t in ${SI_INB[@]+"${SI_INB[@]}"}; do
+    case "$t" in /*) mkdir -p "${t%/*}" 2>/dev/null || { ao_warn "session-init: 폴더 생성 실패: ${t%/*}"; si_fail 4; continue; } ;; esac
+    "${SI_AO[@]}" inbox-subscribe "$t" >/dev/null || si_fail $?
+  done
+  # 3) 증거 한 줄: 이름은 어댑터로 다시 읽는다(못 읽으면 -)
+  SI_TL=$("${SI_AO[@]}" whoami --field tab-label 2>/dev/null) || SI_TL=""
+  SI_PL=$("${SI_AO[@]}" whoami --field pane-label 2>/dev/null) || SI_PL=""
+  SI_N=$("${SI_AO[@]}" inbox-subscribe --list 2>/dev/null | grep -c .)
+  echo "session-init role=$SI_ROLE tab=${SI_TL:--} pane=${SI_PL:--} subs=${SI_N:-0}"
+  exit "$SI_RC"
 fi
 
 # ── 0. 받은편지함 동작: 백엔드와 무관(herdr 밖·backend=none·백엔드 고장에서도 동작) → 여기서 처리하고 끝

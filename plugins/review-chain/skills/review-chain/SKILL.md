@@ -27,7 +27,7 @@ description: >-
 
 0. **경로 판정 먼저**(`references/launch.md` §1). 첫 지시가 시작 메모(`launch-*.md`)를 가리키거나 사용자가 "이 세션에서"라고 명시했을 때만 이 세션이 OC로 1번부터 진행한다. 인계 문서(`oc-handover-*.md`)면 5번(재개). **그 밖 전부(기본)는 launch** — 이 세션은 시작 메모를 쓰고 새 탭 `[OC] <프로젝트 한글> QC`에 깨끗한 OC를 연 뒤 손을 뗀다(`references/launch.md` §2). auto-chain이 끝난 세션처럼 맥락이 무거운 세션이 OC가 되지 않게 하기 위해서다.
 1. `"$AO" backend`가 0인지 본다. 10·11·12면 이 스킬은 쓰지 않는다(사용자가 worker 탭에서 직접 대화하는 것이 핵심이라 ① `Agent`로 내려갈 수 없다). 12는 설치 결함으로 한 줄 알린다. 사용자에게 "review-chain은 오케스트레이션 툴 안에서만 동작한다"고 보고하고 멈춘다.
-2. `"$AO" self-name "[OC] <프로젝트 한글> QC" "[OC] <프로젝트 한글> QC"`. 확인은 `"$AO" whoami --field tab-label|pane-label`.
+2. `"$AO" session-init OC "<프로젝트 한글> QC"`(0.5.0). 탭·pane 이름을 붙이고 증거 줄 `session-init role=OC tab=… pane=… subs=…`을 낸다. `tab=`·`pane=`에 `[OC]`가 없으면 고친 뒤 진행한다. 4번에서 `$RC/inbox.log`를 만든 뒤 구독은 아래 `rc-watch.sh --subscribe`로 한다. launch 경로(0번)로 손을 떼는 세션도 손을 떼기 전에 `"$AO" session-init OC "<현재 주제 한글>"`을 한 번 한다.
 3. 프로젝트 설정 `.claude/review-chain.md`를 읽는다(없으면 기본값, `references/project-config.md`).
 4. **새 체인**: chain-id = `rc-<YYYYMMDD>-<짧은 영문>`. `$RC`를 만들고 `.git/info/exclude`에 `/.review-chain/`가 없으면 한 줄 추가한다(§15 D1). `state.md`·`queue.md`·`current-oc`를 `references/state-files.md` 틀로 만든다. `current-oc`에 `"$AO" whoami` 값을 쓴다(기록·호환용 — 메시지 경로에는 쓰이지 않는다, §6). 빈 `inbox.log`를 만들고, 설정 `shared-files`를 한 줄 한 패턴으로 `$RC/shared-files`에 쓴다(§5, 없으면 빈 파일).
    - **받은편지함 구독 시작(0.2.0)**(상태 파일이 생긴 직후, 첫 worker 기동 전): `<SKILL 폴더>/scripts/rc-watch.sh --subscribe $RC/inbox.log` 한 번(출력 없음이 정상). 새 줄은 `[inbox] 새 메시지 …` 깨움 아래 `#<n> …`로 들어온다. 줄을 처리한 뒤마다 `rc-watch.sh --ack $RC/inbox.log <n>`(출력 없음이 정상). 훅이 없는 도구의 Monitor 대체와 자세한 형식은 `references/messages.md` §1.

@@ -21,7 +21,7 @@ OC가 판단만 하고 진본이 파일에 있으므로, 교체 때 넘길 것�
 
 순서가 핵심이다(0.2.0): 받은편지함을 **구독**하고 → 상태를 다시 읽고 → `--pending`으로 미처리 줄을 처리한다. 받은편지함 경로가 고정이고 옛 OC가 `--ack`한 위치 뒤의 줄은 전부 남아 있으므로, 교체 순간 들어온 요청도 빠지지 않는다. `current-oc`는 기록·호환용이라 라우팅과 무관하다.
 
-1. review-chain 스킬을 로드하고 `self-name`.
+1. review-chain 스킬을 로드하고 `"$AO" session-init OC "<프로젝트 한글> QC"`(증거 줄의 `tab=`·`pane=`에 `[OC]` 확인).
 2. 인계 문서 → `state.md` → `queue.md` 순으로 1차로 읽는다(맥락 파악용). worker 화면·report 전량은 읽지 않는다.
 3. `"$AO" list --agents`로 worker 표의 이름이 살아 있는지 대조. 없는 이름은 상태 `막힘`(사유: 세션 없음) → §4로 교체 판단.
 4. `current-oc` 갱신(기록·호환용): `printf '%s\n' "$("$AO" whoami)" > "$RC/current-oc.tmp" && mv "$RC/current-oc.tmp" "$RC/current-oc"`, `current-oc.log`에 한 줄. 이 값은 메시지 경로에 쓰이지 않는다.

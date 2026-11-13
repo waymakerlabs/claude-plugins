@@ -21,7 +21,7 @@ mkdir -p "$FAKE" "$NOHERDR" "$FD" "$T/home"
 REAL_HOME=$HOME; touch "$T/stamp"
 REAL_EV="$REAL_HOME/.local/state/agent-orchestrator/inbox/events.log"; REAL_EV_SZ=$(wc -c < "$REAL_EV" 2>/dev/null | tr -d ' '); REAL_EV_SZ=${REAL_EV_SZ:-0}
 cp "$HERE/fake-herdr.py" "$FAKE/herdr"; chmod +x "$FAKE/herdr"
-EXPECT=261
+EXPECT=275
 
 PASS=0; FAIL=0
 # 여러 줄 값은 ⏎로 이어 한 줄 한 케이스를 지킨다
@@ -199,7 +199,7 @@ ao self-name --force; chk arg-self-name-force-only 2
 # "-" = 대상 건너뜀: 사용자 탭은 두고 pane만 --force (S5 2회차 BLOCK)
 reset_state; setlabel tab w1:t1 "[OC] Peter review"; setlabel pane w1:p1 "[OC] 논의"
 ao self-name --force - "[OC] 구현"
-[ "$RC" = 0 ] && called "pane rename w1:p1 [OC] 구현" && ! called "tab rename" && ! called "tab get" && ok self-name-skip-tab "탭 - 건너뜀, pane만 --force" || bad self-name-skip-tab "pane만 rename" "rc=$RC $(grep rename "$FD/calls.log")"
+[ "$RC" = 0 ] && called "pane rename w1:p1 [OC] 구현" && ! called "tab rename" && ok self-name-skip-tab "탭 - 건너뜀(이미 [OC] 탭은 가드도 rename 없음), pane만 --force" || bad self-name-skip-tab "pane만 rename" "rc=$RC $(grep rename "$FD/calls.log")"
 reset_state; ao self-name "[OC] 탭만" -
 [ "$RC" = 0 ] && called "tab rename w1:t1 [OC] 탭만" && ! called "pane get" && ok self-name-skip-pane "pane - 건너뜀" || bad self-name-skip-pane "탭만" "rc=$RC $(grep -E "rename|pane get" "$FD/calls.log")"
 ao self-name - -; chk arg-self-name-both-skip 2
@@ -219,6 +219,58 @@ if grep -q 'GUARD:user-name' "$T/ao-nouserguard/adapters/herdr.sh"; then bad neg
   called "tab rename w1:t1 [OC] 새 작업" && ! called "tab rename w1:t1 [OC] Peter review" \
     && ok neg-self-name-user-guard "가드 없으면 Peter review 본문이 바뀐다(Peter review 케이스가 FAIL할 조건)" || bad neg-self-name-user-guard "본문 교체" "rc=$RC $(grep rename "$FD/calls.log")"
 fi
+
+echo "== self-name 탭 가드(탭 -·[OC] pane이면 탭 접두어 한 번 확인)"
+reset_state; setlabel tab w1:t1 "Peter review"; setlabel pane w1:p1 "[OC] 이전"
+ao self-name --force - "[OC] 이름 · 대기 1 (x)"
+[ "$RC" = 0 ] && called "tab rename w1:t1 [OC] Peter review" && called "pane rename w1:p1 [OC] 이름 · 대기 1 (x)" && echo "$ERR" | grep -q '탭 접두어 보정: Peter review → \[OC\] Peter review' \
+  && ok tab-guard-user "사용자 탭 → [OC] 접두어만·stderr 보정 한 줄" || bad tab-guard-user "[OC] Peter review" "rc=$RC $(grep rename "$FD/calls.log") err=$ERR"
+reset_state; setlabel tab w1:t1 ""
+ao self-name --force - "[OC] 이름 · 대기 1 (x)"
+[ "$RC" = 0 ] && called "tab rename w1:t1 [OC] 이름" && ! called "tab rename w1:t1 [OC] 이름 ·" && ok tab-guard-empty "빈 탭 → [OC] <pane 본문 ' · ' 앞>" || bad tab-guard-empty "[OC] 이름" "rc=$RC $(grep rename "$FD/calls.log")"
+reset_state; setlabel tab w1:t1 "[RV] 남의 접두어"
+ao self-name --force - "[OC] 이름 · 대기 1 (x)"
+[ "$RC" = 0 ] && ! called "tab rename" && [ -z "$(printf '%s' "$ERR" | grep '탭 접두어')" ] && ok tab-guard-prefixed "이미 [XX] 탭 → 그대로·조용히" || bad tab-guard-prefixed "tab rename 없음" "rc=$RC $(grep rename "$FD/calls.log") err=$ERR"
+reset_state; setlabel tab w1:t1 "Peter review"
+ao self-name --force - "[WO] 작업자 · 대기"
+[ "$RC" = 0 ] && ! called "tab " && called "pane rename w1:p1 [WO] 작업자 · 대기" && ok tab-guard-wo "[WO] pane → 탭 조회·변경 없음" || bad tab-guard-wo "tab 호출 없음" "rc=$RC $(cat "$FD/calls.log")"
+reset_state; setlabel tab w1:t1 "Peter review"; echo internal > "$FD/fail-tab-rename"
+ao self-name --force - "[OC] 이름"
+rm -f "$FD/fail-tab-rename"
+[ "$RC" = 0 ] && called "pane rename w1:p1 [OC] 이름" && echo "$ERR" | grep -q '보정 실패' && ok tab-guard-fail-warn "가드 실패는 경고만·pane rc=0" || bad tab-guard-fail-warn "rc=0 + 경고" "rc=$RC err=$ERR"
+
+echo "== session-init(이름 + 받은편지함 구독 한 번에)"
+SIS="$T/si-state"; SIR=(AO_STATE_ROOT="$SIS")
+reset_state; setlabel pane w1:p1 7
+run "${SIR[@]}" -- bash "$BIN" session-init OC "조정자" --tab "체인 탭"
+[ "$RC" = 0 ] && called "tab rename w1:t1 [OC] 체인 탭" && called "pane rename w1:p1 [OC] 조정자" \
+  && [ "$OUT" = "session-init role=OC tab=[OC] 체인 탭 pane=[OC] 조정자 subs=0" ] \
+  && ok session-init-oc-default "숫자·기본 이름 → 인자 그대로·증거 줄" || bad session-init-oc-default "rename 둘·증거 줄" "rc=$RC out=$OUT $(grep rename "$FD/calls.log") err=$ERR"
+reset_state; setlabel tab w1:t1 "헬프AI"
+run "${SIR[@]}" -- bash "$BIN" session-init OC "조정자"
+[ "$RC" = 0 ] && called "tab rename w1:t1 [OC] 헬프AI" && called "pane rename w1:p1 [OC] 조정자" && ok session-init-oc-user "사용자 탭 → 접두어만" || bad session-init-oc-user "[OC] 헬프AI" "rc=$RC $(grep rename "$FD/calls.log")"
+reset_state; setlabel tab w1:t1 ""
+run "${SIR[@]}" -- bash "$BIN" session-init WO "작업자 A"
+[ "$RC" = 0 ] && ! called "tab rename" && called "pane rename w1:p1 [WO] 작업자 A" && printf '%s' "$OUT" | grep -q '^session-init role=WO tab=- pane=\[WO\] 작업자 A subs=0$' \
+  && ok session-init-wo-pane-only "WO → pane만 rename(탭은 증거 읽기만)·빈 탭은 tab=-" || bad session-init-wo-pane-only "pane만" "rc=$RC out=$OUT $(cat "$FD/calls.log")"
+reset_state; SID1="$T/si/parent/main-x.log"
+run "${SIR[@]}" -- bash "$BIN" session-init RV "리뷰어" --inbox "$SID1" --inbox w1:p4
+[ "$RC" = 0 ] && [ -d "$T/si/parent" ] && [ -f "$SID1" ] && grep -qxF "$SID1" "$SIS/inbox/subs/pane-w1_p1" && grep -qxF "$SIS/inbox/pane-w1_p4.log" "$SIS/inbox/subs/pane-w1_p1" \
+  && printf '%s' "$OUT" | grep -q ' subs=2$' && ok session-init-inbox "--inbox → 폴더 생성·구독 2·subs=2" || bad session-init-inbox "구독 2" "rc=$RC out=$OUT err=$ERR $(cat "$SIS/inbox/subs/pane-w1_p1" 2>&1)"
+reset_state; SID2="$T/si/out/main-y.log"
+run "${SIR[@]}" HERDR_ENV= -- bash "$BIN" session-init OC "밖" --inbox "$SID2"
+[ "$RC" = 0 ] && ! called "rename" && grep -qxF "$SID2" "$SIS/inbox/subs/pane-w1_p1" && echo "$ERR" | grep -q '이름 붙이기 건너뜀' \
+  && [ "$OUT" = "session-init role=OC tab=- pane=- subs=3" ] && ok session-init-no-backend "herdr 밖 → 이름 건너뜀 안내·구독은 함·0" || bad session-init-no-backend "rc=0 구독" "rc=$RC out=$OUT err=$ERR"
+reset_state; rm -rf "$T/si/bad"
+run "${SIR[@]}" -- bash "$BIN" session-init XX "이름" --inbox "$T/si/bad/a.log"; c1=$RC
+run "${SIR[@]}" -- bash "$BIN" session-init OC "이름" --inbox "rel/a.log"; c2=$RC
+run "${SIR[@]}" -- bash "$BIN" session-init WO "이름" --tab "탭"; c3=$RC
+run "${SIR[@]}" -- bash "$BIN" session-init OC; c4=$RC
+[ "$c1/$c2/$c3/$c4" = 2/2/2/2 ] && [ ! -s "$FD/calls.log" ] && [ ! -e "$T/si/bad" ] && ok session-init-arg-error "역할·대상·--tab(WO)·인자 부족 → 2·부작용 0" || bad session-init-arg-error "2/2/2/2·호출 0" "$c1/$c2/$c3/$c4 $(cat "$FD/calls.log")"
+reset_state; echo internal > "$FD/fail-pane-get"
+run "${SIR[@]}" -- bash "$BIN" session-init WO "작업자" --inbox "$T/si/f/z.log"; rm -f "$FD/fail-pane-get"
+[ "$RC" != 0 ] && [ "$RC" != 2 ] && grep -qxF "$T/si/f/z.log" "$SIS/inbox/subs/pane-w1_p1" && printf '%s' "$OUT" | grep -q '^session-init role=WO tab=1 pane=- subs=4$' \
+  && ok session-init-step-fail "이름 단계 실패 → 구독은 하고 증거 줄 뒤 그 코드" || bad session-init-step-fail "rc≠0·구독·증거" "rc=$RC out=$OUT err=$ERR"
 
 echo "== agent-start"
 reset_state
@@ -574,6 +626,12 @@ ao2 inbox-send "$LW" "대기자만"; r1="$RC/$OUT"
 killw
 ao2 inbox-send "$LW" "대기자 KILL 뒤"; r2="$RC/$OUT"
 [ "$r1" = 0/watched ] && [ "$r2" = 0/unwatched ] && ok inbox-send-waiter-watched "대기자만 → watched, KILL 뒤 → unwatched" || bad inbox-send-waiter-watched "0/watched 0/unwatched" "$r1 $r2 err=$ERR"
+LWW="$S1/ww.log"; fakew "$LWW" sid-ffff0009
+ao2 inbox-send "$LWW" "감시 중"; w1="$RC/$OUT"; e1=$ERR; killw
+ao2 inbox-send "$LWW" "감시 끝"; w2="$RC/$OUT"; e2=$ERR
+[ "$w1" = 0/watched ] && ! printf '%s' "$e1" | grep -q '미감시' && ok inbox-send-watched-no-warn "watched → 미감시 경고 없음" || bad inbox-send-watched-no-warn "0/watched·경고 없음" "$w1 err=$e1"
+[ "$w2" = 0/unwatched ] && printf '%s' "$e2" | grep -qF "미감시: $LWW 줄 #2 — 받는 세션이 구독하지 않았다(inbox-subscribe 안 함). 부모·조정자 받은편지함이면 사용자에게 알릴 것(notify)" \
+  && ok inbox-send-unwatched-warn "unwatched → stdout·rc 그대로 + stderr 미감시 한 줄" || bad inbox-send-unwatched-warn "0/unwatched·미감시 줄" "$w2 err=$e2"
 LM="$S1/st.log"
 fakew "$LM" sid-ffff0003
 ao2 inbox-watch --state "$LM"; chk inbox-watch-state-waiter 0 waiter
@@ -597,8 +655,8 @@ chmod 755 "$RO2"
 [ "$c" = 4 ] && [ ! -e "$RO2/x.log" ] && ok inbox-send-append-fail "받은편지함 쓰기 불가 → 4·기록 0" || bad inbox-send-append-fail "4·파일 없음" "rc=$c $(ls "$RO2")"
 mkdir -p "$T/state2/inbox/events.log"
 run2 AO_STATE_ROOT="$T/state2" -- bash "$BIN" inbox-send "$S1/me.log" "events 불가"
-[ "$RC/$OUT" = 0/unwatched ] && [ -z "$ERR" ] && [ "$(wc -l < "$S1/me.log" | tr -d ' ')" = 1 ] \
-  && ok inbox-send-event-fail-quiet "events.log 쓰기 불가 → 0·경고 없음" || bad inbox-send-event-fail-quiet "0·빈 stderr" "rc=$RC err=$ERR"
+[ "$RC/$OUT" = 0/unwatched ] && [ -z "$(printf '%s' "$ERR" | grep -v '미감시: ')" ] && [ "$(wc -l < "$S1/me.log" | tr -d ' ')" = 1 ] \
+  && ok inbox-send-event-fail-quiet "events.log 쓰기 불가 → 0·events 경고 없음(미감시 한 줄만)" || bad inbox-send-event-fail-quiet "0·미감시 외 stderr 없음" "rc=$RC err=$ERR"
 UQ="body-uniq-$$-Zq9"
 ao2 inbox-send "$S1/nb.log" "$UQ 원문"
 EV="$SI/events.log"

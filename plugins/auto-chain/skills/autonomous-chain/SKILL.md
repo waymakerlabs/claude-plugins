@@ -15,6 +15,11 @@ description: >-
 > 이 문서를 열었다면 체인을 시작하거나 이어받는 중이다. 절차를 기억으로 재구성하지 말고 아래를 따른다.
 > 설계 근거: 이 플러그인 리포의 `docs/design/claude-autonomous-chain.md`.
 
+> **착수 체크 (2.13.0, 계획·마일스톤·이어받은 세션 모두 첫 응답 전)**
+> 1. `"$AO" session-init OC "<체인 한글 이름>" --inbox <내 받은편지함>…` 한 번. 탭·pane 이름(`[OC]`, 사용자가 붙인 이름은 접두어만)과 받은편지함 구독을 함께 한다. 받은편지함은 체인 조정자면 `…/inbox/chain-<chain-id>/coordinator.log`, 자식을 띄우는 메인이면 `…/inbox/main-<주제 영문>.log`(아래 「세션 간 메시지」). 상태 파일이 아직 없으면 `--inbox` 없이 이름만 먼저 하고, 상태 파일을 만든 직후 `--inbox`를 붙여 다시 실행한다(멱등).
+> 2. 출력 증거 줄 `session-init role=OC tab=… pane=… subs=…`을 확인한다. `tab=`·`pane=`에 `[OC]`가 없거나 `subs=0`이면 고친 뒤 진행한다.
+> 3. `inbox-send`가 stderr에 `미감시:`를 내면 받는 세션이 구독하지 않은 것이다. 부모·조정자 받은편지함이면 `"$AO" notify` 1회 후 사용자에게 알린다.
+
 reference 경로(이 SKILL.md와 같은 디렉터리 기준): `references/planning.md`, `references/task-brief.md`, `references/sol-review.md`, `references/profile.md`, (2.3.0) `references/pane-worker.md`(③ 전용), `scripts/review-run.sh`·`scripts/review-wait.sh`(리뷰 실행·대기), `scripts/headless-run.sh`(② 비리뷰 실행), `scripts/spawn-pane-worker.sh`(③ 기동), `scripts/agent-stall-watch.sh`(③ 정지 감시). worker에게는 **절대 경로**로 넘긴다. 오케스트레이션 툴 명령은 `agent-orchestrator <동작>`(`${AGENT_ORCHESTRATOR:-$HOME/.local/bin/agent-orchestrator}`, 이 리포 `tools/agent-orchestrator/`)으로만 부르고, 툴 특이사항은 `tools/agent-orchestrator/docs/<backend>.md`에만 있다.
 
 ## 1-1. 실행 단계 선택 (2.3.0)

@@ -1,10 +1,10 @@
 {
   "name": "review-chain",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "QC follow-up chain: one OC session takes the user's QC findings into a queue, spawns worker sessions (one per discussion-type feature, one bundled worker for small non-overlapping fixes) in their own git worktrees, checks file-scope conflicts before work starts, serializes merges, and owns shared files (version, release notes, progress ledger, external trackers). The user talks to workers directly in their tabs/panes; workers claim file scopes themselves via rc-claim.sh and exchange messages through inbox files; receivers subscribe and the inbox-hooks dependency wakes an idle session (Monitor only for tools without hooks; no typing into panes), so the OC can be replaced when its context fills. Uses the tool-neutral agent-orchestrator in tools/.",
   "author": {
     "name": "waymakerlabs",
     "email": "peter@waymakerlabs.com"
   },
-  "dependencies": ["inbox-hooks"]
+  "dependencies": ["inbox-hooks", "auto-chain"]
 }

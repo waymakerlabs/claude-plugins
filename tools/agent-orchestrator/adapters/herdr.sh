@@ -232,6 +232,26 @@ name_one() {
   fi
 }
 
+# tab_guard <[OC] pane 인자> — 탭 이름에 역할 접두어가 없을 때만 보정(이미 [XX] 면 그대로, 조용히)
+#   사용자 이름 → "[OC] <현재 이름>" / 빈 값·숫자 → "[OC] <pane 본문의 첫 ' · ' 앞, 앞뒤 공백 제거>"
+tab_guard() {
+  local body cur new
+  [ -n "${HERDR_TAB_ID:-}" ] || return 3
+  hd_must tab get "$HERDR_TAB_ID"
+  cur=$(hj "d['result']['tab'].get('label')") || return 4
+  [[ $cur =~ $AO_PREFIX_RE ]] && return 0
+  if [ -z "$cur" ] || [[ $cur =~ $AO_NUM_RE ]]; then
+    body=${1#\[OC\] }; body=${body%% · *}
+    body=$(printf '%s' "$body" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+    [ -n "$body" ] || return 0
+    new="[OC] $body"
+  else
+    new="[OC] $cur"
+  fi
+  hd_must tab rename "$HERDR_TAB_ID" "$new"
+  ao_warn "탭 접두어 보정: ${cur:-(빈 값)} → $new"
+}
+
 # ───────── self-name <force 0|1> <탭> [<pane>]
 op_self_name() {
   local force=$1
@@ -239,6 +259,10 @@ op_self_name() {
   if [ "$1" != - ]; then   # "-" = 탭 건너뜀
     [ -n "${HERDR_TAB_ID:-}" ] || ao_die 3 "HERDR_TAB_ID 없음"
     name_one tab "$HERDR_TAB_ID" "$1" "$force"
+  elif [ $# -ge 2 ] && [ "${2#\[OC\] }" != "$2" ]; then
+    # 탭 가드(2026-11-13): 탭을 건너뛰어도 [OC] pane이면 탭을 한 번 판정 없이(force 0 규칙) 확인한다.
+    #   하위 셸에서 돌려 실패는 경고만 — pane 이름 바꾸기의 종료 코드를 바꾸지 않는다
+    ( tab_guard "$2" ) || ao_warn "탭 접두어 보정 실패(무시)"
   fi
   if [ $# -ge 2 ] && [ "$2" != - ]; then
     [ -n "${HERDR_PANE_ID:-}" ] || ao_die 3 "HERDR_PANE_ID 없음"

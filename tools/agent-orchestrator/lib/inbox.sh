@@ -169,6 +169,9 @@ ao_inbox_send() {
     ao_die 3 "대상 pane 없음: $1 — 줄 #$_AOI_SENT_N 은 기록했지만 읽을 세션이 없다. 사용자에게 알릴 것(notify)"
   fi
   _aoi_event send "$_AOI_LOG" "n=$_AOI_SENT_N" "watch=$w"
+  # (2026-11-13) 미감시 경고: stdout·종료 코드는 그대로, stderr 한 줄만 더한다(읽는 세션 없는 받은편지함 발견용)
+  #   --raw 호출자(rc-send·rc-claim)는 stdout 으로 받아 직접 `미감시 전송` 기록을 남기므로 경고하지 않는다
+  [ "$w" = unwatched ] && [ "$raw" = 0 ] && ao_warn "미감시: $1 줄 #$_AOI_SENT_N — 받는 세션이 구독하지 않았다(inbox-subscribe 안 함). 부모·조정자 받은편지함이면 사용자에게 알릴 것(notify)"
   echo "$w"
 }
 
