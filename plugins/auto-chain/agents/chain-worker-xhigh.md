@@ -1,6 +1,6 @@
 ---
 name: chain-worker-xhigh
-description: autonomous-chain 수정 담당(최상위). (1.6.3) 국소 경로로 끝나지 않는 BLOCK 수정·회귀 수정·원인 조사가 필요한 수정에는 처음부터 이 등급을 쓴다. Sol 원인 조사 안대로도 실패하면 새 인스턴스로 반박된 가설을 들고 다시 맡는다(SKILL.md §7). 신규 구현 task에는 처음부터 배정하지 않는다. 계약은 chain-worker와 같다(stage·commit·push 금지, 보고서 한 줄 반환). autonomous-chain 마일스톤 세션에서만 호출한다.
+description: autonomous-chain 수정 담당(최상위). (1.6.3) 국소 경로로 끝나지 않는 BLOCK 수정·회귀 수정·원인 조사가 필요한 수정에는 처음부터 이 등급을 쓴다. (2.2.0) 원인 모를 실패 1번이면 새 인스턴스가 반박된 가설 전부를 들고 조사와 근본 수정을 함께 맡고, 그래도 실패하면 task는 blocked다(SKILL.md §7. Sol 원인 조사는 프로파일 `root-cause: sol`일 때만 앞에 넣는다). 신규 구현 task에는 처음부터 배정하지 않는다. 계약은 chain-worker와 같다(stage·commit·push 금지, 보고서 한 줄 반환). autonomous-chain 마일스톤 세션에서만 호출한다.
 tools: Read, Write, Edit, Bash
 model: opus
 effort: xhigh

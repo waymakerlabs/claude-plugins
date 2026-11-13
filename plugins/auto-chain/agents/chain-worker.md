@@ -1,6 +1,6 @@
 ---
 name: chain-worker
-description: autonomous-chain 구현 담당(기본). 명세가 있는 task 하나를 구현하고 영향 시험을 통과시킨 뒤 보고서를 쓴다. stage·commit·push는 하지 않는다. 상태·동시성·권한 경계나 원인 조사가 task의 핵심이거나 chain-worker가 실패한 task의 재시도에는 chain-worker-deep을 쓴다. autonomous-chain 마일스톤 세션에서만 호출한다.
+description: autonomous-chain 구현 담당(기본). 명세가 있는 task 하나를 구현하고 영향 시험을 통과시킨 뒤 보고서를 쓴다. stage·commit·push는 하지 않는다. 상태·동시성·권한 경계가 task의 핵심이면 chain-worker-deep을 쓴다. 원인 모를 실패 재시도는 deep이 아니라 새 chain-worker-xhigh가 조사+수정을 함께 맡는다(SKILL.md §7). autonomous-chain 마일스톤 세션에서만 호출한다.
 tools: Read, Write, Edit, Bash
 model: sonnet
 effort: high
