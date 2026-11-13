@@ -21,7 +21,7 @@ mkdir -p "$FAKE" "$NOHERDR" "$FD" "$T/home"
 REAL_HOME=$HOME; touch "$T/stamp"
 REAL_EV="$REAL_HOME/.local/state/agent-orchestrator/inbox/events.log"; REAL_EV_SZ=$(wc -c < "$REAL_EV" 2>/dev/null | tr -d ' '); REAL_EV_SZ=${REAL_EV_SZ:-0}
 cp "$HERE/fake-herdr.py" "$FAKE/herdr"; chmod +x "$FAKE/herdr"
-EXPECT=253
+EXPECT=259
 
 PASS=0; FAIL=0
 # 여러 줄 값은 ⏎로 이어 한 줄 한 케이스를 지킨다
@@ -414,11 +414,25 @@ ao inbox-watch --ack "$L1" 0; chk inbox-ack-bad-n 2
 ao inbox-watch --bogus "$L1"; chk inbox-watch-bad-opt 2
 run AGENT_ORCHESTRATOR_BACKEND=none -- bash "$BIN" inbox-send "$L1" "백엔드 none"; chk inbox-backend-none 0 unwatched
 run HERDR_ENV= PATH="$NOHERDR:/usr/bin:/bin" -- bash "$BIN" inbox-send "$L1" "herdr 밖"; chk inbox-no-herdr 0 unwatched
-ao inbox-send w1:p9 "pane 대상"; chk inbox-pane-target 0 unwatched
+run HERDR_ENV= -- bash "$BIN" inbox-send w1:p9 "pane 대상"; chk inbox-pane-target 0 unwatched
 PL="$T/home/.local/state/agent-orchestrator/inbox/pane-w1_p9.log"
 [ -f "$PL" ] && grep -q ' pane 대상$' "$PL" && ok inbox-pane-path "pane id → ~/.local/state/…/inbox/pane-w1_p9.log (폴더 자동 생성)" || bad inbox-pane-path "$PL" "$(ls -R "$T/home/.local" 2>&1 | head -5)"
 run AGENT_ORCHESTRATOR_BACKEND=none -- bash "$BIN" inbox-watch --pending w1:p9
 [ "$RC" = 0 ] && printf '%s\n' "$OUT" | grep -Eq '^#1 [0-9:]{8} pane 대상$' && ok inbox-pending-pane "--pending pane 대상·backend=none" || bad inbox-pending-pane "#1 … pane 대상" "rc=$RC $OUT"
+
+echo "== 받은편지함: 없는 pane 대상·notify (2026-11-13 메인 고정 받은편지함)"
+reset_state
+ao inbox-send w1:p8 "닫힌 pane"; PG="$T/home/.local/state/agent-orchestrator/inbox/pane-w1_p8.log"
+[ "$RC" = 3 ] && [ "$OUT" = unwatched ] && grep -q ' 닫힌 pane$' "$PG" 2>/dev/null && printf '%s' "$ERR" | grep -q '대상 pane 없음' \
+  && ok inbox-send-pane-gone "없는 pane → 3·줄은 기록·stderr 대상 pane 없음" || bad inbox-send-pane-gone "rc=3 unwatched 기록" "rc=$RC out=$OUT err=$ERR"
+ao inbox-send w1:p1 "살아 있는 pane"; chk inbox-send-pane-alive 0 unwatched
+echo garbage > "$FD/fail-pane-get"; ao inbox-send w1:p8 "응답 불명"; rm -f "$FD/fail-pane-get"; chk inbox-send-pane-unknown 0 unwatched
+ao notify "제목 하나" "본문 하나"; [ "$RC" = 0 ] && called "notification show 제목 하나 --body 본문 하나 --sound request" \
+  && ok notify-herdr "herdr 안 → herdr notification show" || bad notify-herdr "rc=0·호출" "rc=$RC $(tail -1 "$FD/calls.log")"
+printf '#!/bin/sh\nprintf "%%s|" "$@" > "%s/osa.log"\n' "$T" > "$T/osa"; chmod +x "$T/osa"
+run HERDR_ENV= AO_OSASCRIPT="$T/osa" -- bash "$BIN" notify "밖 제목" "밖 본문"
+[ "$RC" = 0 ] && grep -qF '|밖 제목|밖 본문|' "$T/osa.log" 2>/dev/null && ok notify-osascript "herdr 밖 → osascript 인자 그대로" || bad notify-osascript "rc=0·인자" "rc=$RC $(cat "$T/osa.log" 2>&1)"
+ao notify "제목만"; chk notify-bad-args 2
 
 echo "== 받은편지함: 병렬 기록·생성 경쟁·ack 경쟁(§4-2·3·4)"
 L2="$IB/par.log"
@@ -580,7 +594,7 @@ UQ="body-uniq-$$-Zq9"
 ao2 inbox-send "$S1/nb.log" "$UQ 원문"
 EV="$SI/events.log"
 grep -qF "$UQ" "$EV" && bad inbox-ev-no-body "원문 없음" "$(grep -F "$UQ" "$EV")" || ok inbox-ev-no-body "보낸 원문이 events.log 에 없음"
-ao2 inbox-send w1:p7 "루트 대상"
+run2 HERDR_ENV= -- bash "$BIN" inbox-send w1:p7 "루트 대상"
 [ "$RC" = 0 ] && [ -f "$SI/pane-w1_p7.log" ] && [ ! -e "$T/home/.local/state/agent-orchestrator/inbox/pane-w1_p7.log" ] && grep -q $'\tbox=pane-w1_p7\t' "$EV" \
   && ok inbox-state-root "AO_STATE_ROOT → \$T/state/inbox/pane-w1_p7.log·box=pane-w1_p7" || bad inbox-state-root "$SI/pane-w1_p7.log" "rc=$RC $(ls "$SI")"
 

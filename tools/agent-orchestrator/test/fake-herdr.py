@@ -178,6 +178,11 @@ if g == "pane":
         save()
         ok({"ok": True})
 
+if g == "notification":
+    if a == "show" and len(argv) > 2:
+        ok({"ok": True})
+    err("invalid_args")
+
 if g == "tab":
     if a == "list":
         ok({"tabs": st["tabs"], "type": "tab_list"})

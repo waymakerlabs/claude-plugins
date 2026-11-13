@@ -9,7 +9,8 @@
 #   inbox-watch --state <대상>            감시 판정 monitor|waiter|none
 # 대상 = 절대 경로(*.log) 또는 pane id(→ $AO_STATE_ROOT/inbox/pane-<:를 _>.log).
 # 상태 루트 AO_STATE_ROOT(기본 ~/.local/state/agent-orchestrator). 시험은 임시 폴더를 준다.
-# 종료 코드: 0 / 2 인자·대상 형식(4000자 초과 포함) / 4 기록·잠금·ack 실패.
+# 종료 코드: 0 / 2 인자·대상 형식(4000자 초과 포함) / 3 inbox-send 대상 pane 없음(herdr 확인, 줄은 기록됨)
+#   / 4 기록·잠금·ack 실패.
 # events.log 는 send·wake 두 사건만(실패는 무시). 잠금 = 커널 flock(fd 9, /usr/bin/perl 경유). bash 3.2.
 # shellcheck shell=bash
 
@@ -160,8 +161,25 @@ ao_inbox_send() {
   ao_inbox_append "$line"
   # 이 아래는 append 확정 뒤 — 어떤 실패도 4로 만들지 않는다
   case "$(_aoi_watch_state)" in monitor|waiter) w=watched ;; *) w=unwatched ;; esac
+  # (2026-11-13) pane id 대상인데 herdr가 그 pane이 없다고 답하면 3. 줄은 이미 기록됐다(지우지 않음).
+  #   읽을 세션이 없는 곳에 보고가 조용히 쌓이는 것을 막는다. herdr 밖·응답 불명은 판정하지 않는다(0 유지)
+  if [ "${1#/}" = "$1" ] && _aoi_pane_gone "$1"; then
+    _aoi_event send "$_AOI_LOG" "n=$_AOI_SENT_N" "watch=gone"
+    echo unwatched
+    ao_die 3 "대상 pane 없음: $1 — 줄 #$_AOI_SENT_N 은 기록했지만 읽을 세션이 없다. 사용자에게 알릴 것(notify)"
+  fi
   _aoi_event send "$_AOI_LOG" "n=$_AOI_SENT_N" "watch=$w"
   echo "$w"
+}
+
+# _aoi_pane_gone <pane id> → herdr 안이고 herdr가 pane_not_found 로 답하면 0. 그 밖(herdr 밖·바이너리 없음·다른 오류)은 1
+_aoi_pane_gone() {
+  local out
+  [ "${HERDR_ENV:-}" = 1 ] || return 1
+  command -v herdr >/dev/null 2>&1 || return 1
+  out=$(herdr pane get "$1" 2>&1)
+  case "$out" in *'"pane_not_found"'*) return 0 ;; esac
+  return 1
 }
 
 # _aoi_mark_ok <표식 파일> → 세 칸 "<pid> <lstart> <token>"의 pid가 살아 있고 lstart가 같으면 0.

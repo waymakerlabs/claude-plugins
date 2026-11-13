@@ -46,7 +46,9 @@
 #   wait-status [--session <sid>]                   이 세션이 기다리는 것(서브에이전트·같은 탭 pane·미처리 받은편지함)
 #                                                   줄마다 종류\t이름\t상태\t근거 + 합계 줄. 구현 lib/wait-status.sh
 #                                                   구현 lib/inbox-wait.sh(계획 2026-11-11-inbox-simplify §2·§3·§10)
-#   받은편지함 종료 코드: 0 / 2 인자·대상 형식 / 4 기록·잠금·ack 실패
+#   받은편지함 종료 코드: 0 / 2 인자·대상 형식 / 3 inbox-send 대상 pane 없음(herdr pane_not_found, 줄은 기록됨)
+#                         / 4 기록·잠금·ack 실패
+#   notify <제목> <본문>                             사람에게 알림(herdr notification, 소리 request). 받을 세션이 없을 때 승격용
 #
 # 종료 코드: 0 성공 / 2 인자 오류 / 3 대상 없음·충돌 / 4 백엔드 실행 실패 / 5 에이전트 준비 안 됨
 #   / 6 대상이 사용자 입력 대기(blocked) / 7 timeout / 10 unsupported / 11 no backend / 12 adapter error
@@ -74,6 +76,26 @@ fi
 . "$AO_HOME/lib/common.sh" || { echo "agent-orchestrator: lib/common.sh 로딩 실패" >&2; exit 12; }
 
 usage() { ao_die 2 "$*  (사용법: $AO_HOME/bin/agent-orchestrator 머리 주석)"; }
+
+# ── 0-1. notify: 사람에게 알림. 백엔드와 무관 — herdr 안이면 herdr notification, 아니면 macOS 알림.
+#   둘 다 실패해도 0(알림은 보조 수단, 호출자는 이미 받은편지함·보고서에 기록했다). 인자 오류만 2
+if [ "${1:-}" = notify ]; then
+  [ $# = 3 ] || usage "notify <제목> <본문>"
+  ao_one_line "$2" && ao_one_line "$3" || usage "notify 제목·본문은 비어 있지 않은 한 줄"
+  if [ "${HERDR_ENV:-}" = 1 ] && command -v herdr >/dev/null 2>&1 \
+     && herdr notification show "$2" --body "$3" --sound request >/dev/null 2>&1; then
+    exit 0
+  fi
+  OSA=${AO_OSASCRIPT:-/usr/bin/osascript}   # 시험이 덮어쓴다
+  if [ -x "$OSA" ]; then
+    # 값은 argv로 넘긴다(AppleScript 문자열에 끼우지 않음 — 따옴표 주입 방지)
+    "$OSA" -e 'on run a' -e 'display notification (item 2 of a) with title (item 1 of a)' -e 'end run' "$2" "$3" >/dev/null 2>&1 \
+      || ao_warn "notify: 알림 표시 실패(무시)"
+  else
+    ao_warn "notify: 알림 수단 없음(무시)"
+  fi
+  exit 0
+fi
 
 # ── 0. 받은편지함 동작: 백엔드와 무관(herdr 밖·backend=none·백엔드 고장에서도 동작) → 여기서 처리하고 끝
 case "${1:-}" in
