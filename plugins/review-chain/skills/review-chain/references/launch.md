@@ -1,6 +1,6 @@
 # 새 세션으로 시작 (launch)
 
-review-chain은 보통 auto-chain이 끝난 무거운 세션에서 불린다. 그 세션이 OC가 되면 지난 개발 맥락이 OC 컨텍스트를 처음부터 차지한다. 그래서 **기본은 새 탭에 깨끗한 OC를 여는 것**이고, 부른 세션(launcher)은 시작 메모만 쓰고 넘긴다.
+review-chain은 보통 auto-chain이 끝난 무거운 세션에서 불린다. 그 세션이 OC가 되면 지난 개발 맥락이 OC 컨텍스트를 처음부터 차지한다. 그래서 **기본은 같은 탭의 pane에 깨끗한 OC를 여는 것**이고(0.6.0 — 탭의 맨 왼쪽 pane이 맨 위 부모, 새 탭은 사용자가 명시할 때만), 부른 세션(launcher)은 시작 메모만 쓰고 넘긴다.
 
 ## 1. 어느 경로인가
 
@@ -23,17 +23,17 @@ launcher는 체인 폴더·worktree·worker를 만들지 않는다. 대기열 �
    - 공용 파일 위치(VERSION·릴리즈 노트·진행 원장), 외부 시스템(JIRA 등), 프로젝트 설정 `.claude/review-chain.md` 유무
    - 이 세션에서 사용자가 준 상시 권한(push·외부 쓰기)이 있으면 그대로, 없으면 "없음"
 4. `.git/info/exclude`에 `/.review-chain/`가 없으면 한 줄 추가하고, 시작 메모를 `<리포>/.review-chain/launch-<YYYYMMDD-HHMM>.md`에 쓴다(§3 틀, 60줄 이하).
-5. 새 탭에 OC를 연다(전역 `session-handoff` 스킬(후속 세션 인계 프로토콜)의 새 탭 방식 — 순차 대체이므로 맞는 쓰임):
+5. 같은 탭의 pane에 OC를 연다(전역 `session-handoff` 스킬과 같은 방식 — 순차 대체). 사용자가 새 탭을 명시했으면 `tab-open "[OC] <부모 탭 본문> › <프로젝트 한글> QC" --cwd "<리포>"`:
    ```bash
-   ROOT=$("$AO" tab-open "[OC] <프로젝트 한글> QC" --cwd "<리포>")
+   ROOT=$("$AO" pane-open "[OC] <프로젝트 한글> QC" --parent "$("$AO" whoami)" --cwd "<리포>")
    "$AO" agent-start rc-oc "$ROOT" --kind claude -- <이 세션과 같은 플래그 — ps -o args= -p $PPID>
    "$AO" agent-send rc-oc "review-chain 스킬로 <메모 절대경로>를 읽고 OC로 시작해. 부모 pane: $("$AO" whoami)" --confirm
    ```
    - `--cwd`는 리포 루트(이미 신뢰된 폴더). 이름 `rc-oc`가 살아 있으면(3) `rc-oc-2`처럼 바꾼다. 기동은 1회.
    - 출력 working|done이 인계 증거다. 5·6·그 밖 실패면 메모 경로와 함께 사용자에게 보고하고 멈춘다.
    - 이 `agent-send` 한 줄이 launcher가 새 OC에 보내는 유일한 입력이다(세션을 여는 첫 지시). 이후 launcher↔OC 사이에 메시지는 없다.
-6. 사용자에게 한 줄: `[OC] <프로젝트> QC — 새 탭에서 시작했습니다(<pane> · working). 그 탭에서 수정사항을 말씀해 주세요.`
-7. 그 뒤 launcher는 review-chain 일을 하지 않는다. 사용자가 이 탭에서 수정사항을 말하면 "새 OC 탭에서 말해 달라"고만 답한다.
+6. 사용자에게 한 줄: `[OC] <프로젝트> QC — 이 탭 오른쪽 pane에서 시작했습니다(<pane> · working). 곧 왼쪽 자리로 옮겨집니다. 그 pane에서 수정사항을 말씀해 주세요.`
+7. 그 뒤 launcher는 review-chain 일을 하지 않는다. 사용자가 이 pane에서 수정사항을 말하면 "새 OC pane에서 말해 달라"고만 답한다.
 
 ## 3. 시작 메모 틀
 
@@ -56,6 +56,6 @@ launcher는 체인 폴더·worktree·worker를 만들지 않는다. 대기열 �
 ## 4. 새 OC의 첫 행동
 
 1. SKILL §1-1~§1-6을 진행한다(§1-4 새 체인, 메모의 사실로 `state.md` frontmatter·`queue.md` 초기 항목을 채운다). §1-4의 `inbox.log`·`shared-files` 생성과 받은편지함 구독(`rc-watch.sh --subscribe $RC/inbox.log`, 0.2.0) 시작도 여기서 한다(첫 worker 기동 전).
-2. 메모의 "부모 닫기"가 허용이면 첫 착수 전에 `"$AO" close <부모 pane>`(실패는 무시). 금지면 닫지 않는다. launcher 탭에 다른 pane이 남아 있으면 탭은 닫히지 않는다.
+2. 메모의 "부모 닫기"가 허용이면 첫 착수 전에 `"$AO" pane-swap "$("$AO" whoami)" <부모 pane>`으로 왼쪽 자리를 이어받고 `"$AO" close <부모 pane>`(둘 다 실패는 무시, 0.6.0). 금지면 옮기지도 닫지도 않는다(launcher가 그 탭의 부모로 왼쪽에 남는다). 새 탭으로 열린 경우는 close만 한다.
 3. launcher는 부모 닫기를 이렇게 정한다: 같은 머신이고, launcher 탭에 살아 있는 worker pane·백그라운드 작업이 없고, 사용자가 남기라고 하지 않았으면 허용.
 4. 메모는 지우지 않는다(체인 폴더 `state.md` "## 결정"에 메모 경로 한 줄).

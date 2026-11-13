@@ -7,7 +7,7 @@ description: >-
   공용 파일(VERSION·릴리즈 노트·진행 원장·외부 반영)을 맡는다. worker는 파일 범위를 스스로 선점해(rc-claim.sh)
   바로 착수하고, 메시지는 받은편지함 파일 + 구독(inbox-hooks 깨움, 0.2.0)으로 오간다. OC 컨텍스트가 차면 새 OC로 교체한다(받은편지함
   처리 위치가 이어진다). 사용자가 "리뷰체인으로", "리뷰체인으로 새 세션 열어줘", "시각리뷰 시작",
-  "QC 수정 체인" 등을 요청할 때 사용. 기본은 부른 세션이 시작 메모만 쓰고 새 탭에 깨끗한 OC를 연다.
+  "QC 수정 체인" 등을 요청할 때 사용. 기본은 부른 세션이 시작 메모만 쓰고 같은 탭의 pane에 깨끗한 OC를 연다(새 탭은 사용자가 명시할 때만).
   여러 마일스톤·비가역 변경·설계 계획이 선행돼야 하는 항목은 이 스킬이 아니라 auto-chain으로 넘긴다.
 ---
 
@@ -20,12 +20,12 @@ description: >-
 - **OC**: 사용자와 QC를 진행하는 중심 세션 하나. 대기열·배정·충돌 판정·병합·공용 파일만 한다. 코드를 직접 고치지 않는다. 병합 판정은 보고 파일·diff 통계에 더해 **diff 본문 검토**로 한다 — 본문 정독은 읽기 전용 서브에이전트에 맡겨 결론 한 줄만 받고, 시험 파일·assertion 삭제는 OC가 직접 짚어 본다(§7-3).
 - **WO**: OC가 띄운 worker 세션. 논의형 feature 전용 worker와 잡수정 묶음 worker 두 종류다. 각자 자기 worktree·브랜치에서 일한다.
 - **체인 폴더** `$RC` = `<리포>/.review-chain/<chain-id>/`(§15 D1). 이 안의 파일이 진본이다.
-- reference(이 SKILL.md 폴더 기준, worker에게는 절대 경로로 넘긴다): `references/launch.md`(새 탭 OC로 시작), `references/state-files.md`(상태 파일 형식), `references/messages.md`(메시지 형식), `references/worker-brief.md`(worker 지시서 틀), `references/oc-handover.md`(OC·worker 교체), `references/project-config.md`(프로젝트 설정). 스크립트(`scripts/`, 모두 머리 주석이 진본): `rc-send.sh`(메시지 한 줄을 받은편지함 파일에 덧붙임), `rc-watch.sh`(받은편지함 `--subscribe`·`--unsubscribe`(0.2.0)·`--ack`·`--pending`, 훅이 없는 도구는 Monitor 대체), `rc-claim.sh`(파일 범위 선점·충돌 판정·`--release`·`--list`).
+- reference(이 SKILL.md 폴더 기준, worker에게는 절대 경로로 넘긴다): `references/launch.md`(같은 탭 pane에 깨끗한 OC로 시작), `references/state-files.md`(상태 파일 형식), `references/messages.md`(메시지 형식), `references/worker-brief.md`(worker 지시서 틀), `references/oc-handover.md`(OC·worker 교체), `references/project-config.md`(프로젝트 설정). 스크립트(`scripts/`, 모두 머리 주석이 진본): `rc-send.sh`(메시지 한 줄을 받은편지함 파일에 덧붙임), `rc-watch.sh`(받은편지함 `--subscribe`·`--unsubscribe`(0.2.0)·`--ack`·`--pending`, 훅이 없는 도구는 Monitor 대체), `rc-claim.sh`(파일 범위 선점·충돌 판정·`--release`·`--list`).
 - 오케스트레이션 툴은 `AO=${AGENT_ORCHESTRATOR:-$HOME/.local/bin/agent-orchestrator}`로만 부른다. 동작 계약은 `tools/agent-orchestrator/bin/agent-orchestrator` 머리 주석, 툴 특이사항은 `tools/agent-orchestrator/docs/<backend>.md`. pane 기동·정지 판정·이름 규칙은 auto-chain `references/pane-worker.md` §2·§6을 그대로 따른다(이 문서는 review-chain 정책만 적는다).
 
 ## 1. 시작과 재개
 
-0. **경로 판정 먼저**(`references/launch.md` §1). 첫 지시가 시작 메모(`launch-*.md`)를 가리키거나 사용자가 "이 세션에서"라고 명시했을 때만 이 세션이 OC로 1번부터 진행한다. 인계 문서(`oc-handover-*.md`)면 5번(재개). **그 밖 전부(기본)는 launch** — 이 세션은 시작 메모를 쓰고 새 탭 `[OC] <프로젝트 한글> QC`에 깨끗한 OC를 연 뒤 손을 뗀다(`references/launch.md` §2). auto-chain이 끝난 세션처럼 맥락이 무거운 세션이 OC가 되지 않게 하기 위해서다.
+0. **경로 판정 먼저**(`references/launch.md` §1). 첫 지시가 시작 메모(`launch-*.md`)를 가리키거나 사용자가 "이 세션에서"라고 명시했을 때만 이 세션이 OC로 1번부터 진행한다. 인계 문서(`oc-handover-*.md`)면 5번(재개). **그 밖 전부(기본)는 launch** — 이 세션은 시작 메모를 쓰고 같은 탭의 pane `[OC] <프로젝트 한글> QC`에 깨끗한 OC를 연 뒤 손을 뗀다(새 OC가 왼쪽 자리를 이어받는다, 0.6.0)(`references/launch.md` §2). auto-chain이 끝난 세션처럼 맥락이 무거운 세션이 OC가 되지 않게 하기 위해서다.
 1. `"$AO" backend`가 0인지 본다. 10·11·12면 이 스킬은 쓰지 않는다(사용자가 worker 탭에서 직접 대화하는 것이 핵심이라 ① `Agent`로 내려갈 수 없다). 12는 설치 결함으로 한 줄 알린다. 사용자에게 "review-chain은 오케스트레이션 툴 안에서만 동작한다"고 보고하고 멈춘다.
 2. `"$AO" session-init OC "<프로젝트 한글> QC"`(0.5.0). 탭·pane 이름을 붙이고 증거 줄 `session-init role=OC tab=… pane=… subs=…`을 낸다. `tab=`·`pane=`에 `[OC]`가 없으면 고친 뒤 진행한다. 4번에서 `$RC/inbox.log`를 만든 뒤 구독은 아래 `rc-watch.sh --subscribe`로 한다. launch 경로(0번)로 손을 떼는 세션도 손을 떼기 전에 `"$AO" session-init OC "<현재 주제 한글>"`을 한 번 한다.
 3. 프로젝트 설정 `.claude/review-chain.md`를 읽는다(없으면 기본값, `references/project-config.md`).
@@ -76,11 +76,11 @@ description: >-
 1. 동시 worker 수가 상한(§13) 미만인지 본다. 넘으면 `queue.md`에 `대기`로 둔다.
 2. worktree와 브랜치를 만든다(OC만, `git worktree add`): 경로 `<리포>/.review-chain/wt/<name>`, 브랜치 `rc/<chain-id>/<name>`, 기준 = 현재 main. 설정 `worktree-setup`이 있으면 그 명령을 worktree에서 1회 실행한다(의존 설치·데이터 사본).
 3. 지시서 `workers/<name>/brief.md`를 `references/worker-brief.md` 틀로 쓴다. 맡은 대기열 번호와 사용자 원문, 보고 방법, 금지 사항을 넣는다. worker 받은편지함 폴더가 이미 있으니(`workers/<name>/`을 이때 만든다) `inbox.log`를 빈 파일로 만들고, 지시서의 "받은편지함 구독" 줄에 **worker가 그대로 실행할 명령**(`<SKILL 폴더>/scripts/rc-watch.sh --subscribe <$RC>/workers/<name>/inbox.log`, 0.2.0)을 절대 경로로 적는다.
-4. 배치(§15 D3, 0.4.0): **논의형·잡수정 모두 OC가 있는 탭의 pane**이다. 부모(OC)는 왼쪽, 자식(worker)은 오른쪽에 열린다. pane 개수에 제한이 없다. 처음 시작하는 체인 OC만 새 탭에 열리므로(`references/launch.md`) 탭 하나가 체인 하나다.
+4. 배치(§15 D3, 0.4.0): **논의형·잡수정 모두 OC가 있는 탭의 pane**이다. 부모(OC)는 왼쪽, 자식(worker)은 오른쪽에 열린다. pane 개수에 제한이 없다. (0.6.0) OC도 부른 세션의 탭에 pane으로 열리므로(`references/launch.md`) 탭의 맨 왼쪽 pane이 맨 위 부모다.
    - 논의형(0.4.0): `P=$("$AO" pane-open "[WO] <기능 한글>" --parent "$("$AO" whoami)" --cwd "$PWD")` → `"$AO" agent-start <name> "$P" --kind claude -- --model <m> --effort <e> [OC와 같은 권한 플래그]` → `"$AO" agent-send <name> "<brief 절대경로>를 읽고 그대로 진행해. 내 이름: <name>" --confirm`. 새 탭을 열지 않는다(`tab-open` 금지).
    - 잡수정: auto-chain `scripts/spawn-pane-worker.sh`를 `ROLE=none PANE_LABEL="[WO] 잡수정 <n>"`으로 쓴다(권한 플래그 판정·성공 줄 형식 재사용). 이 스크립트는 이미 OC 탭의 pane으로 연다. pane 수 제한이 없어 기본으로는 넘침 탭이 생기지 않는다(`TAB_LABEL`은 넘길 필요 없다). 첫 지시에 붙는 "조정자 pane" 값은 지시서가 무시하라고 적는다(보고는 받은편지함 파일로 간다).
    - **`agent-send`는 이 첫 지시 한 줄에만 쓴다.** 그 뒤 OC↔worker 메시지는 전부 받은편지함 파일(`rc-send.sh`)이고 입력창에 쳐 넣지 않는다(§6, §15 D11).
-   - **전역 인계 규칙(`session-handoff` 스킬 — 새 탭 + `[OC]`)으로 worker를 열지 않는다.** 그 규칙은 순차 대체용이다. worker pane 이름은 항상 `[WO]`로 시작한다.
+   - **전역 인계 규칙(`session-handoff` 스킬 — `[OC]` + 부모 자리 이어받기)으로 worker를 열지 않는다.** 그 규칙은 순차 대체용이다. worker pane 이름은 항상 `[WO]`로 시작한다.
    - `--cwd`는 OC의 `$PWD`(신뢰된 리포 루트). worker는 worktree 절대 경로로 일한다(새 폴더 신뢰 화면 회피).
 5. 모델·effort: 논의형 `opus high`, 잡수정 `sonnet high`(명세가 아주 뻔하면 `sonnet medium`). 고른 값과 이유를 worker 표 비고에 한 줄.
 6. 기동 증거(`agent-send --confirm` 출력 working|done)를 worker 표에 적고 사용자에게 한 줄 보고한다: `[WO] 진행 레일 — 오른쪽 pane 열림(w2:p9 · working). 그 pane에서 논의해 주세요.` (0.4.0)
@@ -212,7 +212,7 @@ review-chain 안에서 auto-chain을 돌리지 않는다(OC가 둘이 되어 보
 - D7 보조 대기(`agent-wait`)와 정지 감시를 두지 않는다 — 논의형은 사용자 대화로 오래 멈춰 있는 것이 정상이다.
 - D8 `ROLE=none` — auto-chain `chain-worker` 정의는 "사용자와 길게 논의"를 전제하지 않는다. 규칙은 지시서에 적는다.
 - D9 오케스트레이션 툴 밖이면 체인을 시작하지 않는다(내려감 없음).
-- D10 시작 기본은 launch(새 탭 깨끗한 OC, 0.1.1) — 보통 auto-chain이 끝난 무거운 세션에서 불리므로. 부른 세션이 OC가 되는 것은 사용자가 "이 세션에서"라고 할 때만. launcher→새 OC는 순차 대체라 전역 인계 규칙(새 탭 + `[OC]`)이 맞는 쓰임이다.
+- D10 시작 기본은 launch(깨끗한 OC, 0.1.1. 0.6.0부터 같은 탭의 pane — 새 탭은 사용자가 명시할 때만) — 보통 auto-chain이 끝난 무거운 세션에서 불리므로. 부른 세션이 OC가 되는 것은 사용자가 "이 세션에서"라고 할 때만. launcher→새 OC는 순차 대체라 전역 인계 규칙(같은 탭 pane + 왼쪽 자리 이어받기)이 맞는 쓰임이다.
 - D11 메시지는 받은편지함 파일 + 수신(0.1.2 Monitor → 0.2.0 구독) — `agent-send`는 상대 pane 입력창에 키보드처럼 쳐 넣어 사용자가 치던 프롬프트와 섞였다(관찰된 결함). 파일에 덧붙이고 받는 쪽이 `rc-watch.sh --subscribe`로 구독해 두면 새 줄이 inbox-hooks 깨움으로 들어온다(0.2.0, 이전에는 Monitor로 지켜봄 — 훅이 없는 도구는 지금도 Monitor 대체). 2026-11-09 실측: 유휴 상태 깨움 약 2초, 치다 만 입력 보존, 턴 진행 중 도착한 메시지는 그 턴이 끝난 뒤 처리. 파일이 기록이라 OC·worker 교체 때 미처리 줄이 처리 위치(`.cursor`) 뒤에 남는다. `agent-send`는 세션을 여는 첫 지시 한 줄에만 쓴다.
 - D12 범위 선점 자동화(0.1.2) — OC 왕복이 worker 착수를 늦췄고 OC의 판정이 패턴 비교라 기계적이었다. `rc-claim.sh`가 잠금 아래에서 판정·기록하고 충돌일 때만 OC가 순서를 정한다. 병합은 OC 전용 그대로(선점은 착수 허가일 뿐 병합 허가가 아니다).
 - D13 대기 목록·실제 상태 확인·pane 배치(0.4.0) — 2026-11-12 사례: 포털 Q5 #23 메시지가 bg 세션에 가로채여 5시간 방치됐고, planner·서브에이전트 완료를 턴 도중 놓치고 "기다린다"로 끝난 턴이 4건, "이어서 하겠다"로 멈춘 턴이 1건 있었다. 그래서 (1) 기다리는 턴은 항목별 실제 상태를 직접 확인한 대기 목록으로 끝내고, (2) 훅 대기자가 대기 목록 턴을 10분·30분 간격으로 점검 깨움하며, (3) worker와 교체 OC를 같은 탭의 pane으로 열어 부모를 왼쪽에 둔다. 메시지 전송 방식(받은편지함 파일 + 구독 + 훅)은 그대로다.

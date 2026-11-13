@@ -8,7 +8,7 @@ OC가 판단만 하고 진본이 파일에 있으므로, 교체 때 넘길 것�
 2. **동결**: `state.md` frontmatter `oc-status: 교체중`으로 바꾼다. 이 순간부터 옛 OC는 새 결정·병합·worker 답을 하지 않는다. (0.3.0, 4단계) 인계 순서: ① 진행 중 처리를 끝내거나 되돌리고 **실제로 처리한 마지막 번호까지만** `rc-watch.sh --ack $RC/inbox.log <n>`(답하지 않은 줄은 ack하지 않는다) ② `rc-watch.sh --unsubscribe $RC/inbox.log`(Monitor로 받고 있었으면 `TaskStop`도) ③ 인계 문서에 받은편지함 경로와 마지막 처리 번호 <n>을 적고 새 OC를 기동한다 ④ 새 OC는 `--subscribe` 뒤 `--pending`으로 n+1부터 처리한다. 동결 뒤 들어온 줄은 처리 위치 뒤에 그대로 남아 새 OC가 처리한다(표도 고치지 않는다). 옛 OC pane이 닫힐 때까지 이 상태를 유지한다.
 3. 동결 직전까지의 `state.md` worker 표 `마지막 보고`, `queue.md` 상태, "## 결정"이 최신인지 본다. 머릿속에만 있는 판단(사용자와 방금 합의한 순서 등)은 "## 결정"에 한 줄로 적는다. 동결 전에 받았지만 아직 답하지 않은 줄은 `--ack`하지 않은 채 둔다(새 OC가 `--pending`으로 본다). 이미 처리한 줄은 반드시 `--ack`해 둔다(새 OC가 중복 처리하지 않게).
 4. 짧은 인계 문서 `$RC/oc-handover-<n>.md`: 체인 폴더 절대경로, 리포, 옛 OC pane, 진행 중 사용자 대화 요지(OC 탭에서 하던 QC 흐름), 다음 첫 행동. 옛 인계 문서는 지우지 않는다.
-5. 새 OC 기동(0.4.0) — **같은 탭의 새 pane**에 연다. 전역 `session-handoff` 스킬의 새 탭 규칙은 쓰지 않는다(그 규칙은 체인을 처음 시작하는 launch에만 쓰인다. 탭 하나가 체인 하나다):
+5. 새 OC 기동(0.4.0) — **같은 탭의 새 pane**에 연다(전역 `session-handoff` 스킬과 같은 기본, 탭의 맨 왼쪽 pane이 맨 위 부모):
    ```bash
    N=$("$AO" pane-open "[OC] <프로젝트 한글> QC <n>" --parent "$("$AO" whoami)" --cwd "$PWD")
    "$AO" agent-start rc-oc-<n> "$N" --kind claude -- <옛 OC와 같은 플래그>

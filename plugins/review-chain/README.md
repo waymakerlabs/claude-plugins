@@ -29,5 +29,6 @@
 - 메시지는 worker→OC, OC→worker 한 줄만. worker끼리 대화하지 않습니다.
 - worker 안에서 auto-chain을 돌리지 않습니다. 큰 항목은 auto-chain으로 승격하고, 첫 판에서는 승격이 생기면 진행 중 worker만 마무리하고 멈춥니다.
 - 오케스트레이션 툴(`tools/agent-orchestrator`, `backend`가 0) 안에서만 동작합니다.
+- (0.6.0) launch도 같은 탭의 pane에 깨끗한 OC를 엽니다(`pane-open --parent`). 새 OC는 착수 때 `pane-swap`으로 왼쪽 자리를 이어받고 launcher pane을 닫습니다. 탭의 맨 왼쪽 pane이 맨 위 부모입니다. 새 탭은 사용자가 명시할 때만 쓰고 이름은 `[OC] <부모 탭 본문> › <프로젝트> QC`입니다.
 - (0.5.0) 시작·재개의 이름 붙이기를 `agent-orchestrator session-init OC "<프로젝트 한글> QC"`로 바꿨습니다(증거 줄 확인). launch 경로로 손을 떼는 세션도 자기 이름을 붙입니다. auto-chain 스크립트(`spawn-pane-worker.sh`)와 참조를 쓰므로 dependency에 auto-chain을 명시했습니다.
 - (0.4.0) 탭 하나가 체인 하나입니다. 처음 시작하는 OC만 새 탭에 열고, worker(논의형 포함)와 교체되는 새 OC는 같은 탭의 pane(부모 왼쪽, 자식 오른쪽, 개수 제한 없음)에 엽니다. OC·worker는 기다리는 채로 턴을 끝낼 때 항목별 실제 상태를 확인한 "대기 목록"을 답 끝에 두고, 기다릴 것이 없으면 "대기 없음"을 남깁니다(훅 대기자가 대기 목록 턴을 10분·30분 간격으로 점검 깨움). 메시지 전송 방식은 그대로입니다.
