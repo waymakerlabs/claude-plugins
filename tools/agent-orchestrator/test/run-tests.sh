@@ -21,7 +21,7 @@ mkdir -p "$FAKE" "$NOHERDR" "$FD" "$T/home"
 REAL_HOME=$HOME; touch "$T/stamp"
 REAL_EV="$REAL_HOME/.local/state/agent-orchestrator/inbox/events.log"; REAL_EV_SZ=$(wc -c < "$REAL_EV" 2>/dev/null | tr -d ' '); REAL_EV_SZ=${REAL_EV_SZ:-0}
 cp "$HERE/fake-herdr.py" "$FAKE/herdr"; chmod +x "$FAKE/herdr"
-EXPECT=241
+EXPECT=253
 
 PASS=0; FAIL=0
 # 여러 줄 값은 ⏎로 이어 한 줄 한 케이스를 지킨다
@@ -146,12 +146,17 @@ ao pane-open "작업자 2" --cwd "$T"; chk pane-open-down 0 w1:p3
 called "pane split w1:p2 --direction down --ratio 0.5" && ok pane-open-down-args "가장 높은 오른쪽 pane을 down 0.5" || bad pane-open-down-args "split w1:p2 down" "$(grep 'pane split' "$FD/calls.log" | tail -1)"
 # --parent: HERDR_PANE_ID 없이 기준 pane 지정(기존 spawn 5번째 인자 호환)
 run HERDR_PANE_ID= -- bash "$BIN" pane-open "작업자 3" --parent w1:p1 --cwd "$T"; chk pane-open-parent 0 w1:p4
-ao pane-open "작업자 4" --cwd "$T"; ao pane-open "작업자 5" --cwd "$T"; chk pane-open-fifth 0 w1:p6
-ao pane-open "작업자 6" --cwd "$T"; chk pane-open-overflow-tab 0 w1:p7
+run AGENT_ORCHESTRATOR_MAX_RIGHT=5 -- bash "$BIN" pane-open "작업자 4" --cwd "$T"; run AGENT_ORCHESTRATOR_MAX_RIGHT=5 -- bash "$BIN" pane-open "작업자 5" --cwd "$T"; chk pane-open-fifth 0 w1:p6
+run AGENT_ORCHESTRATOR_MAX_RIGHT=5 -- bash "$BIN" pane-open "작업자 6" --cwd "$T"; chk pane-open-overflow-tab 0 w1:p7
 called "tab create --workspace w1 --cwd $T --label [WO] 작업 넘침 --no-focus" && ok pane-open-overflow-label "넘침 탭 '[WO] 작업 넘침'" || bad pane-open-overflow-label "tab create [WO] 작업 넘침" "$(grep 'tab create' "$FD/calls.log")"
 # 넘침 탭이 이미 있고 첫 pane이 비어 있으면 그대로 쓴다
-ao pane-open "작업자 7" --cwd "$T"; chk pane-open-overflow-reuse 0 w1:p7
+run AGENT_ORCHESTRATOR_MAX_RIGHT=5 -- bash "$BIN" pane-open "작업자 7" --cwd "$T"; chk pane-open-overflow-reuse 0 w1:p7
 ao pane-open "작업자 8" --parent w1:p99 --cwd "$T"; chk pane-open-missing-parent 3
+# (2026-11-13) 기본은 제한 없음: 6번째도 같은 탭 오른쪽 열(넘침 탭 없음)
+reset_state; for i in 1 2 3 4 5 6; do ao pane-open "작업자 u$i" --cwd "$T"; done
+[ "$RC" = 0 ] && ! grep -q 'tab create' "$FD/calls.log" && ok pane-open-unlimited "기본 제한 없음 → 6번째도 split·넘침 탭 없음" || bad pane-open-unlimited "split" "rc=$RC $(grep 'tab create' "$FD/calls.log")"
+ao pane-swap w1:p2 w1:p1; [ "$RC" = 0 ] && called "pane swap --source-pane w1:p2 --target-pane w1:p1" && ok pane-swap-args "pane-swap → herdr pane swap --source-pane --target-pane" || bad pane-swap-args "swap" "rc=$RC $ERR"
+ao pane-swap w1:p2; [ "$RC" = 2 ] && ok pane-swap-usage "인자 하나 → 2" || bad pane-swap-usage 2 "$RC"
 reset_state; echo internal > "$FD/fail-pane-rename"
 ao pane-open "작업자 9" --cwd "$T"
 [ "$RC" = 0 ] && [ "$OUT" = w1:p2 ] && echo "$ERR" | grep -q '이름 붙이기 실패' && ok pane-open-rename-fail-warn "이름 실패는 경고만 rc=0" || bad pane-open-rename-fail-warn "rc=0 + 경고" "rc=$RC out=$OUT err=$ERR"
@@ -755,6 +760,44 @@ WL_TP="$W/sn1.jsonl" wl n3 "$NS" Stop AO_INBOX_STALL=1 AO_INBOX_WAIT_MAX=2; wrc 
 ns; LSO="$SB/so.log"; sub "$NS" "$LSO"; mktp so1 "기다린다로 끝나면 깨웁니다. 원하시면 추가하겠습니다."
 WL_TP="$W/so1.jsonl" wl o1 "$NS" Stop AO_INBOX_STALL=1 AO_INBOX_WAIT_MAX=2; wrc o1; c=$WRC
 [ "$c" = 2 ] && grep -qF "$EXM" "$W/o1.err" && ok inbox-wait-stall-offer "\"원하시면 ~\" 제안으로 끝난 턴 → 멈춤 깨움 없음" || bad inbox-wait-stall-offer "만료만" "rc=$c $(cat "$W/o1.err")"
+ns; LWL="$SB/wl.log"; sub "$NS" "$LWL"; mktp wl1 "보고드렸습니다.\\n대기 목록 (1): - [WO] portalds2 — Q5 — 보고서 진행 3/7 (09:41 확인)"
+WL_TP="$W/wl1.jsonl" wl w1 "$NS" Stop AO_INBOX_STALL=1; wrc w1; c1=$WRC
+WL_TP="$W/wl1.jsonl" wl w2 "$NS" Stop AO_INBOX_STALL=1 AO_INBOX_WAITLIST_EVERY=1; wrc w2; c2=$WRC
+WL_TP="$W/wl1.jsonl" wl w3 "$NS" Stop AO_INBOX_STALL=1 AO_INBOX_WAITLIST_EVERY=3 AO_INBOX_WAIT_MAX=2; wrc w3; c3=$WRC
+[ "$c1/$c2/$c3" = 2/2/2 ] && grep -qF '대기 점검' "$W/w1.err" && grep -qF '대기 점검' "$W/w2.err" && grep -qF "$EXM" "$W/w3.err" && [ -f "$SI/wait/sid-$NS.wl" ] \
+  && ok inbox-wait-waitlist "대기 목록으로 끝난 턴 → 대기 점검 되풀이(1회 제한 없음)·다음 간격은 WAITLIST_EVERY" || bad inbox-wait-waitlist "2/2/2" "$c1/$c2/$c3 $(cat "$W/w3.err")"
+ns; LWN="$SB/wn.log"; sub "$NS" "$LWN"; mktp wn1 "체인을 마감했습니다. 이어서 할 것은 없습니다.\\n대기 없음 — 더 기다리는 것이 없습니다. 이 세션은 닫아도 됩니다."
+WL_TP="$W/wn1.jsonl" wl wn "$NS" Stop AO_INBOX_STALL=1 AO_INBOX_WAIT_MAX=2; wrc wn; c=$WRC
+[ "$c" = 0 ] && [ ! -s "$W/wn.err" ] && ok inbox-wait-waitlist-none "\"대기 없음\"으로 끝난 턴 → 깨움 없음·만료도 조용히 0" || bad inbox-wait-waitlist-none "0·빈 출력" "rc=$c $(cat "$W/wn.err")"
+ns; LWO="$SB/wo.log"; sub "$NS" "$LWO"; mktp wo1 "앞의 대기 목록 (1)은 모두 끝났습니다.\\n대기 없음 — 이 세션은 닫아도 됩니다."
+WL_TP="$W/wo1.jsonl" wl wo "$NS" Stop AO_INBOX_STALL=1 AO_INBOX_WAIT_MAX=2; wrc wo; c=$WRC
+[ "$c" = 0 ] && [ ! -s "$W/wo.err" ] && ok inbox-wait-waitlist-order "목록 언급 뒤 \"대기 없음\"으로 끝남 → 대기 점검 아님" || bad inbox-wait-waitlist-order "0" "rc=$c $(cat "$W/wo.err")"
+ns; LWS="$SB/ws.log"; sub "$NS" "$LWS"; : > "$SI/wait/sid-$NS.wl"; mktp ws1 "끝나면 이어서 진행하겠습니다."
+WL_TP="$W/ws1.jsonl" wl ws "$NS" Stop AO_INBOX_STALL=1 AO_INBOX_WAITLIST_EVERY=30; wrc ws; c=$WRC
+[ "$c" = 2 ] && grep -qF '이어서 하겠다' "$W/ws.err" && [ ! -e "$SI/wait/sid-$NS.wl" ] && ok inbox-wait-waitlist-stale "앞 턴 .wl 이 남아도 목록 없는 턴은 STALL 간격·.wl 지움" || bad inbox-wait-waitlist-stale "2·멈춤" "rc=$c $(cat "$W/ws.err")"
+ns; LWG="$SB/wg.log"; sub "$NS" "$LWG"; items=$(for i in $(seq 1 60); do printf -- '- [WO] 작업자 %02d — 긴 작업 설명 칸을 채우는 문장 — 보고서 진행 1/9 (09:41 확인) ' "$i"; done); mktp wg1 "대기 목록 (60): $items"
+WL_TP="$W/wg1.jsonl" wl wg "$NS" Stop AO_INBOX_STALL=1; wrc wg; c=$WRC
+[ "$c" = 2 ] && grep -qF '대기 점검' "$W/wg.err" && ok inbox-wait-waitlist-long "6KB 넘는 대기 목록도 머리 줄을 놓치지 않음" || bad inbox-wait-waitlist-long "대기 점검" "rc=$c $(head -c 200 "$W/wg.err")"
+ns; LWU="$SB/wu.log"; sub "$NS" "$LWU"; snd "$LWU" "완료 보고"; echo 1 > "$LWU.notified"; : > "$SI/wait/sid-$NS.wl"; mktp wu1 "대기 목록 (1): - [WO] a — b — 진행 중 (09:41 확인)"
+WL_TP="$W/wu1.jsonl" wl wu "$NS" Stop AO_INBOX_STALL=1 AO_INBOX_WAITLIST_EVERY=30; wrc wu; c=$WRC
+[ "$c" = 2 ] && grep -qF '안 읽은 받은편지함' "$W/wu.err" && ok inbox-wait-waitlist-unacked "이어진 대기 목록(30분 간격)이어도 미처리 줄 점검은 STALL 간격" || bad inbox-wait-waitlist-unacked "2·미처리" "rc=$c $(cat "$W/wu.err")"
+ns; LWI="$SB/wi.log"; sub "$NS" "$LWI"; mktp wi1 "대기 목록 (1):\\n- 서브에이전트: 점검 — 결과가 대기 없음 — 이면 닫는다 — 진행 중 (09:41 확인)"
+WL_TP="$W/wi1.jsonl" wl wi "$NS" Stop AO_INBOX_STALL=1; wrc wi; c=$WRC
+[ "$c" = 2 ] && grep -qF '대기 점검' "$W/wi.err" && ok inbox-wait-waitlist-inline "항목 안의 \"대기 없음\" 글자는 끝맺음으로 보지 않음" || bad inbox-wait-waitlist-inline "대기 점검" "rc=$c $(cat "$W/wi.err")"
+# wait-status: 가짜 HOME 의 서브에이전트 표식·같은 탭 pane·미처리 받은편지함을 측정해 낸다
+WSID=cccccccc-0009; WSD="$T/home/.claude/projects/-x/$WSID/subagents"; mkdir -p "$WSD"; echo '{}' > "$T/home/.claude/projects/-x/$WSID.jsonl"
+printf '%s' '{"description":"분해 A","requestShape":"background","finished":true}' > "$WSD/agent-a1.meta.json"; : > "$WSD/agent-a1.jsonl"
+printf '%s' '{"description":"조사 B","requestShape":"background"}' > "$WSD/agent-a2.meta.json"; : > "$WSD/agent-a2.jsonl"
+printf '%s' '{"description":"앞에서 끝남","requestShape":"foreground","finished":true}' > "$WSD/agent-a3.meta.json"
+printf '%s' '{"description":"중단됨","requestShape":"background"}' > "$WSD/agent-a4.meta.json"; : > "$WSD/agent-a4.jsonl"
+printf '%s\n' '<task-id>a4</task-id><status>killed</status>' >> "$T/home/.claude/projects/-x/$WSID.jsonl"; touch -t 202601010000 "$WSD/agent-a4.jsonl"
+LWQ="$SB/wq.log"; run2 CLAUDE_CODE_SESSION_ID=$WSID -- bash "$BIN" inbox-subscribe --session $WSID "$LWQ"; printf 'a\nb\nc\n' >> "$LWQ"; echo 1 > "$LWQ.cursor"
+run2 CLAUDE_CODE_SESSION_ID=$WSID HERDR_PANE_ID= -- bash "$BIN" wait-status
+[ "$RC" = 0 ] && printf '%s\n' "$OUT" | grep -q "^서브에이전트"$'\t'"분해 A \[a1\]"$'\t'"완료"$'\t' && printf '%s\n' "$OUT" | grep -q "^서브에이전트"$'\t'"조사 B \[a2\]"$'\t'"진행 중" \
+  && ! printf '%s\n' "$OUT" | grep -qF '앞에서 끝남' && ! printf '%s\n' "$OUT" | grep -qF '중단됨' \
+  && printf '%s\n' "$OUT" | grep -qF "받은편지함"$'\t'"$LWQ"$'\t'"미처리 2"$'\t'"#2~#3" && printf '%s\n' "$OUT" | tail -1 | grep -q "^합계"$'\t'"대기 2"$'\t'"완료 1"$'\t' \
+  && ok wait-status-measure "서브에이전트 완료·진행/foreground·중단 제외/미처리 2줄/합계" || bad wait-status-measure "측정 4칸" "rc=$RC $(printf '%s' "$OUT" | tr '\t' '|')"
+run2 -- bash "$BIN" wait-status --bogus; [ "$RC" = 2 ] && ok wait-status-usage "알 수 없는 인자 → 2" || bad wait-status-usage 2 "$RC"
 # 받은편지함 케이스 이름 — 하나라도 PASS로 실행되지 않으면 FAIL(하니스 전제: 지운 시험이 조용히 빠지지 않게)
 INBOX_OLD="
   inbox-send inbox-format inbox-raw inbox-raw-notime inbox-4000-ok inbox-no-truncate inbox-4000-multibyte

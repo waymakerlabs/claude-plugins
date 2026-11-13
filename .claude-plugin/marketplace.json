@@ -152,7 +152,7 @@
     },
     {
       "name": "auto-chain",
-      "version": "2.9.0",
+      "version": "2.10.0",
       "description": "Milestone → wave → task autonomous execution for large multi-session work. Opus plans, GPT-6.1 Sol reviews (codex CLI via a common review runner), Claude workers implement in parallel, and a lean coordinator session per milestone integrates, verifies and hands off to the next milestone. Workers run in three tiers: Claude Agent subagents by default, headless one-shot runs for other CLIs and reviews, and side-pane sessions (via the tool-neutral agent-orchestrator in tools/) only for watched work, planners that outlive a handoff, and milestone handoffs. Per-project hooks via .claude/autonomous-chain.md. Requires the Codex CLI for reviews; side panes need agent-orchestrator and a supported tool.",
       "author": {
         "name": "waymakerlabs",
@@ -178,7 +178,7 @@
     },
     {
       "name": "review-chain",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "description": "QC follow-up chain: one OC session takes the user's QC findings into a queue, spawns worker sessions (one per discussion-type feature, one bundled worker for small non-overlapping fixes) in their own git worktrees, checks file-scope conflicts before work starts, serializes merges, and owns shared files (version, release notes, progress ledger, external trackers). The user talks to workers directly in their tabs/panes; workers report to whichever OC is current via an indirection file, so the OC can be replaced when its context fills. Uses the tool-neutral agent-orchestrator in tools/.",
       "author": {
         "name": "waymakerlabs",

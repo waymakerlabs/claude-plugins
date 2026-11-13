@@ -25,6 +25,7 @@
 #   agent-keys <이름|pane> <키>                     키 보내기(Escape 등)
 #   pane-run <pane> <셸 문자열>                     pane에서 명령 실행
 #   close <pane>                                    pane 닫기
+#   pane-swap <pane> <pane>                         두 pane 자리 맞바꿈(인계 뒤 새 조정자를 왼쪽 자리로)
 #   list --agents|--panes                           줄마다 <id>\t<이름>\t<상태>
 #
 # 받은편지함(백엔드 결정 전에 처리 — herdr 밖·backend=none에서도 동작. 구현 lib/inbox.sh):
@@ -42,6 +43,8 @@
 #   inbox-wait                                      훅 전용(stdin 훅 JSON). 0 / 2 깨움(stderr) / 4 JSON·인자 오류
 #   inbox-wait --status|--drain|--undrain           "inbox-wait 2" / TERM 보낸 수 / 빈 출력
 #   inbox-wait --session-start                      옛 래퍼 호환용 무동작(stdin 버림, 빈 출력, 0)
+#   wait-status [--session <sid>]                   이 세션이 기다리는 것(서브에이전트·같은 탭 pane·미처리 받은편지함)
+#                                                   줄마다 종류\t이름\t상태\t근거 + 합계 줄. 구현 lib/wait-status.sh
 #                                                   구현 lib/inbox-wait.sh(계획 2026-11-11-inbox-simplify §2·§3·§10)
 #   받은편지함 종료 코드: 0 / 2 인자·대상 형식 / 4 기록·잠금·ack 실패
 #
@@ -74,10 +77,15 @@ usage() { ao_die 2 "$*  (사용법: $AO_HOME/bin/agent-orchestrator 머리 주�
 
 # ── 0. 받은편지함 동작: 백엔드와 무관(herdr 밖·backend=none·백엔드 고장에서도 동작) → 여기서 처리하고 끝
 case "${1:-}" in
-  inbox-send|inbox-watch|inbox-subscribe|inbox-wait)
+  inbox-send|inbox-watch|inbox-subscribe|inbox-wait|wait-status)
     [ -f "$AO_HOME/lib/inbox.sh" ] || ao_die 12 "lib/inbox.sh 없음: $AO_HOME/lib/inbox.sh"
     # shellcheck source=/dev/null
     . "$AO_HOME/lib/inbox.sh" || ao_die 12 "lib/inbox.sh 로딩 실패"
+    if [ "$1" = wait-status ]; then
+      # shellcheck source=/dev/null
+      . "$AO_HOME/lib/wait-status.sh" || ao_die 12 "lib/wait-status.sh 로딩 실패"
+      shift; ao_wait_status "$@"; exit $?
+    fi
     if [ "$1" = inbox-subscribe ] || [ "$1" = inbox-wait ]; then
       [ -f "$AO_HOME/lib/inbox-wait.sh" ] || ao_die 12 "lib/inbox-wait.sh 없음"
       # shellcheck source=/dev/null
@@ -212,6 +220,9 @@ case "$OP" in
   close)
     [ $# = 1 ] || usage "close <pane id>"
     need_pane "$1"; ARGS=("$1") ;;
+  pane-swap)
+    [ $# = 2 ] || usage "pane-swap <pane id> <pane id>"
+    need_pane "$1"; need_pane "$2"; ARGS=("$1" "$2") ;;
   list)
     [ $# = 1 ] || usage "list --agents|--panes"
     case "$1" in --agents) ARGS=(agents) ;; --panes) ARGS=(panes) ;; *) usage "list --agents|--panes: $1" ;; esac ;;

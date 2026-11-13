@@ -9,7 +9,8 @@
 # 주의: $(…) 안에서 ao_die 하면 서브셸만 끝난다. 그래서 값을 받는 줄은 모두 `|| exit $?`로 코드를 올린다.
 # shellcheck shell=bash
 
-AO_HERDR_MAX_RIGHT=${AGENT_ORCHESTRATOR_MAX_RIGHT:-5}
+# (2026-11-13) 기본 제한 없음: 부모 탭 안 오른쪽 열에 계속 쌓는다(탭 하나 = 체인 하나). 숫자를 주면 넘침 탭 사용
+AO_HERDR_MAX_RIGHT=${AGENT_ORCHESTRATOR_MAX_RIGHT:-999}
 # 오른쪽 열이 찼을 때 쓰는 탭 이름(한글). 호출자(auto-chain 등)가 덮어쓸 수 있다
 AO_HERDR_OVERFLOW_TAB=${AGENT_ORCHESTRATOR_OVERFLOW_TAB:-[WO] 작업 넘침}
 
@@ -332,6 +333,9 @@ op_agent_keys() { hd_must agent send-keys "$1" "$2"; }
 op_pane_run() { hd_must pane run "$1" "$2"; }
 
 op_close() { hd_must pane close "$1"; }
+
+# pane-swap <a> <b> — 두 pane 자리 맞바꿈(인계: 새 조정자를 왼쪽 부모 자리로)
+op_pane_swap() { hd_must pane swap --source-pane "$1" --target-pane "$2"; }
 
 # ───────── list agents|panes → <id>\t<이름>\t<상태>  (빈 값은 '-')
 AO_ROW_PY='def row(*xs):

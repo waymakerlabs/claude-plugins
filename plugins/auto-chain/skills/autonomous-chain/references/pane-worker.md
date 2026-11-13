@@ -40,10 +40,11 @@ ROLE=chain-worker "$S" "$NAME" <sonnet|opus> <low|medium|high|xhigh> "<지시서
 - `effort=`는 **요청값 그대로**다. 실제 적용값은 화면 표시(`Sonnet 5.5 [medium]` 등)를 `"$AO" agent-read "$NAME" --lines 30`로 1회 확인해 함께 적는다.
 - `status=done|idle`은 첫 지시 뒤 이미 끝난 **빠른 완료**다. 실패가 아니다 — 바로 보고서를 회수한다(§5).
 - 종료 코드: 2 인자·전제 / 3 이름 중복 / 4 배치 / 5 `agent-start`(대개 준비 안 됨) / 6 첫 지시 실패·첫 지시 뒤 `blocked`/`unknown`·이중 기동 / **10·11·12는 agent-orchestrator의 코드를 같은 값 그대로** 전달한다 → §0대로 ①·②. 4 이후 실패면 만든 pane은 닫지 않고 id를 출력한다. §6으로 간다.
-- 환경 변수: `ROLE`(기본 `chain-worker`), `PERM_FLAGS`(비우면 조정자 claude 프로세스 — `argv[0]` 이름이 정확히 `claude`인 조상 — 의 실제 argv 원소에 `--dangerously-skip-permissions`가 있을 때만 붙인다. `ps args` 문자열은 인자 경계를 잃어 쓰지 않는다), `TAB_LABEL`(넘침 탭 이름, 기본 `[WO] 자율체인 작업`), `PANE_LABEL`(기본 `[WO] 작업자 <name>` — 역할 접두어 + 한글), `AGENT_ORCHESTRATOR`(진입점 경로).
+- 환경 변수: `ROLE`(기본 `chain-worker`), `PERM_FLAGS`(비우면 조정자 claude 프로세스 — `argv[0]` 이름이 정확히 `claude`인 조상 — 의 실제 argv 원소에 `--dangerously-skip-permissions`가 있을 때만 붙인다. `ps args` 문자열은 인자 경계를 잃어 쓰지 않는다), `TAB_LABEL`(어댑터의 넘침 탭 이름 환경 변수. (2.10.0) 어댑터 기본이 바뀌어 pane 개수 제한이 없으므로 넘침 탭은 기본으로 생기지 않는다. 평소에는 쓰이지 않는다), `PANE_LABEL`(기본 `[WO] 작업자 <name>` — 역할 접두어 + 한글), `AGENT_ORCHESTRATOR`(진입점 경로).
   - `ROLE` 해석: `none` → `--agent` 없음 / `:` 포함(`auto-chain:chain-worker-deep`) → 그대로 / `$PWD/.claude/agents/<ROLE>.md`가 있으면 프로젝트 정의 이름 / 그 밖 → `auto-chain:<ROLE>`.
   - `--agent` 적용 여부는 화면 표시로 입증되지 않는다. 역할 규칙(도구 제한·금지 사항)은 지시서에도 함께 적는다.
-- **이름 규칙**: 탭·pane 이름은 역할 접두어 + 한글 — `[OC]` 오케스트레이터·조정자, `[WO]` worker, `[RV]` 리뷰어, 단계는 이름 본문에(예: `[OC] 헬프AI M1-12`, `[WO] 작업 넘침`). 조정자는 착수 때 `"$AO" self-name "[OC] <한글>" "[OC] <한글>"`을 한 번 실행한다(비었거나 숫자만인 툴 기본 번호는 그대로 바꾸고, 이미 `[XX]` 접두어가 있으면 유지하며, 사용자가 붙인 이름은 본문을 두고 접두어만 붙인다. 주제가 바뀌어 이 세션이 붙인 이름을 바꿀 때만 `self-name --force`(사용자가 붙인 대상은 `-`로 건너뜀). 현재 이름 확인은 `"$AO" whoami --field tab-label|pane-label`). 에이전트 이름은 `[a-z][a-z0-9_-]{0,31}`.
+- **창 배치 (2.10.0)**: 탭 하나는 체인 하나다. 처음 시작하는 체인 세션만 새 탭에서 열고, 조정자가 띄우는 worker·RV(`pane-open --parent`)와 마일스톤 인계로 뜨는 다음 조정자(§8)는 모두 **같은 탭의 pane**이다. 부모는 왼쪽, 자식은 오른쪽에 놓인다. pane 개수에는 제한이 없다.
+- **이름 규칙**: 탭·pane 이름은 역할 접두어 + 한글 — `[OC]` 오케스트레이터·조정자, `[WO]` worker, `[RV]` 리뷰어, 단계는 이름 본문에(예: `[OC] 헬프AI M1-12`, `[WO] 작업자 T03`). 조정자는 착수 때 `"$AO" self-name "[OC] <한글>" "[OC] <한글>"`을 한 번 실행한다(비었거나 숫자만인 툴 기본 번호는 그대로 바꾸고, 이미 `[XX]` 접두어가 있으면 유지하며, 사용자가 붙인 이름은 본문을 두고 접두어만 붙인다. 주제가 바뀌어 이 세션이 붙인 이름을 바꿀 때만 `self-name --force`(사용자가 붙인 대상은 `-`로 건너뜀). 현재 이름 확인은 `"$AO" whoami --field tab-label|pane-label`). 에이전트 이름은 `[a-z][a-z0-9_-]{0,31}`.
 - `--cwd`는 조정자의 `$PWD`(신뢰된 폴더)다. 대상 리포가 다르면 지시서에 리포 절대 경로를 적고 worker가 `git -C <리포>`·절대 경로로 일한다.
 
 ## 3. 모델·effort
@@ -154,19 +155,19 @@ pid=$(sed -n 's/^RUN [^ ]* pid=\([0-9]*\).*/\1/p' "$DONE.run")   # 파일이 생
 
 ## 8. 마일스톤 인계
 
-다음 마일스톤 조정자를 **새 탭**에 띄운다(조정자는 크게 보여야 한다).
+(2.10.0) 다음 마일스톤 조정자는 새 탭이 아니라 **같은 탭의 pane**으로 띄운 뒤, 성공을 확인하고 왼쪽 부모 자리를 이어받게 한다. 탭 하나가 체인 하나다.
 
 ```bash
-ROOT=$("$AO" tab-open "[OC] <짧은 한글 이름> M<n+1>")          # 예: "[OC] 헬프AI M1-12". 포커스 이동 없음
+N=$("$AO" pane-open "[OC] <짧은 한글 이름> M<n+1>" --parent "$("$AO" whoami)")   # 예: "[OC] 헬프AI M1-12". 같은 탭, 부모 오른쪽
 NEXT="<chain-id 줄임>-m<n+1>"
-"$AO" agent-start "$NEXT" "$ROOT" --kind claude -- <현재 조정자와 같은 플래그(--model·--effort·권한 모드)>
+"$AO" agent-start "$NEXT" "$N" --kind claude -- <현재 조정자와 같은 플래그(--model·--effort·권한 모드)>
 "$AO" agent-send "$NEXT" "<상태 파일 절대 경로>와 <인계 문서 절대 경로>를 읽고 auto-chain 스킬로 M<n+1>을 진행해. 부모 조정자 pane: $("$AO" whoami)" --confirm
-# stdout working|done = 인계 증거
+# stdout working|done = 인계 증거. 자리 바꾸기(pane-swap)는 새 조정자가 착수 때 한다(아래 "부모 정리")
 ```
 
 - 조정자 플래그는 `ps -o args= -p $PPID`에서 그대로 가져온다.
 - 프롬프트는 줄바꿈 없는 한 줄(줄바꿈이면 2), 문서가 진본이고 프롬프트는 포인터다.
 - **인계 순서(2.8.0, 2.9.0 4단계)**: ① 옛 조정자가 진행 중 처리를 끝내거나 되돌리고 **실제로 처리한 마지막 번호까지만** `"$AO" inbox-watch --ack "$IB/coordinator.log" <n>`한다(답하지 않은 줄은 ack하지 않는다) ② `"$AO" inbox-subscribe --unsubscribe "$IB/coordinator.log"`(Monitor로 받고 있었으면 TaskStop) ③ 인계 문서에 받은편지함 경로와 마지막 처리 번호 <n>을 적고 **그 뒤에** 위 첫 지시를 보낸다 ④ 새 조정자는 착수 때 같은 `coordinator.log`를 `inbox-subscribe`한 뒤 `--pending`으로 n+1부터 처리한다.
-- **`agent-send`는 인계 시도당 1회, 재전송 금지.** 응답을 잃었거나 결과가 불명확해도 `$NEXT` 입력창에 다시 보내지 않는다. `agent-status`·transcript로 착수를 1회 확인하고, 착수 안 됐으면 그 탭을 `"$AO" close`한 뒤 `"$AO" list --panes`에서 사라진 것을 확인한 **뒤에만** 새 탭·새 이름(`agent-start` 재기동은 새 세션이라 허용)으로 다시 띄운다. 닫기를 확인하지 못했거나 그래도 실패하거나 10·11·12면 인계 문서만 남기고 다음 세션 시작 명령 한 줄을 사용자에게 보고한다.
-- 인계 문서에 부모 pane id(`whoami`)와 탭 id(`whoami --field tab`)를 적는다.
-- **부모 정리는 child가 한다**: 상태·인계 문서를 읽은 직후, 첫 착수 전에 부모 탭의 worker가 모두 닫혔는지(`"$AO" list --panes`) 보고 `"$AO" close <부모 pane>`. 부모 탭에 사용자가 쓰던 다른 pane이 있으면 부모 pane만 닫는다. 결과를 상태 파일에 적는다. 닫기 실패는 무시하고 진행하되, 부모가 아직 `working`이면 편집 소유자가 둘일 수 있으니 질문 대기열에 올리고 부모가 고치던 파일은 건드리지 않는다.
+- **`agent-send`는 인계 시도당 1회, 재전송 금지.** 응답을 잃었거나 결과가 불명확해도 `$NEXT` 입력창에 다시 보내지 않는다. `agent-status`·transcript로 착수를 1회 확인하고, 착수 안 됐으면 그 pane을 `"$AO" close`한 뒤 `"$AO" list --panes`에서 사라진 것을 확인한 **뒤에만** 새 pane·새 이름(`agent-start` 재기동은 새 세션이라 허용)으로 다시 띄운다. 닫기를 확인하지 못했거나 그래도 실패하거나 10·11·12면 인계 문서만 남기고 다음 세션 시작 명령 한 줄을 사용자에게 보고한다.
+- 인계 문서에 부모 pane id(`whoami`)와 탭 id(`whoami --field tab`)를 적는다(2.10.0: 부모와 child는 같은 탭이다).
+- **자리 바꾸기와 부모 정리는 child가 한다**(2.10.0, 순서 고정): 상태·인계 문서를 읽은 직후, 첫 착수 전에 ① `"$AO" pane-swap "$("$AO" whoami)" <부모 pane>`으로 왼쪽 부모 자리를 이어받고(실패는 무시) ② 그 뒤에 부모 탭의 worker가 모두 닫혔는지(`"$AO" list --panes`) 보고 `"$AO" close <부모 pane>`. 옛 조정자는 첫 지시를 보낸 뒤 자리를 바꾸거나 닫지 않는다(두 세션이 같은 pane을 동시에 다루지 않게). 탭에 사용자가 쓰던 다른 pane이 있으면 부모 pane만 닫는다. 결과를 상태 파일에 적는다. 닫기 실패는 무시하고 진행하되, 부모가 아직 `working`이면 편집 소유자가 둘일 수 있으니 질문 대기열에 올리고 부모가 고치던 파일은 건드리지 않는다.

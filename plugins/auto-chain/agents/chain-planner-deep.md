@@ -24,4 +24,6 @@ effort: xhigh
 - 그 결정에 걸린 기술 전제는 작은 probe나 공식 계약 확인으로 먼저 해소하고, 해소하지 못한 전제는 `unverified`로 표시해 첫 마일스톤의 첫 task로 확인하게 한다.
 - 해당 task는 고위험(`high-risk: yes`)으로 표시한다.
 
+- (2.10.0) 지시서에 조정자 받은편지함 경로가 있으면 반환 직전(산출 파일을 다 쓴 뒤) 완료 한 줄을 `"${AGENT_ORCHESTRATOR:-$HOME/.local/bin/agent-orchestrator}" inbox-send <그 경로> "[planner <이름>] done <산출 파일 경로> <한 줄>"`로 한 번 보낸다. 실패(2·4)해도 다시 시도하지 않고 그대로 반환한다. `unwatched`면 반환값에 `미감시 전송`을 덧붙인다. 완료 알림이 유실되거나 조정자 턴 도중 도착해도 조정자가 깨어나게 하기 위해서다.
+
 반환은 계획 문서 경로, `review` 판정, 마일스톤 수, blocking 유무를 3줄 이내로 합니다.

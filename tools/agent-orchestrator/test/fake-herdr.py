@@ -135,6 +135,13 @@ if g == "agent":
 if g == "pane":
     if a == "list":
         ok({"panes": [p for p in st["panes"] if p["pane_id"].startswith(opt("--workspace", "") + ":")]})
+    if a == "swap":
+        x, y = find_pane(opt("--source-pane")), find_pane(opt("--target-pane"))
+        if not x or not y:
+            err("pane_not_found")
+        x["rect"], y["rect"] = y["rect"], x["rect"]
+        save()
+        ok({"ok": True})
     p = find_pane(argv[2] if len(argv) > 2 else opt("--pane"))
     if a == "layout":
         p = find_pane(opt("--pane"))

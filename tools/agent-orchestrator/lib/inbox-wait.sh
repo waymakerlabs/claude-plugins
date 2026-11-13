@@ -158,6 +158,13 @@ _aoiw_last_text() {
       $last = $t if $t =~ /\S/ }
     print $last;'
 }
+# 마지막 답의 끝맺음(줄 머리 표식 기준): waitlist("대기 목록 (N):"이 마지막 표식) | none("대기 없음"이 더 뒤) | other
+_aoiw_ending() {
+  printf '%s' "$1" | "$AO_PERL" -e 'local $/; my $t = <STDIN>; my $w = -1; my $z = -1;
+    # 줄 머리의 표식만 센다(문장 속 언급·목록 항목 안의 "대기 없음"은 무시)
+    while ($t =~ /(?:^|\n)[ \t>*]*대기 목록 \([0-9]+\):/g) { $w = pos $t } while ($t =~ /(?:^|\n)[ \t>*]*대기 없음 —/g) { $z = pos $t }
+    print $w > $z ? "waitlist" : $z >= 0 ? "none" : "other"'
+}
 _aoiw_stall_due() {
   local t c n s txt k="$_AOW_WAIT/$_W_KEY.stall" rx
   _W_STALL=""
@@ -173,9 +180,18 @@ _aoiw_stall_due() {
     _W_STALL="[inbox] 멈춤 점검 — 안 읽은 받은편지함 줄이 남아 있다. \"$AO_HOME/bin/agent-orchestrator\" inbox-watch --pending <대상> 으로 읽고 처리한 뒤 --ack 하라. 처리했으면 --ack 만, 사람 결정이 필요하면 사용자에게 바로 알려라"$'\n'"$_W_STALL"
     return 0
   fi
-  [ "$(_aoi_num "$k")" -ge 1 ] && return 1
-  txt=$(_aoiw_last_text | tail -c 6000)
+  [ "${_W_ONLY:-}" = unacked ] && return 1
+  txt=$_W_TXT
   [ -n "$txt" ] || return 1
+  # "대기 없음 — … 닫아도 됩니다"로 끝난 턴은 정상 종료다
+  [ "$_W_END" = none ] && return 1
+  # ③ 대기 목록으로 끝난 턴 → 대기 점검. 1회 제한 없이 되풀이(간격은 _aoiw_main 이 고른다)
+  if [ "$_W_END" = waitlist ]; then
+    { date +%s > "$_AOW_WAIT/$_W_KEY.wl"; } 2>/dev/null
+    _W_STALL="[inbox] 대기 점검 — 먼저 \"$AO_HOME/bin/agent-orchestrator\" wait-status 를 실행하라(서브에이전트·같은 탭 pane·미처리 받은편지함을 측정). 완료가 있으면 그것부터 회수하고, 마지막 답의 다른 항목(보고서 진행 줄 등)도 다시 확인하라. 끝난 것은 이어 가고, 바뀐 것만 짧게 보고하고, pane 이름을 갱신한 뒤 새 대기 목록으로 끝내라. 더 기다릴 것이 없으면 \"대기 없음 — 이 세션은 닫아도 됩니다\"로 끝내라"
+    return 0
+  fi
+  [ "$(_aoi_num "$k")" -ge 1 ] && return 1
   printf '%s' "$txt" | tail -c 80 | grep -qE '(\?|까요|할지|주세요|주십시오)[[:space:]*)]*$' && return 1
   printf '%s' "$txt" | tail -c 300 | grep -qE '원하시면|말씀해 주시면|정해 주시면|정해 주십시오|결정하실' && return 1
   rx='이어서|이어 가|이어가|진행하겠|진행 ?중|착수하겠|들어가겠|들어갑니다|띄우겠|기다리|기다립|대기 중|대기하|회수 대기|(오면|끝나면|되면|마치면|돌아오면) [^.]{0,60}(하겠|합니다|갑니다|확인|병합)|[Ww]aiting|[Rr]esuming|[Ww]ill (continue|resume)'
@@ -190,7 +206,7 @@ _aoiw_stall_wake() {
 }
 _aoiw_main() {
   local js pf ls prev="" start max=${AO_INBOX_WAIT_MAX:-7000} poll=${AO_INBOX_WAIT_POLL:-1} t b n ep
-  local stall=${AO_INBOX_STALL:-600} stall_at=""
+  local stall=${AO_INBOX_STALL:-600} stall_at="" wl_every wl_at=""
   [ -e "$AO_INBOX_DIR/hooks.off" ] && exit 0
   js=$(_aoiw_json) || exit 4
   IFS=$'\t' read -r _W_SID _W_HOOK _W_TP _W_HUMAN <<< "$js"
@@ -199,7 +215,14 @@ _aoiw_main() {
   if [ -n "$ep" ] && ao_is_pane "$ep"; then _W_KEY="pane-${ep//:/_}"; else _W_KEY="sid-$_W_SID"; fi
   _aoiw_sync; [ -n "$_W_TGTS" ] || exit 0
   # 사람이 입력했으면 "연속 1회" 멈춤 점검 표식을 푼다(깨움 통지로 들어온 UserPromptSubmit 은 아님 — 10분마다 되풀이 방지)
-  [ "$_W_HOOK" = UserPromptSubmit ] && [ "$_W_HUMAN" = 1 ] && rm -f "$_AOW_WAIT/$_W_KEY.stall" 2>/dev/null
+  [ "$_W_HOOK" = UserPromptSubmit ] && [ "$_W_HUMAN" = 1 ] && rm -f "$_AOW_WAIT/$_W_KEY.stall" "$_AOW_WAIT/$_W_KEY.wl" 2>/dev/null
+  # 이번 턴의 끝맺음을 등록 때 한 번 판정한다. 대기 목록 턴이 이어질 때만 다음 점검을 30분 뒤로 미룬다
+  #   (멈춤·미처리 점검은 늘 AO_INBOX_STALL 간격 — 앞 턴의 .wl 이 늦추지 않는다)
+  _W_TXT=""; _W_END=other
+  if [ "$_W_HOOK" = Stop ] && [ -f "$_W_TP" ]; then _W_TXT=$(_aoiw_last_text); _W_END=$(_aoiw_ending "$_W_TXT"); _W_TXT=$(printf '%s' "$_W_TXT" | tail -c 6000); fi
+  wl_every=$stall
+  if [ "$_W_END" = waitlist ]; then [ -e "$_AOW_WAIT/$_W_KEY.wl" ] && wl_every=${AO_INBOX_WAITLIST_EVERY:-1800}
+  elif [ "$_W_HOOK" = Stop ]; then rm -f "$_AOW_WAIT/$_W_KEY.wl" 2>/dev/null; fi
   # 등록(§3 5번): 앞 대기자를 읽어 두고 내 표식을 쓴 뒤, 살아 있고 lstart 가 맞으면 TERM(기다리지 않음)
   mkdir -p "$_AOW_WAIT" 2>/dev/null || exit 4
   pf="$_AOW_WAIT/$_W_KEY.pid"; ls=$(_aoi_lstart $$); _W_TOK="w$$-$RANDOM$RANDOM-$(date +%s)"
@@ -209,7 +232,11 @@ _aoiw_main() {
   _aoiw_pause registered
   start=$(date +%s)
   # 멈춤 점검은 Stop 대기자만(턴 도중인 UserPromptSubmit 대기자는 아님). 0 이면 끔
-  if [ "$_W_HOOK" = Stop ] && [ "$stall" -gt 0 ] 2>/dev/null && [ -f "$_W_TP" ]; then stall_at=$((start + stall)); fi
+  if [ "$_W_HOOK" = Stop ] && [ "$stall" -gt 0 ] 2>/dev/null && [ -f "$_W_TP" ]; then
+    stall_at=$((start + stall))
+    # 대기 목록 턴: 미처리 줄 점검은 stall_at(10분), 대기 점검은 wl_at(첫 회 10분, 이어지면 30분)
+    [ "$_W_END" = waitlist ] && wl_at=$((start + wl_every))
+  fi
   while :; do
     [ -e "$AO_INBOX_DIR/hooks.off" ] && exit 0
     [ "$(awk '{print $NF; exit}' "$pf" 2>/dev/null)" = "$_W_TOK" ] || exit 0
@@ -221,10 +248,16 @@ _aoiw_main() {
     done <<< "$_W_BASE"
     [ -n "$_W_DUE" ] && _aoiw_wake
     if [ -n "$stall_at" ] && [ "$(date +%s)" -ge "$stall_at" ]; then
-      stall_at=""; _aoiw_stall_due && _aoiw_stall_wake "$stall"
+      stall_at=""; _W_ONLY=""; [ -n "$wl_at" ] && _W_ONLY=unacked
+      _aoiw_stall_due && _aoiw_stall_wake
+    fi
+    if [ -n "$wl_at" ] && [ "$(date +%s)" -ge "$wl_at" ]; then
+      wl_at=""; _W_ONLY=""; _aoiw_stall_due && _aoiw_stall_wake
     fi
     # 만료(§10-3): 대상이 있으므로 exit 2 로 깨워 다음 Stop 에서 대기자가 다시 뜨게 한다
     if [ $(( $(date +%s) - start )) -ge "$max" ]; then
+      # "대기 없음"으로 끝낸 세션은 조용히 끝낸다(닫아도 되는 세션을 2시간마다 깨우지 않는다)
+      [ "$_W_END" = none ] && exit 0
       trap '' TERM; echo "[inbox] 대기 만료(재등록) — 새 메시지 없음. 할 일 없으면 아무 말 없이 쉬어라" >&5; exit 2
     fi
     sleep "$poll" & _W_BG=$!; wait "$_W_BG"; _W_BG=""

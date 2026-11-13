@@ -16,6 +16,7 @@
 
 ## 핵심 규칙
 
+- (2.10.0) ① 창 배치: 처음 시작하는 체인 세션만 새 탭이고, worker·RV와 마일스톤 인계로 뜨는 다음 조정자는 같은 탭의 pane입니다(`pane-open --parent`, 새 조정자가 착수 때 `pane-swap`으로 왼쪽 자리를 이어받은 뒤 옛 조정자를 닫음). pane 개수 제한이 없어 넘침 탭은 기본으로 생기지 않고, 탭 하나가 체인 하나입니다. ② 「대기 목록과 끝맺음」: 무언가 기다리며 턴을 끝낼 때 항목마다 실제 상태를 확인한 `대기 목록 (N):`을 답 끝에 두고, 훅 대기자가 10분 뒤 한 번·그 뒤 30분마다 "대기 점검"으로 깨웁니다(2026-11-12 editor-parity에서 planner 완료 알림을 받고도 "아직 돌고 있다"고 끝낸 사례). ③ `chain-planner`·`chain-planner-deep`도 반환 직전 `[planner <이름>] done <산출 파일> <한 줄>`을 조정자 받은편지함에 보내고, 조정자는 planner 지시서에 그 경로를 넣습니다.
 - (2.9.0) 받은편지함 훅 대기자를 단순화(재통지·전달 확인·세대·sweep 삭제). 중복 깨움은 --ack 만으로 견딘다. 인계 순서는 ① 처리한 마지막 번호까지 `--ack` ② `inbox-subscribe --unsubscribe`(Monitor면 TaskStop) ③ 인계 문서에 받은편지함 경로·마지막 처리 번호 ④ 새 조정자가 `inbox-subscribe` 뒤 `--pending`의 4단계입니다.
 - (2.8.1) 완료 알림 유실 대비: ① `Agent` worker도 반환 직전 조정자 받은편지함에 `[worker <task-id>] done|failed <보고서>` 한 줄을 보내고, 조정자는 완료 알림·받은편지함 줄·진행 감시 `완료` 중 먼저 온 것으로 회수합니다. 진행 감시 스크립트는 고쳐 쓰지 않고, 다시 띄운 직후 각 보고서 `- 진행:` 줄을 직접 읽어 이미 끝난 task를 회수합니다(2026-11-11 회수 지연 4시간·1시간 20분 사례).
 - (2.8.0) 받은편지함 감시를 Monitor에서 `inbox-hooks` 구독으로 바꿨습니다. 받는 쪽은 받은편지함이 정해진 직후 `agent-orchestrator inbox-subscribe <받은편지함>`을 한 번 하고(조정자는 상태 파일을 만든 직후), 새 줄이 오면 쉬는 세션이 훅으로 깨어납니다. `inbox-hooks`는 dependency라 auto-chain과 함께 자동 설치·켜집니다. 인계 순서는 2.9.0 항목의 4단계이고, `inbox-send`가 `unwatched`를 내면 보고서·상태 파일에 `미감시 전송` 한 줄을 남깁니다. `spawn-pane-worker.sh`는 부모 pane에 감시가 없으면 경고와 `parent_watch=none`을 냅니다(기동은 계속). Codex·OpenCode·kiro-cli처럼 훅이 없는 도구는 Monitor `inbox-watch`를 그대로 씁니다.
