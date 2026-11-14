@@ -137,8 +137,10 @@ b = [p for p in ps if p["pane_id"] == E["AO_BASE"]]
 if not b:
     R = "missing"
 else:
-    bx = b[0]["rect"]["x"]
-    right = [p for p in ps if p["rect"]["x"] > bx]
+    # 오른쪽 영역 = 탭 맨 왼쪽 열(부모)보다 x 가 큰 pane 전부. 기준 pane 이 오른쪽 영역 안에 있어도(자식 조정자가 또 띄울 때)
+    # 새 열을 만들지 않고 오른쪽 영역 안에서 아래로 쌓는다 — 탭은 왼쪽 부모 열 + 오른쪽 세로 쌓기 한 열(2026-11-14 주인님 요청)
+    left = min(p["rect"]["x"] for p in ps)
+    right = [p for p in ps if p["rect"]["x"] > left]
     if not right:
         R = "right " + E["AO_BASE"]
     elif len(right) >= int(E["AO_LIMIT"]):

@@ -21,7 +21,7 @@ mkdir -p "$FAKE" "$NOHERDR" "$FD" "$T/home"
 REAL_HOME=$HOME; touch "$T/stamp"
 REAL_EV="$REAL_HOME/.local/state/agent-orchestrator/inbox/events.log"; REAL_EV_SZ=$(wc -c < "$REAL_EV" 2>/dev/null | tr -d ' '); REAL_EV_SZ=${REAL_EV_SZ:-0}
 cp "$HERE/fake-herdr.py" "$FAKE/herdr"; chmod +x "$FAKE/herdr"
-EXPECT=275
+EXPECT=277
 
 PASS=0; FAIL=0
 # 여러 줄 값은 ⏎로 이어 한 줄 한 케이스를 지킨다
@@ -153,6 +153,12 @@ called "tab create --workspace w1 --cwd $T --label [WO] 작업 넘침 --no-focus
 run AGENT_ORCHESTRATOR_MAX_RIGHT=5 -- bash "$BIN" pane-open "작업자 7" --cwd "$T"; chk pane-open-overflow-reuse 0 w1:p7
 ao pane-open "작업자 8" --parent w1:p99 --cwd "$T"; chk pane-open-missing-parent 3
 # (2026-11-13) 기본은 제한 없음: 6번째도 같은 탭 오른쪽 열(넘침 탭 없음)
+# 기준 pane 이 오른쪽 영역이어도 새 열을 만들지 않고 오른쪽에서 아래로 쌓는다(2026-11-14 — 탭 = 왼쪽 부모 열 + 오른쪽 한 열)
+reset_state
+ao pane-open "작업자 1" --cwd "$T" >/dev/null
+: > "$FD/calls.log"
+run HERDR_PANE_ID= -- bash "$BIN" pane-open "작업자 2b" --parent w1:p2 --cwd "$T"; chk pane-open-child-parent 0 w1:p3
+grep -q -- "--direction right" "$FD/calls.log" && bad pane-open-child-no-new-column "오른쪽 기준이면 down" "$(grep 'pane split' "$FD/calls.log")" || ok pane-open-child-no-new-column "오른쪽 기준 pane 도 down"
 reset_state; for i in 1 2 3 4 5 6; do ao pane-open "작업자 u$i" --cwd "$T"; done
 [ "$RC" = 0 ] && ! grep -q 'tab create' "$FD/calls.log" && ok pane-open-unlimited "기본 제한 없음 → 6번째도 split·넘침 탭 없음" || bad pane-open-unlimited "split" "rc=$RC $(grep 'tab create' "$FD/calls.log")"
 ao pane-swap w1:p2 w1:p1; [ "$RC" = 0 ] && called "pane swap --source-pane w1:p2 --target-pane w1:p1" && ok pane-swap-args "pane-swap → herdr pane swap --source-pane --target-pane" || bad pane-swap-args "swap" "rc=$RC $ERR"
